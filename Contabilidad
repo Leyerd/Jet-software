@@ -3,56 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JET - Gestión EIRL Importadora</title>
+    <title>JET - ERP Financiero & Tributario</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         
-        :root {
-            --bg-main: #f1f5f9;
-            --bg-card: #ffffff;
-            --text-main: #0f172a;
-            --border-color: #e2e8f0;
-            --accent-blue: #3b82f6;
-        }
+        :root { --bg-main: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --border-color: #e2e8f0; --accent-blue: #3b82f6; }
+        .dark { --bg-main: #020617; --bg-card: #1e293b; --text-main: #f1f5f9; --border-color: #334155; --accent-blue: #60a5fa; }
 
-        .dark {
-            --bg-main: #0f172a;
-            --bg-card: #1e293b;
-            --text-main: #f1f5f9;
-            --border-color: #334155;
-            --accent-blue: #60a5fa;
-        }
-
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: var(--bg-main); 
-            color: var(--text-main);
-            transition: background-color 0.3s, color 0.3s;
-        }
-
-        .sidebar-link.active { background-color: #334155; color: #3b82f6; border-right: 4px solid #3b82f6; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-main); color: var(--text-main); transition: background-color 0.3s, color 0.3s; }
+        .sidebar-link.active { background-color: #334155; color: #60a5fa; border-right: 3px solid #60a5fa; }
         .card { background-color: var(--bg-card); border-radius: 20px; border: 1px solid var(--border-color); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
         .tab-content.hidden { display: none; }
         
-        /* Limpieza de inputs numéricos */
-        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         input[type=number] { -moz-appearance: textfield; }
-
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #64748b; border-radius: 10px; }
+        
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); }
         .btn-jet { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
         .btn-jet:active { transform: scale(0.96); }
-
-        .modal-overlay { background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); }
         .sii-code { font-family: monospace; background: #e2e8f0; padding: 2px 4px; border-radius: 4px; color: #334155; font-size: 0.8em; }
         .dark .sii-code { background: #334155; color: #cbd5e1; }
+        
+        .help-box { border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 0 10px 10px 0; margin-bottom: 1rem; }
+        .dark .help-box { background: rgba(59, 130, 246, 0.2); }
+
+        /* Estilos para etiquetas de proyección */
+        .badge-prediction { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .dark .badge-prediction { background: #0c4a6e; color: #bae6fd; }
     </style>
-    <script>
-        tailwind.config = { darkMode: 'class' }
-    </script>
+    <script> tailwind.config = { darkMode: 'class' } </script>
 </head>
 <body class="flex min-h-screen overflow-hidden">
 
@@ -62,13 +47,16 @@
             <h1 class="text-2xl font-black text-white flex items-center gap-2 tracking-tighter text-left">
                 <i data-lucide="rocket" class="text-blue-500 fill-blue-500/20"></i> JET PRO
             </h1>
-            <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2 text-left">EIRL Auditor Ready</p>
+            <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2 text-left">EIRL Fase 2</p>
         </div>
         
         <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-            <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left">Operaciones</div>
+            <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left">Operativa</div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left">
                 <i data-lucide="layout-grid" class="w-4 h-4"></i> Dashboard
+            </button>
+            <button onclick="switchTab('tesoreria')" id="btn-tesoreria" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left text-emerald-400">
+                <i data-lucide="wallet" class="w-4 h-4"></i> Caja & Bancos
             </button>
             <button onclick="switchTab('movimientos')" id="btn-movimientos" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left">
                 <i data-lucide="activity" class="w-4 h-4"></i> Libro Diario
@@ -77,26 +65,30 @@
                 <i data-lucide="box" class="w-4 h-4"></i> Bodega / Stock
             </button>
             
-            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left">Tributario & Análisis</div>
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left">Inteligencia</div>
+            <!-- NUEVO BOTÓN PROYECCIONES -->
+            <button onclick="switchTab('proyecciones')" id="btn-proyecciones" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left text-purple-400">
+                <i data-lucide="radar" class="w-4 h-4"></i> Proyecciones
+            </button>
             <button onclick="switchTab('resumen-anual')" id="btn-resumen-anual" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left">
-                <i data-lucide="trending-up" class="w-4 h-4 text-left"></i> P&L Anual
+                <i data-lucide="trending-up" class="w-4 h-4"></i> P&L Anual
             </button>
             <button onclick="switchTab('f29')" id="btn-f29" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left text-left">
-                <i data-lucide="file-text" class="w-4 h-4 text-left"></i> F29 Mensual
+                <i data-lucide="file-text" class="w-4 h-4"></i> F29 Mensual
             </button>
             <button onclick="switchTab('f22')" id="btn-f22" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-left text-left text-left">
-                <i data-lucide="landmark" class="w-4 h-4 text-left text-left text-left"></i> Renta F22
+                <i data-lucide="landmark" class="w-4 h-4"></i> Renta F22
             </button>
 
-            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left text-left text-left">Sistema</div>
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest text-left">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-left text-slate-500">
-                <i data-lucide="palette" id="theme-icon" class="w-4 h-4 text-left"></i> Interfaz
+                <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
             </button>
             <button onclick="exportData()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-left text-slate-500">
-                <i data-lucide="download-cloud" class="w-4 h-4 text-left"></i> Exportar Backup
+                <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup Local
             </button>
             <button onclick="document.getElementById('import-file').click()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-left text-slate-500">
-                <i data-lucide="upload-cloud" class="w-4 h-4 text-left"></i> Importar Backup
+                <i data-lucide="upload-cloud" class="w-4 h-4"></i> Importar Backup
             </button>
             <input type="file" id="import-file" class="hidden" accept=".json" onchange="importData(event)">
         </nav>
@@ -113,77 +105,181 @@
     <!-- Main Content -->
     <main class="flex-1 flex flex-col overflow-hidden h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
         
-        <!-- Header -->
         <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-20 shadow-sm transition-colors">
             <div class="flex items-center gap-4 text-left">
                 <span id="tab-title" class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.25em]">Dashboard</span>
             </div>
             <div class="flex items-center gap-8 text-left">
                 <div class="hidden lg:flex flex-col items-end text-right">
-                    <p id="current-date" class="text-[9px] text-slate-400 font-black uppercase tracking-[0.1em] text-right"></p>
+                    <p id="current-date" class="text-[9px] text-slate-400 font-black uppercase tracking-[0.1em]"></p>
                     <div class="flex items-center gap-2 text-right">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight text-right">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span></p>
                     </div>
                 </div>
                 <div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
-                <button onclick="resetApp()" class="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Limpiar Base">
+                <button onclick="resetApp()" class="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Limpiar Base de Datos">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                 </button>
             </div>
         </header>
 
-        <!-- Dynamic Content Area -->
         <section id="content-area" class="flex-1 overflow-y-auto p-8 transition-colors">
             
             <!-- Dashboard -->
             <div id="tab-dashboard" class="tab-content space-y-6">
-                <div id="tax-alerts" class="hidden"></div>
+                <!-- Alertas Inteligentes (NUEVO) -->
+                <div id="smart-alerts" class="hidden grid grid-cols-1 gap-4"></div>
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-6 text-left">
+                    <div class="card p-8 border-b-4 border-emerald-500 bg-emerald-50/50 dark:bg-slate-900">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponible Real</p>
+                                <h3 id="dash-disponible" class="text-2xl font-black text-emerald-600 text-left">$ 0</h3>
+                            </div>
+                            <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600"><i data-lucide="banknote" class="w-5 h-5"></i></div>
+                        </div>
+                        <p class="text-[9px] text-slate-400 font-bold mt-2 uppercase">Caja Total - IVA por Pagar</p>
+                    </div>
+
                     <div class="card p-8 border-b-4 border-blue-600 text-left">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left text-left">Ingresos Netos</p>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left">Ventas Netas (Año)</p>
                         <h3 id="dash-ventas" class="text-2xl font-black text-slate-900 dark:text-white text-left">$ 0</h3>
                     </div>
-                    <div class="card p-8 border-b-4 border-emerald-500 text-left">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left">Utilidad Estimada</p>
-                        <h3 id="dash-utilidad" class="text-2xl font-black text-emerald-600 text-left">$ 0</h3>
-                    </div>
+                    
                     <div class="card p-8 border-b-4 border-indigo-500 text-left">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left text-left text-left">IVA Remanente Acum.</p>
-                        <h3 id="dash-iva-credito" class="text-2xl font-black text-indigo-600 text-left">$ 0</h3>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left">IVA por Pagar (Est.)</p>
+                        <h3 id="dash-iva-pagar" class="text-2xl font-black text-indigo-600 text-left">$ 0</h3>
                     </div>
-                    <div class="card p-8 border-b-4 border-slate-950 dark:border-blue-900 text-left text-left">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left text-left text-left text-left text-left">Capital en Stock</p>
+                    
+                    <div class="card p-8 border-b-4 border-slate-950 dark:border-blue-900 text-left">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 text-left">Capital en Stock</p>
                         <h3 id="dash-stock" class="text-2xl font-black text-slate-900 dark:text-white text-left">$ 0</h3>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <div class="card p-8 lg:col-span-2 text-left">
-                        <div class="flex justify-between items-center mb-8 text-left">
-                            <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] flex items-center gap-2 text-left text-left">
-                                <i data-lucide="trending-up" class="w-4 h-4 text-orange-500 text-left text-left text-left"></i> Márgenes Recientes
-                            </h4>
-                        </div>
-                        <div id="margin-summary" class="space-y-4 text-left text-left"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-8 text-left">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Resumen de Tesorería</h4>
+                        <div id="treasury-summary" class="space-y-4"></div>
                     </div>
-                    <div class="card p-8 text-left text-left">
-                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-8 text-left">Estado de Bodega</h4>
-                        <div id="low-stock-alert" class="text-center py-12 text-left">
-                            <i data-lucide="check-circle" class="w-8 h-8 text-emerald-100 mx-auto mb-3 text-left"></i>
-                            <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest text-left text-left">Suministro Estable</p>
+                    <div class="card p-8 text-left">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Alertas de Inventario</h4>
+                        <div id="low-stock-alert" class="text-center py-8 text-left">
+                            <i data-lucide="check-circle" class="w-8 h-8 text-emerald-100 mx-auto mb-3"></i>
+                            <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest text-left">Suministro Estable</p>
                         </div>
                         <ul id="stock-list" class="space-y-4 text-left"></ul>
                     </div>
                 </div>
             </div>
 
+            <!-- PROYECCIONES (NUEVO MÓDULO FASE 2) -->
+            <div id="tab-proyecciones" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Burn Rate -->
+                    <div class="card p-8 bg-slate-900 text-white border-none shadow-2xl relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-10"><i data-lucide="flame" class="w-24 h-24"></i></div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Burn Rate (Gasto Mensual Promedio)</p>
+                        <h3 id="proj-burn-rate" class="text-3xl font-black">$ 0</h3>
+                        <div class="mt-4 pt-4 border-t border-slate-800">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Runway (Vida de Caja)</p>
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="hourglass" class="w-4 h-4 text-blue-400"></i>
+                                <span id="proj-runway" class="text-lg font-bold text-blue-400">Calculando...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Proyección de Cierre -->
+                    <div class="card p-8 text-left">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Proyección Cierre de Mes</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Ventas Actuales</span><span id="proj-sales-current" class="text-slate-500"></span></div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2"><div id="proj-bar-sales" class="bg-blue-500 h-2 rounded-full" style="width: 0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Proyección Final</span><span id="proj-sales-forecast" class="text-blue-600"></span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Próximo Pago IVA -->
+                    <div class="card p-8 text-left border-l-4 border-indigo-500">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Estimación F29 (Día 20)</h4>
+                        <h3 id="proj-iva-est" class="text-2xl font-black text-indigo-600">$ 0</h3>
+                        <p class="text-[9px] text-slate-400 mt-2 font-bold">Basado en movimiento actual</p>
+                    </div>
+                </div>
+
+                <!-- Tabla de Quiebres de Stock -->
+                <div class="card overflow-hidden border-none shadow-md transition-colors text-left">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Predicción de Inventario (Inteligencia)</h4>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Producto</th>
+                                <th class="px-6 py-4 text-center">Stock Actual</th>
+                                <th class="px-6 py-4 text-center">Venta Diaria (Prom.)</th>
+                                <th class="px-6 py-4 text-center">Días Restantes</th>
+                                <th class="px-6 py-4 text-center">Fecha Quiebre</th>
+                                <th class="px-6 py-4 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-projections" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 transition-colors"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TESORERÍA (CON BANCHILE ACTUALIZADO) -->
+            <div id="tab-tesoreria" class="tab-content hidden space-y-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Control de Fondos</h2>
+                    <div class="flex gap-2">
+                        <button onclick="openModal('modal-capital')" class="btn-jet bg-indigo-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="user-check" class="w-4 h-4"></i> SOCIO / DUEÑO
+                        </button>
+                        <button onclick="openModal('modal-transfer')" class="btn-jet bg-emerald-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="arrow-left-right" class="w-4 h-4"></i> Transferir
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="treasury-cards"></div>
+
+                <div class="card overflow-hidden border-none shadow-md transition-colors text-left">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Últimos Movimientos de Dinero</h4>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Fecha</th>
+                                <th class="px-6 py-4">Cuenta</th>
+                                <th class="px-6 py-4">Concepto</th>
+                                <th class="px-6 py-4 text-right">Ingreso</th>
+                                <th class="px-6 py-4 text-right">Egreso</th>
+                                <th class="px-6 py-4 text-right">Saldo Final</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-caja" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 transition-colors"></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Analítica Anual -->
             <div id="tab-resumen-anual" class="tab-content hidden space-y-6">
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">¿Cómo leer esto?</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">Este es tu <b>Estado de Resultados (P&L)</b> real. Muestra si tu negocio es rentable operativamente, descontando lo que vendiste, lo que te costó esa mercadería (CMV) y los gastos como comisiones o fletes. No incluye compra de activos (stock guardado) porque eso es inversión, no gasto.</p>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div class="card p-10 transition-colors text-left border-none shadow-xl text-left">
-                        <h4 class="font-black text-slate-900 dark:text-white mb-10 uppercase text-[10px] tracking-[0.3em] border-b dark:border-slate-800 pb-5 text-left text-left text-left text-left text-left text-left text-left">Evolución Operacional</h4>
+                        <h4 class="font-black text-slate-900 dark:text-white mb-10 uppercase text-[10px] tracking-[0.3em] border-b dark:border-slate-800 pb-5 text-left">Evolución Operacional</h4>
                         <canvas id="chart-performance" height="200"></canvas>
                     </div>
                     <div class="card p-10 transition-colors text-left border-none shadow-xl text-left">
@@ -228,7 +324,7 @@
                         <thead class="bg-white dark:bg-slate-900 text-slate-400 font-black uppercase text-[9px] tracking-widest border-b dark:border-slate-800">
                             <tr>
                                 <th class="px-8 py-6">Fecha</th>
-                                <th class="px-8 py-6 text-left text-left">Documento / Concepto</th>
+                                <th class="px-8 py-6 text-left text-left">Concepto</th>
                                 <th class="px-8 py-6 text-right text-left text-left text-left">Neto ($)</th>
                                 <th class="px-8 py-6 text-right text-left text-left text-left text-left text-left">Impuestos ($)</th>
                                 <th class="px-8 py-6 text-right font-black text-left">Total ($)</th>
@@ -249,7 +345,7 @@
                 <div class="flex justify-between items-center mb-8 text-left text-left text-left text-left text-left text-left text-left">
                     <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter text-left">Gestión de Stock</h2>
                     <button onclick="openModal('modal-producto')" class="btn-jet bg-slate-950 dark:bg-blue-600 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-left text-left text-left">
-                        <i data-lucide="plus-circle" class="w-4 h-4 text-left text-left"></i> NUEVO SKU
+                        <i data-lucide="package-plus" class="w-4 h-4 text-left text-left"></i> NUEVO SKU
                     </button>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-left" id="grid-inventario"></div>
@@ -258,6 +354,16 @@
             <!-- F29 (SII MAPPING) -->
             <div id="tab-f29" class="tab-content hidden space-y-8 text-left">
                 <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter text-left">Impuestos Mensuales (F29)</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Guía de Llenado F29</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">
+                        <b>[538] Débito:</b> Suma del IVA de tus Boletas y Facturas de Venta.<br>
+                        <b>[520] Crédito:</b> IVA de Facturas de Compra (Gastos y Comisiones ML).<br>
+                        <b>DIN:</b> El IVA pagado en Aduana se suma a tu Crédito Fiscal.<br>
+                        <b>[77] Remanente:</b> Si el mes anterior no pagaste IVA (saldo negativo), el sistema arrastra ese valor aquí automáticamente.<br>
+                        <b>[89] A Pagar:</b> (Débito - Crédito - DIN - Remanente) + PPM. Si es negativo, no pagas IVA y generas nuevo remanente.
+                    </p>
+                </div>
                 <div class="card overflow-hidden transition-colors border-none shadow-2xl text-left">
                     <table class="w-full text-sm">
                         <thead class="bg-slate-950 text-white font-black text-[9px] uppercase tracking-[0.2em]">
@@ -273,46 +379,45 @@
                         <tbody id="table-f29" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 transition-colors"></tbody>
                     </table>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-blue-50 dark:bg-blue-900/10 p-6 rounded-2xl border border-blue-100 dark:border-blue-900/30 text-left">
-                        <p class="text-[10px] text-blue-800 dark:text-blue-300 font-black uppercase tracking-widest flex items-center gap-2 mb-2 text-left"><i data-lucide="info" class="w-4 h-4"></i> Instrucciones F29</p>
-                        <ul class="text-[10px] text-blue-700 dark:text-blue-400 space-y-2 list-disc pl-4">
-                            <li><b>[538] Débito:</b> Suma total del IVA de tus Boletas y Facturas de Venta.</li>
-                            <li><b>[520] Crédito:</b> IVA de Facturas de Compra (Gastos y Comisiones ML).</li>
-                            <li><b>DIN:</b> El IVA pagado en Aduana se suma a tu Crédito Fiscal del mes.</li>
-                            <li><b>[77] Remanente:</b> Si el mes anterior no pagaste IVA, anota aquí el saldo a favor (UTM corregida).</li>
-                        </ul>
-                    </div>
-                </div>
             </div>
 
             <!-- F22 -->
             <div id="tab-f22" class="tab-content hidden space-y-6 text-left">
                 <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter text-left">Declaración Anual (F22)</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Renta Líquida Imponible (RLI)</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">
+                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b>ProPyme General (14 D3)</b> optimizado con control de inventario (CMV). Si usas el régimen Transparente (14 D8), podrías rebajar el stock comprado como gasto inmediato, pero esta vista te muestra la salud real de tu negocio devengado.
+                    </p>
+                </div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl transition-colors text-left text-left">
                     <div class="text-center pb-12 border-b-2 border-slate-100 dark:border-slate-800 text-left">
-                        <h3 class="text-3xl font-black text-slate-950 dark:text-white tracking-tighter text-left">Base Imponible (Propyme General)</h3>
+                        <h3 class="text-3xl font-black text-slate-950 dark:text-white tracking-tighter text-left">Base Imponible Tributaria</h3>
                         <p class="text-[11px] text-slate-400 uppercase font-black mt-3 tracking-[0.5em] text-left">Año <span class="current-year-display"></span></p>
                     </div>
                     <div class="space-y-8 pt-12 text-left">
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 text-left">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">Ingresos (Ventas Netas)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">Ingresos Totales Neto</span>
                             <span id="f22-ventas" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
                         </div>
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 text-left text-left">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">(-) Costo de Ventas (Inventario Salido)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">(-) Costo de Venta (CMV)</span>
                             <span id="f22-costos" class="font-black text-red-500 text-xl">$ 0</span>
                         </div>
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 text-left text-left">
                             <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">(-) Gastos Aceptados (Comisiones/Otros)</span>
                             <span id="f22-gastos" class="font-black text-red-500 text-xl">$ 0</span>
                         </div>
-                        <div class="flex justify-between items-center py-8 bg-slate-50 dark:bg-slate-800 px-10 rounded-[2.5rem] border-2 border-slate-950 dark:border-blue-900 text-left text-left">
+                        <div class="flex justify-between items-center py-8 bg-slate-50 dark:bg-slate-800 px-10 rounded-[2.5rem] border-2 border-slate-950 dark:border-blue-900 text-left">
                             <div>
                                 <span class="block text-slate-950 dark:text-white font-black text-sm uppercase tracking-widest text-left">Renta Líquida Imponible</span>
                                 <span class="text-[9px] text-slate-400 uppercase font-bold text-left">Monto sobre el cual pagas impuesto (1ra Categoría)</span>
                             </div>
                             <span id="f22-utilidad" class="font-black text-blue-600 dark:text-blue-400 text-3xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-t border-slate-50 dark:border-slate-800 text-left mt-4 pt-4">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest text-left">Retiros Efectivos (Global Compl.)</span>
+                            <span id="f22-retiros" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
                         </div>
                     </div>
                 </div>
@@ -350,10 +455,61 @@
                         <label class="block text-[10px] font-black text-orange-500 uppercase mb-3 tracking-widest text-left text-left">Comisiones + Flete (Bruto Total)</label>
                         <input type="number" id="venta-comision" value="0" class="w-full border-2 border-orange-50 dark:border-orange-900/20 p-5 rounded-3xl text-sm bg-transparent font-bold text-orange-600 dark:text-orange-400 outline-none text-left text-left">
                     </div>
+                    
+                    <!-- SELECTOR DE CUENTA TESORERÍA (FASE 1) -->
+                    <div class="md:col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2 text-left">
+                            <i data-lucide="wallet" class="w-3 h-3 text-left"></i> Ingreso a Cuenta
+                        </label>
+                        <select id="venta-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none text-left"></select>
+                    </div>
                 </div>
                 <div class="flex gap-4 pt-4 text-left">
                     <button type="button" onclick="closeModal('modal-venta')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 tracking-widest text-left">Cancelar</button>
                     <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl text-left text-left">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Capital / Socio (NUEVO) -->
+    <div id="modal-capital" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50 text-left">
+        <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl transition-colors text-left">
+            <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter text-left">Gestión Socio</h3>
+            <form onsubmit="handleCapital(event)" class="space-y-8 text-left">
+                <div class="space-y-6 text-left">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Tipo Operación</label>
+                        <select id="capital-tipo" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left">
+                            <option value="APORTE">Aporte de Capital (Ingreso)</option>
+                            <option value="RETIRO">Retiro de Utilidades (Egreso)</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Cuenta Afectada</label><select id="capital-cuenta" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></select></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Monto</label><input type="number" id="capital-monto" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none text-left"></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Detalle</label><input type="text" id="capital-desc" placeholder="Ej: Préstamo dueño" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></div>
+                </div>
+                <div class="flex gap-4 pt-6 text-left">
+                    <button type="button" onclick="closeModal('modal-capital')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 text-left">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl text-left">Registrar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Transferencia (FASE 1) -->
+    <div id="modal-transfer" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50 text-left">
+        <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl transition-colors text-left">
+            <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter text-left">Transferir Fondos</h3>
+            <form onsubmit="handleTransfer(event)" class="space-y-8 text-left">
+                <div class="space-y-6 text-left">
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Origen</label><select id="transfer-origen" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></select></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Destino</label><select id="transfer-destino" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></select></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Monto</label><input type="number" id="transfer-monto" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none text-left"></div>
+                </div>
+                <div class="flex gap-4 pt-6 text-left">
+                    <button type="button" onclick="closeModal('modal-transfer')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 text-left">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl text-left">Mover</button>
                 </div>
             </form>
         </div>
@@ -399,6 +555,14 @@
                     <div class="text-left text-left text-left text-left"><label class="block text-[10px] font-black text-emerald-600 uppercase mb-2 text-left">FOB (USD)</label><input type="number" id="import-fob" required step="0.01" class="w-full border-2 border-emerald-50 dark:border-emerald-900/10 p-5 rounded-3xl text-sm bg-transparent font-bold text-emerald-600 dark:text-emerald-400 outline-none text-left"></div>
                     <div class="text-left text-left text-left text-left"><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Flete (USD)</label><input type="number" id="import-flete" value="0" step="0.01" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></div>
                     <div class="text-left text-left text-left text-left text-left"><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left text-left">Seguro (USD)</label><input type="number" id="import-seguro" value="0" step="0.01" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></div>
+                    
+                    <!-- Selector de Cuenta para Importación (FASE 1) -->
+                    <div class="md:col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+                        <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2 text-left">
+                            <i data-lucide="wallet" class="w-3 h-3 text-left"></i> Pago desde Cuenta
+                        </label>
+                        <select id="import-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none text-left"></select>
+                    </div>
                 </div>
                 <div class="flex gap-4 pt-6 text-left">
                     <button type="button" onclick="closeModal('modal-import')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 text-left">Cerrar</button>
@@ -419,11 +583,19 @@
                     <div class="text-left text-left">
                         <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest text-left">Tipo</label>
                         <select id="gasto-tipo" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none text-left">
-                            <option value="GASTO_LOCAL">Gasto Local (Factura)</option><option value="HONORARIOS">Honorarios (Servicios)</option><option value="RETIRO">Retiro Personal</option>
+                            <option value="GASTO_LOCAL">Gasto Local (Factura)</option><option value="HONORARIOS">Honorarios (Servicios)</option><option value="RETIRO">Retiro Personal (Utilidad)</option>
                         </select>
                     </div>
                     <div class="text-left"><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Descripción</label><input type="text" id="gasto-desc" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none text-left"></div>
                     <div class="text-left"><label class="block text-[10px] font-black text-slate-400 uppercase mb-2 text-left">Monto Bruto</label><input type="number" id="gasto-monto" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none text-left"></div>
+                    
+                    <!-- Selector de Cuenta para Gasto (FASE 1) -->
+                    <div class="pt-4 border-t border-slate-100 dark:border-slate-800 text-left">
+                        <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2 text-left">
+                            <i data-lucide="wallet" class="w-3 h-3 text-left"></i> Origen de Fondos
+                        </label>
+                        <select id="gasto-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none text-left"></select>
+                    </div>
                 </div>
                 <div class="flex gap-4 pt-6 text-left">
                     <button type="button" onclick="closeModal('modal-gasto')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 text-left">Cancelar</button>
@@ -450,99 +622,82 @@
         let db = {
             movimientos: [],
             productos: [],
+            cuentas: [
+                { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                { id: 'caja', nombre: 'Caja Chica', tipo: 'efectivo', saldo: 0 }
+            ],
+            flujoCaja: [],
             config: { usdRate: 950, ppmRate: 1, year: 2026, theme: 'light', selectedMonth: new Date().getMonth() }
         };
 
         let performanceChart = null;
 
-        function safeCreateIcons() {
-            if (typeof lucide !== 'undefined') lucide.createIcons();
-            else setTimeout(safeCreateIcons, 100);
-        }
+        // SAFE HELPERS
+        function safeSetText(id, text) { const el = document.getElementById(id); if(el) el.innerText = text; }
+        function safeSetHTML(id, html) { const el = document.getElementById(id); if(el) el.innerHTML = html; }
+        function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
 
+        document.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('jet_db_v20_phase2');
+            if (saved) {
+                db = JSON.parse(saved);
+                // Update Banchile name if coming from older version
+                const bc = db.cuentas.find(c => c.id === 'banchile');
+                if (bc) bc.nombre = 'Banco Chile (empresa)';
+            }
+            
+            // Migración: Asegurar cuentas si no existen
+            if (!db.cuentas || db.cuentas.length === 0) {
+                db.cuentas = [ 
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 }, 
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 } 
+                ];
+                db.flujoCaja = [];
+            }
+            // Asegurar que exista Banchile si viene de v18
+            if (!db.cuentas.find(c => c.id === 'banchile')) {
+                db.cuentas.splice(1, 0, { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 });
+            }
+
+            if (db.config.selectedMonth === undefined) db.config.selectedMonth = new Date().getMonth();
+            safeSetText('current-date', new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+            const yearInp = document.getElementById('config-year'); if(yearInp) yearInp.value = db.config.year;
+            const monthSel = document.getElementById('filter-month'); if(monthSel) monthSel.value = db.config.selectedMonth;
+            
+            applyTheme(); updateUSD(); render();
+        });
+
+        function save() { localStorage.setItem('jet_db_v20_phase2', JSON.stringify(db)); render(); }
+        function resetApp() { if(confirm('¿Reiniciar todo?')) { localStorage.removeItem('jet_db_v20_phase2'); location.reload(); } }
         async function updateUSD() {
             try {
                 const res = await fetch('https://mindicador.cl/api/dolar');
                 const data = await res.json();
-                const valor = Math.round(data.serie[0].valor);
-                db.config.usdRate = valor;
-                document.getElementById('usd-val').innerText = `$ ${valor}`;
+                db.config.usdRate = Math.round(data.serie[0].valor);
+                safeSetText('usd-val', `$ ${db.config.usdRate}`);
                 save();
-            } catch (e) { 
-                document.getElementById('usd-val').innerText = `$ ${db.config.usdRate}`;
-            }
+            } catch (e) { safeSetText('usd-val', `$ ${db.config.usdRate}`); }
         }
 
-        function toggleTheme() {
-            db.config.theme = db.config.theme === 'light' ? 'dark' : 'light';
-            applyTheme();
-            save();
+        // --- CORE LOGIC: TESORERÍA + CONTABILIDAD ---
+        function registrarFlujo(fecha, cuentaId, concepto, monto, tipo, refId) {
+            const c = db.cuentas.find(x => x.id === cuentaId);
+            if (!c) return;
+            if (tipo === 'INGRESO') c.saldo += monto; else c.saldo -= monto;
+            db.flujoCaja.push({ id: Date.now()+Math.random(), fecha, cuentaId, concepto, monto, tipoMovimiento: tipo, refId, saldoParcial: c.saldo });
         }
 
-        function applyTheme() {
-            if (db.config.theme === 'dark') document.documentElement.classList.add('dark');
-            else document.documentElement.classList.remove('dark');
-            safeCreateIcons();
-            if (performanceChart) renderAnnualSummary(); 
+        function revertMovement(m) {
+            const p = db.productos.find(x => x.id === m.prodId);
+            if (p && m.tipo === 'VENTA') p.stock += m.cant;
+            if (p && m.tipo === 'IMPORTACION') p.stock -= m.cant;
+            // No revertimos caja automáticamente por seguridad, saldo debe ajustarse manualmente si hay error monetario.
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const saved = localStorage.getItem('jet_db_v12_definitiva');
-            if (saved) db = JSON.parse(saved);
-            
-            if (db.config.selectedMonth === undefined) db.config.selectedMonth = new Date().getMonth();
-            
-            document.getElementById('current-date').innerText = new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            document.getElementById('config-year').value = db.config.year;
-            document.getElementById('filter-month').value = db.config.selectedMonth;
-            
-            applyTheme();
-            updateUSD();
-            render();
-        });
-
-        function save() {
-            localStorage.setItem('jet_db_v12_definitiva', JSON.stringify(db));
-            render();
-        }
-
-        function resetApp() {
-            if (confirm('¿BORRAR TODO? Esta acción no se puede deshacer.')) {
-                localStorage.removeItem('jet_db_v12_definitiva');
-                location.reload();
-            }
-        }
-
-        function updateYear(val) { db.config.year = parseInt(val); save(); }
-        function updateMonthFilter(val) { 
-            db.config.selectedMonth = parseInt(val); 
-            save(); 
-            render(); 
-        }
-
-        function exportData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
-            const dl = document.createElement('a');
-            dl.setAttribute("href", dataStr);
-            dl.setAttribute("download", `JET_Respaldo_${db.config.year}.json`);
-            dl.click();
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                try {
-                    db = JSON.parse(e.target.result);
-                    save();
-                    location.reload();
-                } catch (err) { alert('JSON inválido.'); }
-            };
-            reader.readAsText(file);
-        }
-
-        // --- SKU & LINK ---
         function generateSKU() {
             const cat = document.getElementById('prod-cat').value;
             if (!cat) { document.getElementById('prod-sku').value = ""; return; }
@@ -550,91 +705,45 @@
             document.getElementById('prod-sku').value = `${cat}-${count + 1}`;
         }
 
-        // --- NAVIGATION ---
-        function switchTab(tab) {
-            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-            document.getElementById(`tab-${tab}`).classList.remove('hidden');
-            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-            document.getElementById(`btn-${tab}`).classList.add('active');
-            const titles = { dashboard: 'Dashboard', movimientos: 'Libro Diario', inventario: 'Bodega', 'resumen-anual': 'Analítica', f29: 'Impuestos F29', f22: 'Renta F22' };
-            document.getElementById('tab-title').innerText = titles[tab] || 'Dashboard';
-            if (tab === 'resumen-anual') renderAnnualSummary();
-            safeCreateIcons();
+        // --- PHASE 2 LOGIC: PROJECTIONS ---
+        function calculateStockRunout(prodId) {
+            // Analizar ventas de los últimos 30 días
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            
+            const sales = db.movimientos.filter(m => 
+                m.tipo === 'VENTA' && 
+                m.prodId == prodId && 
+                new Date(m.fecha) >= thirtyDaysAgo
+            ).reduce((a,b) => a + b.cant, 0);
+
+            const dailySales = sales / 30;
+            const prod = db.productos.find(p => p.id == prodId);
+            
+            if (dailySales === 0) return { days: 999, date: 'Estable' };
+            const daysLeft = Math.floor(prod.stock / dailySales);
+            
+            const runoutDate = new Date();
+            runoutDate.setDate(runoutDate.getDate() + daysLeft);
+            
+            return { days: daysLeft, date: runoutDate.toLocaleDateString() };
         }
 
-        function openModal(id, editingId = null) {
-            const modal = document.getElementById(id);
-            modal.classList.remove('hidden');
-            const sel = id === 'modal-venta' ? 'venta-prod' : 'import-prod';
-            if (document.getElementById(sel)) {
-                document.getElementById(sel).innerHTML = db.productos.map(p => `<option value="${p.id}">${p.nombre} [${p.sku}] - Stock: ${p.stock}</option>`).join('');
-            }
-
-            if (editingId) {
-                const m = db.movimientos.find(x => x.id == editingId);
-                if (id === 'modal-venta') {
-                    document.getElementById('venta-id').value = m.id;
-                    document.getElementById('venta-fecha').value = m.fecha.split('T')[0];
-                    document.getElementById('venta-prod').value = m.prodId;
-                    document.getElementById('venta-cant').value = m.cant;
-                    document.getElementById('venta-bruto').value = m.total;
-                    const com = db.movimientos.find(x => x.parentId == m.id);
-                    document.getElementById('venta-comision').value = com ? com.total : 0;
-                    document.getElementById('modal-venta-title').innerText = "Editar Venta";
-                } else if (id === 'modal-import') {
-                    document.getElementById('import-id').value = m.id;
-                    document.getElementById('import-fecha').value = m.fecha.split('T')[0];
-                    document.getElementById('import-doc').value = m.nDoc;
-                    document.getElementById('import-prod').value = m.prodId;
-                    document.getElementById('import-cant').value = m.cant;
-                    document.getElementById('import-fob').value = m.fob || 0;
-                    document.getElementById('modal-import-title').innerText = "Editar Importación";
-                } else if (id === 'modal-gasto') {
-                    document.getElementById('gasto-id').value = m.id;
-                    document.getElementById('gasto-fecha').value = m.fecha.split('T')[0];
-                    document.getElementById('gasto-tipo').value = m.tipo;
-                    document.getElementById('gasto-desc').value = m.desc;
-                    document.getElementById('gasto-monto').value = m.total;
-                    document.getElementById('modal-gasto-title').innerText = "Editar Gasto";
-                }
-            } else {
-                modal.querySelector('form')?.reset();
-                if(modal.querySelector('input[type="hidden"]')) modal.querySelector('input[type="hidden"]').value = "";
-                const dateInp = modal.querySelector('input[type="date"]');
-                if (dateInp) {
-                    const now = new Date();
-                    const year = db.config.year;
-                    const month = (db.config.selectedMonth + 1).toString().padStart(2, '0');
-                    const day = (db.config.selectedMonth === now.getMonth()) ? now.getDate().toString().padStart(2, '0') : "01";
-                    dateInp.value = `${year}-${month}-${day}`;
-                }
-            }
-            safeCreateIcons();
+        function calculateBurnRate() {
+            // Gastos promedio últimos 3 meses
+            const now = new Date();
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            
+            const expenses = db.movimientos.filter(m => 
+                (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && 
+                new Date(m.fecha) >= threeMonthsAgo
+            ).reduce((a,b) => a + b.total, 0);
+            
+            return Math.round(expenses / 3);
         }
 
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        // --- BUSINESS LOGIC ---
-        function revertMovement(m) {
-            const p = db.productos.find(x => x.id === m.prodId);
-            if (!p) return;
-            if (m.tipo === 'VENTA') p.stock += m.cant;
-            else if (m.tipo === 'IMPORTACION') p.stock -= m.cant;
-        }
-
-        function handleProducto(e) {
-            e.preventDefault();
-            db.productos.push({
-                id: Date.now().toString(),
-                nombre: document.getElementById('prod-nombre').value,
-                sku: document.getElementById('prod-sku').value,
-                link: document.getElementById('prod-link').value,
-                stock: 0, costoPromedio: 0
-            });
-            save();
-            closeModal('modal-producto');
-        }
-
+        // --- HANDLERS ---
         function handleVenta(e) {
             e.preventDefault();
             const id = document.getElementById('venta-id').value || Date.now().toString();
@@ -643,30 +752,70 @@
 
             const prodId = document.getElementById('venta-prod').value;
             const cant = parseInt(document.getElementById('venta-cant').value);
-            const brutoTotal = parseInt(document.getElementById('venta-bruto').value);
-            const comBruta = parseInt(document.getElementById('venta-comision').value || 0);
+            const bruto = parseInt(document.getElementById('venta-bruto').value);
+            const com = parseInt(document.getElementById('venta-comision').value || 0);
+            const cuenta = document.getElementById('venta-cuenta').value;
             const fechaRaw = document.getElementById('venta-fecha').value;
             const fecha = new Date(fechaRaw + 'T00:00:00');
 
             const prod = db.productos.find(p => p.id === prodId);
             if (!prod || prod.stock < cant) return alert('Stock insuficiente');
 
-            const netoV = Math.round(brutoTotal / 1.19);
-            db.movimientos.push({
-                id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Venta: ${prod.nombre}`,
-                neto: netoV, iva: brutoTotal - netoV, total: brutoTotal, prodId, cant, costoMercaderia: Math.round(prod.costoPromedio * cant), nDoc: 'Boleta'
-            });
+            const neto = Math.round(bruto / 1.19);
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Venta: ${prod.nombre}`, neto, iva: bruto-neto, total: bruto, prodId, cant, costoMercaderia: Math.round(prod.costoPromedio * cant), nDoc: 'Boleta' });
 
-            if (comBruta > 0) {
-                const netoC = Math.round(comBruta / 1.19);
-                db.movimientos.push({
-                    id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL',
-                    desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: comBruta - netoC, total: comBruta, nDoc: 'Factura ML'
+            if (com > 0) {
+                const netoC = Math.round(com / 1.19);
+                db.movimientos.push({ id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL', desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: com-netoC, total: com, nDoc: 'Factura ML' });
+                registrarFlujo(fecha.toISOString(), cuenta, `Pago Comisión (${prod.nombre})`, com, 'EGRESO', id);
+            }
+
+            registrarFlujo(fecha.toISOString(), cuenta, `Venta: ${prod.nombre}`, bruto, 'INGRESO', id);
+            prod.stock -= cant;
+            save(); closeModal('modal-venta');
+        }
+
+        function handleGasto(e) {
+            e.preventDefault();
+            const id = document.getElementById('gasto-id').value || Date.now().toString();
+            db.movimientos = db.movimientos.filter(x => x.id != id);
+            const monto = parseInt(document.getElementById('gasto-monto').value);
+            const tipo = document.getElementById('gasto-tipo').value;
+            const cuenta = document.getElementById('gasto-cuenta').value;
+            const fecha = new Date(document.getElementById('gasto-fecha').value + 'T00:00:00');
+
+            let neto = monto, iva = 0, ret = 0;
+            if (tipo === 'GASTO_LOCAL') { neto = Math.round(monto/1.19); iva = monto - neto; }
+            else if (tipo === 'HONORARIOS') { ret = Math.round(monto * 0.145); neto = monto - ret; }
+
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo, desc: document.getElementById('gasto-desc').value, neto, iva, total: monto, retention: ret, nDoc: 'Egr.' });
+            registrarFlujo(fecha.toISOString(), cuenta, `Pago: ${document.getElementById('gasto-desc').value}`, monto, 'EGRESO', id);
+            save(); closeModal('modal-gasto');
+        }
+
+        function handleCapital(e) {
+            e.preventDefault();
+            const tipo = document.getElementById('capital-tipo').value;
+            const cuenta = document.getElementById('capital-cuenta').value;
+            const monto = parseInt(document.getElementById('capital-monto').value);
+            const desc = document.getElementById('capital-desc').value;
+            const fecha = new Date().toISOString();
+            const id = 'CAP-' + Date.now();
+
+            if (tipo === 'APORTE') {
+                // Aporte: Entra dinero, no es venta (no afecta F29/F22 P&L, pero aumenta capital propio)
+                registrarFlujo(fecha, cuenta, `Aporte Capital: ${desc}`, monto, 'INGRESO', id);
+                // No se registra en movimientos fiscales como ingreso tributable
+            } else {
+                // Retiro: Sale dinero, afecta F22 Global Complementario
+                registrarFlujo(fecha, cuenta, `Retiro Utilidad: ${desc}`, monto, 'EGRESO', id);
+                db.movimientos.push({ 
+                    id, fecha, tipo: 'RETIRO', desc: `Retiro Dueño: ${desc}`, 
+                    neto: 0, iva: 0, total: monto, retiro: monto, nDoc: 'Retiro' 
                 });
             }
-            prod.stock -= cant;
             save();
-            closeModal('modal-venta');
+            closeModal('modal-capital');
         }
 
         function handleImport(e) {
@@ -678,51 +827,47 @@
             const prodId = document.getElementById('import-prod').value;
             const cant = parseInt(document.getElementById('import-cant').value);
             const fob = parseFloat(document.getElementById('import-fob').value);
-            const flete = parseFloat(document.getElementById('import-flete').value || 0);
-            const seg = parseFloat(document.getElementById('import-seguro').value || 0);
-            const fechaRaw = document.getElementById('import-fecha').value;
-            const fecha = new Date(fechaRaw + 'T00:00:00');
+            const flete = parseFloat(document.getElementById('import-flete').value||0);
+            const seg = parseFloat(document.getElementById('import-seguro').value||0);
+            const cuenta = document.getElementById('import-cuenta').value;
+            const fecha = new Date(document.getElementById('import-fecha').value + 'T00:00:00');
 
-            const cifCLP = Math.round((fob + flete + seg) * db.config.usdRate);
+            const cif = Math.round((fob + flete + seg) * db.config.usdRate);
+            const total = cif + Math.round(cif * 0.19);
+
             const prod = db.productos.find(p => p.id === prodId);
-            
-            // PMP
-            prod.costoPromedio = Math.round(((prod.stock * prod.costoPromedio) + cifCLP) / (prod.stock + cant));
+            prod.costoPromedio = Math.round(((prod.stock * prod.costoPromedio) + cif) / (prod.stock + cant));
             prod.stock += cant;
 
-            db.movimientos.push({
-                id, fecha: fecha.toISOString(), tipo: 'IMPORTACION', desc: `Importación: ${prod.nombre}`,
-                neto: cifCLP, iva: Math.round(cifCLP * 0.19), total: cifCLP + Math.round(cifCLP * 0.19), nDoc: document.getElementById('import-doc').value, prodId, cant, fob
-            });
-            save();
-            closeModal('modal-import');
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'IMPORTACION', desc: `Import: ${prod.nombre}`, neto: cif, iva: Math.round(cif * 0.19), total, prodId, cant, nDoc: document.getElementById('import-doc').value, fob });
+            registrarFlujo(fecha.toISOString(), cuenta, `Pago Import (${prod.nombre})`, total, 'EGRESO', id);
+            save(); closeModal('modal-import');
         }
 
-        function handleGasto(e) {
+        function handleProducto(e) {
             e.preventDefault();
-            const id = document.getElementById('gasto-id').value || Date.now().toString();
-            db.movimientos = db.movimientos.filter(x => x.id != id);
-            const monto = parseInt(document.getElementById('gasto-monto').value);
-            const tipo = document.getElementById('gasto-tipo').value;
-            const fechaRaw = document.getElementById('gasto-fecha').value;
-            const fecha = new Date(fechaRaw + 'T00:00:00');
+            db.productos.push({ id: Date.now().toString(), nombre: document.getElementById('prod-nombre').value, sku: document.getElementById('prod-sku').value, link: document.getElementById('prod-link').value, stock: 0, costoPromedio: 0 });
+            save(); closeModal('modal-producto');
+        }
 
-            let neto = monto, iva = 0, ret = 0;
-            if (tipo === 'GASTO_LOCAL') { neto = Math.round(monto/1.19); iva = monto - neto; }
-            else if (tipo === 'HONORARIOS') { ret = Math.round(monto * 0.145); neto = monto - ret; }
-
-            db.movimientos.push({
-                id, fecha: fecha.toISOString(),
-                tipo, desc: document.getElementById('gasto-desc').value, neto, iva, total: monto, retention: ret, nDoc: 'Egr.'
-            });
-            save();
-            closeModal('modal-gasto');
+        function handleTransfer(e) {
+            e.preventDefault();
+            const origen = document.getElementById('transfer-origen').value;
+            const destino = document.getElementById('transfer-destino').value;
+            const monto = parseInt(document.getElementById('transfer-monto').value);
+            if (origen === destino) return alert('Misma cuenta');
+            if (db.cuentas.find(c=>c.id===origen).saldo < monto) return alert('Saldo insuficiente');
+            const fecha = new Date().toISOString();
+            registrarFlujo(fecha, origen, `Traspaso a ${destino}`, monto, 'EGRESO', 'TRF');
+            registrarFlujo(fecha, destino, `Traspaso de ${origen}`, monto, 'INGRESO', 'TRF');
+            save(); closeModal('modal-transfer');
         }
 
         function handleBulkImport() {
             const text = document.getElementById('ml-import-data').value.trim();
             if (!text) return;
             const lines = text.split('\n');
+            let success = 0;
             lines.forEach(line => {
                 const p = line.split(',');
                 if (p.length < 5) return;
@@ -733,22 +878,16 @@
                     const fecha = new Date(fechaStr.trim() + 'T00:00:00');
                     const cantN = parseInt(cant); const brutoN = parseInt(bruto); const comN = parseInt(com);
                     const netoV = Math.round(brutoN / 1.19);
-                    db.movimientos.push({
-                        id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Importado: ${prod.nombre}`,
-                        neto: netoV, iva: brutoN - netoV, total: brutoN, prodId: prod.id, cant: cantN, costoMercaderia: Math.round(prod.costoPromedio * cantN), nDoc: 'Imp.'
-                    });
+                    db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Imp: ${prod.nombre}`, neto: netoV, iva: brutoN-netoV, total: brutoN, prodId: prod.id, cant: cantN, costoMercaderia: Math.round(prod.costoPromedio * cantN), nDoc: 'Imp.' });
                     if (comN > 0) {
                         const netoC = Math.round(comN / 1.19);
-                        db.movimientos.push({
-                            id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL',
-                            desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: comN - netoC, total: comN, nDoc: 'Fact.'
-                        });
+                        db.movimientos.push({ id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL', desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: comN-netoC, total: comN, nDoc: 'Fact.' });
                     }
                     prod.stock -= cantN;
+                    success++;
                 }
             });
-            save();
-            closeModal('modal-import-ml');
+            alert(`Procesado: ${success}`); save(); closeModal('modal-import-ml');
         }
 
         function deleteMov(id) {
@@ -759,146 +898,243 @@
             save();
         }
 
-        function editMov(id) {
-            const m = db.movimientos.find(x => x.id == id);
-            if (m.tipo === 'VENTA') openModal('modal-venta', id);
-            else if (m.tipo === 'IMPORTACION') openModal('modal-import', id);
-            else openModal('modal-gasto', id);
+        // --- NAVIGATION & UTILS ---
+        function toggleTheme() { db.config.theme = db.config.theme === 'light' ? 'dark' : 'light'; applyTheme(); save(); }
+        function applyTheme() {
+            if (db.config.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            safeCreateIcons();
+            if (performanceChart) renderAnnualSummary(); 
+        }
+        function switchTab(t) { document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden')); document.getElementById(`tab-${t}`).classList.remove('hidden'); safeSetText('tab-title', t.toUpperCase()); if(t==='resumen-anual') renderAnnualSummary(); if(t==='proyecciones') renderProjections(); safeCreateIcons(); }
+        function openModal(id, eid) { 
+            const m = document.getElementById(id); m.classList.remove('hidden'); 
+            const sel = id === 'modal-venta' ? 'venta-prod' : 'import-prod';
+            if(document.getElementById(sel)) document.getElementById(sel).innerHTML = db.productos.map(p=>`<option value="${p.id}">${p.nombre} [${p.stock}]</option>`).join('');
+            
+            const dInp = m.querySelector('input[type="date"]');
+            if(dInp && !eid) {
+                const now = new Date();
+                const y = db.config.year;
+                const mo = (db.config.selectedMonth + 1).toString().padStart(2,'0');
+                const d = (db.config.selectedMonth === now.getMonth()) ? now.getDate().toString().padStart(2,'0') : "01";
+                dInp.value = `${y}-${mo}-${d}`;
+            }
+
+            if(eid) {
+                const mov = db.movimientos.find(x=>x.id==eid);
+                if(id==='modal-venta') { document.getElementById('venta-id').value=mov.id; document.getElementById('venta-prod').value=mov.prodId; document.getElementById('venta-cant').value=mov.cant; document.getElementById('venta-bruto').value=mov.total; document.getElementById('venta-comision').value = db.movimientos.find(x=>x.parentId==mov.id)?.total || 0; }
+                if(id==='modal-import') { document.getElementById('import-id').value=mov.id; document.getElementById('import-prod').value=mov.prodId; document.getElementById('import-cant').value=mov.cant; document.getElementById('import-fob').value=mov.fob; }
+                if(id==='modal-gasto') { document.getElementById('gasto-id').value=mov.id; document.getElementById('gasto-tipo').value=mov.tipo; document.getElementById('gasto-desc').value=mov.desc; document.getElementById('gasto-monto').value=mov.total; }
+            } else {
+                m.querySelector('form').reset();
+                if(m.querySelector('input[type="hidden"]')) m.querySelector('input[type="hidden"]').value = "";
+            }
+        }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+        function editMov(id) { const m = db.movimientos.find(x=>x.id==id); if(m.tipo==='VENTA') openModal('modal-venta', id); else if(m.tipo==='IMPORTACION') openModal('modal-import', id); else openModal('modal-gasto', id); }
+        function updateYear(v) { db.config.year = parseInt(v); save(); }
+        function updateMonthFilter(v) { db.config.selectedMonth = parseInt(v); save(); }
+        function exportData() {
+            const dl = document.createElement('a');
+            dl.setAttribute("href", "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2)));
+            dl.setAttribute("download", `JET_Full_Backup_${db.config.year}.json`);
+            dl.click();
+        }
+        function importData(event) {
+            const reader = new FileReader();
+            reader.onload = (e) => { try { db = JSON.parse(e.target.result); save(); location.reload(); } catch (err) { alert('JSON inválido'); } };
+            reader.readAsText(event.target.files[0]);
         }
 
         // --- RENDER ---
         function render() {
             const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
-            const monthFiltered = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
+            const monthMovs = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
 
-            const tableM = document.getElementById('table-movimientos');
-            const emptyS = document.getElementById('empty-state-mov');
+            // Dashboard
+            const cajaTotal = db.cuentas.reduce((a,c)=>a+c.saldo, 0);
+            const ivaPagar = calculateIVAPagar(yearMovs);
+            safeSetText('dash-caja-total', `$ ${cajaTotal.toLocaleString()}`);
+            safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString()}`);
+            safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString()}`);
+            safeSetText('dash-ventas', `$ ${yearMovs.filter(m=>m.tipo==='VENTA').reduce((a,b)=>a+b.neto,0).toLocaleString()}`);
+            safeSetText('dash-stock', `$ ${db.productos.reduce((a,p)=>a+(p.stock*p.costoPromedio),0).toLocaleString()}`);
+
+            // Smart Alerts (Phase 2)
+            const alertsDiv = document.getElementById('smart-alerts');
+            const burnRate = calculateBurnRate();
+            const runway = burnRate > 0 ? Math.floor(cajaTotal / burnRate) : 99;
             
-            if (monthFiltered.length === 0) { tableM.innerHTML = ""; emptyS.classList.remove('hidden'); }
-            else {
-                emptyS.classList.add('hidden');
-                tableM.innerHTML = monthFiltered.slice().sort((a,b) => new Date(b.fecha) - new Date(a.fecha)).map(m => `
-                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b dark:border-slate-800">
-                        <td class="px-8 py-6 text-[10px] font-black text-slate-400 text-left">${new Date(m.fecha).toLocaleDateString()}</td>
-                        <td class="px-8 py-6 text-[10px] font-black text-slate-400 text-left">${m.nDoc || '-'}</td>
-                        <td class="px-8 py-6 text-left">
-                            <div class="flex flex-col text-left">
-                                <span class="text-xs font-black dark:text-white uppercase text-left">${m.desc}</span>
-                                <span class="text-[8px] font-black uppercase ${m.tipo === 'VENTA' ? 'text-blue-500' : m.tipo === 'IMPORTACION' ? 'text-emerald-500' : 'text-slate-500'} tracking-widest text-left">${m.tipo}</span>
-                            </div>
-                        </td>
-                        <td class="px-8 py-6 text-right text-xs font-bold dark:text-slate-300">$ ${m.neto.toLocaleString()}</td>
-                        <td class="px-8 py-6 text-right text-[10px] font-bold">
-                            ${m.tipo === 'IMPORTACION' ? `<span class="text-emerald-500">DIN: $${m.iva.toLocaleString()}</span>` : m.iva > 0 ? `<span class="text-blue-500">IVA: $${m.iva.toLocaleString()}</span>` : '-'}
-                        </td>
-                        <td class="px-8 py-6 text-right font-black text-slate-950 dark:text-white">$ ${m.total.toLocaleString()}</td>
-                        <td class="px-8 py-6 text-center">
-                            <div class="flex justify-center gap-4">
-                                <button onclick="editMov('${m.id}')" class="text-slate-200 hover:text-blue-500 transition-colors"><i data-lucide="edit-3" class="w-4 h-4"></i></button>
-                                <button onclick="deleteMov('${m.id}')" class="text-slate-200 hover:text-red-500 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join('');
+            let alertsHTML = '';
+            if(runway < 3) alertsHTML += `<div class="p-4 bg-red-100 dark:bg-red-900/30 border-l-4 border-red-500 rounded-r-xl flex gap-3"><i data-lucide="alert-octagon" class="text-red-600 dark:text-red-400"></i><div><h4 class="text-xs font-black uppercase text-red-800 dark:text-red-200">Alerta de Liquidez</h4><p class="text-[10px] font-bold text-red-600 dark:text-red-300">Te quedan aprox. ${runway} meses de vida con el gasto actual.</p></div></div>`;
+            
+            if(alertsHTML) { alertsDiv.innerHTML = alertsHTML; alertsDiv.classList.remove('hidden'); } else alertsDiv.classList.add('hidden');
+
+            // Tesorería
+            safeSetHTML('treasury-cards', db.cuentas.map(c => `
+                <div class="card p-6 border-l-4 ${c.saldo >= 0 ? 'border-emerald-500' : 'border-red-500'} bg-white dark:bg-slate-900">
+                    <div class="flex justify-between mb-2"><span class="text-[10px] font-black uppercase text-slate-400">${c.tipo}</span></div>
+                    <h3 class="text-xl font-black text-slate-900 dark:text-white">$ ${c.saldo.toLocaleString()}</h3>
+                    <p class="text-xs font-bold text-slate-500 mt-1">${c.nombre}</p>
+                </div>`).join(''));
+            
+            safeSetHTML('table-caja', db.flujoCaja.sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,10).map(f => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                    <td class="px-6 py-3 text-[10px] text-slate-400 font-bold">${new Date(f.fecha).toLocaleDateString()}</td>
+                    <td class="px-6 py-3 text-[10px] uppercase font-bold text-blue-500">${db.cuentas.find(c=>c.id===f.cuentaId)?.nombre || '?'}</td>
+                    <td class="px-6 py-3 text-xs font-bold dark:text-white">${f.concepto}</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-500">${f.tipoMovimiento==='INGRESO' ? '$ '+f.monto.toLocaleString() : ''}</td>
+                    <td class="px-6 py-3 text-right font-black text-red-500">${f.tipoMovimiento==='EGRESO' ? '$ '+f.monto.toLocaleString() : ''}</td>
+                    <td class="px-6 py-3 text-right text-xs font-bold text-slate-500">$ ${f.saldoParcial?.toLocaleString()||'-'}</td>
+                </tr>`).join(''));
+
+            // Selects
+            const accO = db.cuentas.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+            ['venta-cuenta', 'gasto-cuenta', 'import-cuenta', 'transfer-origen', 'transfer-destino', 'capital-cuenta'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = accO; });
+            const prodOpts = db.productos.map(p => `<option value="${p.id}">${p.nombre} [${p.stock}]</option>`).join('');
+            ['venta-prod', 'import-prod'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = prodOpts; });
+
+            // Movimientos Table
+            const tM = document.getElementById('table-movimientos');
+            const emptyS = document.getElementById('empty-state-mov');
+            if(tM && monthMovs.length === 0) { tM.innerHTML = ''; if(emptyS) emptyS.classList.remove('hidden'); }
+            else if(tM) {
+                if(emptyS) emptyS.classList.add('hidden');
+                tM.innerHTML = monthMovs.slice().sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).map(m => `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                        <td class="px-8 py-4 text-[10px] font-black text-slate-400">${new Date(m.fecha).toLocaleDateString()}</td>
+                        <td class="px-8 py-4 text-[10px] font-black uppercase text-slate-400">${m.nDoc||'-'}</td>
+                        <td class="px-8 py-4 text-xs font-black uppercase dark:text-white">${m.desc}</td>
+                        <td class="px-8 py-4 text-right text-xs font-bold dark:text-slate-300">$ ${m.neto.toLocaleString()}</td>
+                        <td class="px-8 py-4 text-right text-[10px] font-bold text-blue-500">${m.iva.toLocaleString()}</td>
+                        <td class="px-8 py-4 text-right font-black dark:text-white">$ ${m.total.toLocaleString()}</td>
+                        <td class="px-8 py-4 text-center"><div class="flex justify-center gap-3"><button onclick="editMov('${m.id}')"><i data-lucide="edit-3" class="w-4 h-4 text-slate-300 hover:text-blue-500"></i></button><button onclick="deleteMov('${m.id}')"><i data-lucide="trash-2" class="w-4 h-4 text-slate-300 hover:text-red-500"></i></button></div></td>
+                    </tr>`).join('');
             }
 
-            document.getElementById('grid-inventario').innerHTML = db.productos.map(p => `
-                <div class="card p-8 flex flex-col gap-5 border-l-[10px] border-slate-950 dark:border-blue-900 text-left">
-                    <div class="flex justify-between items-start text-left">
-                        <div class="text-left">
-                            <h4 class="font-black text-slate-950 dark:text-white text-sm uppercase text-left">${p.nombre}</h4>
-                            <p class="text-[9px] text-blue-500 font-black uppercase mt-1 text-left">${p.sku}</p>
-                            ${p.link ? `<a href="${p.link}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-[10px] font-black text-blue-600 hover:underline uppercase text-left"><i data-lucide="external-link" class="w-3 h-3 text-left"></i> Proveedor</a>` : ''}
-                        </div>
-                        <span class="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-[10px] font-black ${p.stock < 5 ? 'bg-red-100 text-red-600' : 'text-slate-600'}">${p.stock} UN</span>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4 pt-5 border-t-2 border-slate-50 dark:border-slate-800 text-left">
-                        <div class="text-left text-left"><p class="text-[8px] text-slate-400 font-black uppercase text-left">Costo Unit.</p><p class="text-xs font-black dark:text-white text-left">$ ${p.costoPromedio.toLocaleString()}</p></div>
-                        <div class="text-right text-left"><p class="text-[8px] text-slate-400 font-black uppercase text-left">Capital Inv.</p><p class="text-xs font-black dark:text-white text-left">$ ${(p.stock * p.costoPromedio).toLocaleString()}</p></div>
-                    </div>
-                </div>
-            `).join('');
+            // Inventario
+            safeSetHTML('grid-inventario', db.productos.map(p => `
+                <div class="card p-6 border-l-4 border-slate-900 dark:border-blue-600 text-left">
+                    <h4 class="font-black text-sm dark:text-white">${p.nombre}</h4>
+                    <div class="flex justify-between mt-2 text-xs text-slate-500 font-bold"><span>${p.sku}</span><span>${p.stock} UN</span></div>
+                    ${p.link ? `<a href="${p.link}" target="_blank" class="block mt-2 text-[10px] text-blue-500 uppercase font-black text-right">Comprar ↗</a>` : ''}
+                </div>`).join(''));
 
             calculateReports(yearMovs);
             safeCreateIcons();
         }
 
-        function calculateReports(yearMovs) {
-            const meses = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-            let totals = { vN: 0, cM: 0, gO: 0 };
-            const f29Body = document.getElementById('table-f29');
-            let f29H = ""; let rAcum = 0;
+        // --- PHASE 2 RENDERING ---
+        function renderProjections() {
+            // 1. Proyeccion Ventas Mes
+            const now = new Date();
+            const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+            const currentDay = now.getDate();
             
-            meses.forEach((mes, idx) => {
-                const movs = yearMovs.filter(m => new Date(m.fecha).getMonth() === idx);
-                const ivaV = movs.filter(m => m.tipo === 'VENTA').reduce((a,b) => a+b.iva, 0);
-                const ivaG = movs.filter(m => m.tipo === 'GASTO_LOCAL').reduce((a,b) => a+b.iva, 0);
-                const ivaD = movs.filter(m => m.tipo === 'IMPORTACION').reduce((a,b) => a+b.iva, 0);
-                const vNetas = movs.filter(m => m.tipo === 'VENTA').reduce((a,b) => a+b.neto, 0);
-                const ppm = Math.round(vNetas * 0.01);
-                
-                let neto = ivaV - ivaG - ivaD - rAcum;
-                let dRem = rAcum;
-                if (neto < 0) { rAcum = Math.abs(neto); neto = 0; } else { rAcum = 0; }
+            const currentMonthSales = db.movimientos.filter(m => 
+                m.tipo === 'VENTA' && 
+                new Date(m.fecha).getMonth() === now.getMonth() &&
+                new Date(m.fecha).getFullYear() === now.getFullYear()
+            ).reduce((a,b) => a + b.neto, 0);
 
-                f29H += `
-                    <tr>
-                        <td class="px-6 py-6 font-black text-slate-950 dark:text-white text-[10px] uppercase text-left">${mes}</td>
-                        <td class="px-6 py-6 text-right text-xs font-bold">$ ${ivaV.toLocaleString()}</td>
-                        <td class="px-6 py-6 text-right text-emerald-500 text-xs font-bold">$ ${ivaG.toLocaleString()}</td>
-                        <td class="px-6 py-6 text-right text-blue-500 text-xs font-bold">$ ${ivaD.toLocaleString()}</td>
-                        <td class="px-6 py-6 text-right text-xs font-black text-orange-500">$ ${dRem.toLocaleString()}</td>
-                        <td class="px-6 py-6 text-right font-black">$ ${(neto + ppm).toLocaleString()}</td>
-                    </tr>
-                `;
-                totals.vN += vNetas;
-                totals.cM += movs.reduce((a,b) => a+(b.costoMercaderia || 0), 0);
-                totals.gO += movs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a,b) => a+b.neto, 0);
-            });
-            f29Body.innerHTML = f29H;
+            const dailyAvg = currentMonthSales / currentDay;
+            const projectedTotal = Math.round(dailyAvg * daysInMonth);
             
-            const utilFinal = totals.vN - totals.cM - totals.gO;
-            document.getElementById('f22-ventas').innerText = `$ ${totals.vN.toLocaleString()}`;
-            document.getElementById('f22-costos').innerText = `$ ${totals.cM.toLocaleString()}`;
-            document.getElementById('f22-gastos').innerText = `$ ${totals.gO.toLocaleString()}`;
-            document.getElementById('f22-utilidad').innerText = `$ ${utilFinal.toLocaleString()}`;
-            document.getElementById('dash-ventas').innerText = `$ ${totals.vN.toLocaleString()}`;
-            document.getElementById('dash-utilidad').innerText = `$ ${utilFinal.toLocaleString()}`;
-            document.getElementById('dash-stock').innerText = `$ ${db.productos.reduce((a,p)=>a+(p.stock*p.costoPromedio),0).toLocaleString()}`;
-            document.getElementById('dash-iva-credito').innerText = `$ ${rAcum.toLocaleString()}`;
+            safeSetText('proj-sales-current', `$ ${currentMonthSales.toLocaleString()}`);
+            safeSetText('proj-sales-forecast', `$ ${projectedTotal.toLocaleString()}`);
+            
+            const pBar = document.getElementById('proj-bar-sales');
+            if(pBar) pBar.style.width = `${Math.min(100, (currentMonthSales/projectedTotal)*100)}%`;
+
+            // 2. Burn Rate & Runway
+            const br = calculateBurnRate();
+            const cash = db.cuentas.reduce((a,c)=>a+c.saldo, 0);
+            const runway = br > 0 ? (cash/br).toFixed(1) : '∞';
+            safeSetText('proj-burn-rate', `$ ${br.toLocaleString()}`);
+            safeSetText('proj-runway', `${runway} Meses`);
+
+            // 3. Proyeccion IVA (Día 20)
+            const ivaEst = calculateIVAPagar(db.movimientos);
+            safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString()}`);
+
+            // 4. Tabla Quiebres
+            safeSetHTML('table-projections', db.productos.map(p => {
+                const info = calculateStockRunout(p.id);
+                let badge = '<span class="badge-prediction bg-emerald-100 text-emerald-700">OK</span>';
+                if(info.days < 10) badge = '<span class="badge-prediction bg-red-100 text-red-700">CRÍTICO</span>';
+                else if(info.days < 30) badge = '<span class="badge-prediction bg-orange-100 text-orange-700">ATENCIÓN</span>';
+                
+                return `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                    <td class="px-6 py-3 font-bold text-xs dark:text-white">${p.nombre}</td>
+                    <td class="px-6 py-3 text-center text-xs">${p.stock}</td>
+                    <td class="px-6 py-3 text-center text-xs font-bold text-blue-500">~${(p.stock/info.days).toFixed(1)}/día</td>
+                    <td class="px-6 py-3 text-center font-black">${info.days} días</td>
+                    <td class="px-6 py-3 text-center text-xs text-slate-400">${info.date}</td>
+                    <td class="px-6 py-3 text-center">${badge}</td>
+                </tr>`;
+            }).join(''));
+        }
+
+        function calculateIVAPagar(movs) {
+            const m = movs.filter(x => new Date(x.fecha).getMonth() === new Date().getMonth());
+            const d = m.filter(x => x.tipo === 'VENTA').reduce((a,b) => a + b.iva, 0);
+            const c = m.filter(x => x.tipo === 'GASTO_LOCAL' || x.tipo === 'IMPORTACION').reduce((a,b) => a + b.iva, 0);
+            return d - c;
+        }
+
+        function calculateReports(yearMovs) {
+            const meses = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+            let remanente = 0; let f29H = ""; let margins = [];
+            meses.forEach((mes, idx) => {
+                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
+                const ivaV = m.filter(x => x.tipo === 'VENTA').reduce((a,b) => a + b.iva, 0);
+                const ivaC = m.filter(x => x.tipo === 'GASTO_LOCAL').reduce((a,b) => a + b.iva, 0);
+                const ivaD = m.filter(x => x.tipo === 'IMPORTACION').reduce((a,b) => a + b.iva, 0);
+                const neto = ivaV - ivaC - ivaD - remanente;
+                if(neto < 0) { remanente = Math.abs(neto); } else { remanente = 0; }
+                const ppm = Math.round(m.filter(x=>x.tipo==='VENTA').reduce((a,b)=>a+b.neto,0) * 0.01);
+                f29H += `<tr><td class="px-6 py-4 font-black text-xs">${mes}</td><td class="text-right text-xs">$ ${ivaV.toLocaleString()}</td><td class="text-right text-xs text-emerald-500">$ ${ivaC.toLocaleString()}</td><td class="text-right text-xs text-blue-500">$ ${ivaD.toLocaleString()}</td><td class="text-right text-xs text-orange-500">$ ${remanente.toLocaleString()}</td><td class="text-right font-black text-xs">$ ${Math.max(0, neto + ppm).toLocaleString()}</td></tr>`;
+                
+                m.filter(x => x.tipo === 'VENTA').forEach(v => {
+                    const com = m.find(c => c.parentId == v.id);
+                    margins.push({ desc: v.desc, margen: v.neto - v.costoMercaderia - (com ? com.neto : 0) });
+                });
+            });
+            safeSetHTML('table-f29', f29H);
+            
+            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a,b) => a + b.neto, 0);
+            const cM = yearMovs.reduce((a,b) => a + (b.costoMercaderia || 0), 0);
+            const gO = yearMovs.filter(x => x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS').reduce((a,b) => a + b.neto, 0);
+            const ret = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a,b) => a + b.total, 0);
+            
+            safeSetText('f22-ventas', `$ ${vN.toLocaleString()}`);
+            safeSetText('f22-costos', `$ ${cM.toLocaleString()}`);
+            safeSetText('f22-gastos', `$ ${gO.toLocaleString()}`);
+            safeSetText('f22-utilidad', `$ ${(vN-cM-gO).toLocaleString()}`);
+            safeSetText('f22-retiros', `$ ${ret.toLocaleString()}`);
+
+            safeSetHTML('margin-summary', margins.slice(-5).map(s => `<div class="flex justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border-l-4 ${s.margen>0?'border-emerald-500':'border-red-500'}"><span class="text-[9px] font-black uppercase">${s.desc}</span><span class="text-xs font-black">$ ${s.margen.toLocaleString()}</span></div>`).join(''));
         }
 
         function renderAnnualSummary() {
             const ctx = document.getElementById('chart-performance').getContext('2d');
             if (performanceChart) performanceChart.destroy();
             const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
-            const salesD = Array(12).fill(0); const expenseD = Array(12).fill(0);
-            let a_vne = 0, a_cmv = 0, a_gas = 0;
-
+            const sD = Array(12).fill(0); const eD = Array(12).fill(0);
+            let a_vne=0, a_cmv=0, a_gas=0;
             yearMovs.forEach(m => {
-                const mIdx = new Date(m.fecha).getMonth();
-                if (m.tipo === 'VENTA') { salesD[mIdx] += m.neto; a_vne += m.neto; a_cmv += (m.costoMercaderia || 0); }
-                else { expenseD[mIdx] += m.neto; if(m.tipo !== 'IMPORTACION') a_gas += m.neto; }
+                const idx = new Date(m.fecha).getMonth();
+                if (m.tipo === 'VENTA') { sD[idx] += m.neto; a_vne += m.neto; a_cmv += (m.costoMercaderia||0); }
+                else { eD[idx] += m.neto; if(m.tipo!=='IMPORTACION') a_gas += m.neto; }
             });
-
-            document.getElementById('annual-pnl').innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex justify-between text-[11px] py-2 border-b border-slate-100 dark:border-slate-800 uppercase font-black text-slate-400"><span>Ventas Netas</span><span class="text-slate-900 dark:text-white">$ ${a_vne.toLocaleString()}</span></div>
-                    <div class="flex justify-between text-[11px] py-2 border-b border-slate-100 dark:border-slate-800 uppercase font-black text-red-500"><span>(-) CMV</span><span>$ ${a_cmv.toLocaleString()}</span></div>
-                    <div class="flex justify-between text-[11px] py-2 border-b border-slate-100 dark:border-slate-800 uppercase font-black text-red-500"><span>(-) Gastos Oper.</span><span>$ ${a_gas.toLocaleString()}</span></div>
-                    <div class="flex justify-between text-sm py-8 border-t-4 border-blue-500 font-black text-slate-950 dark:text-white uppercase tracking-[0.3em]"><span>UTILIDAD NETA</span><span class="${(a_vne-a_cmv-a_gas) >= 0 ? 'text-emerald-600' : 'text-red-600'}">$ ${(a_vne-a_cmv-a_gas).toLocaleString()}</span></div>
-                </div>`;
-
+            safeSetHTML('annual-pnl', `<div class="space-y-3"><div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-slate-400 uppercase">Ventas</span><span class="text-xs font-black dark:text-white">$ ${a_vne.toLocaleString()}</span></div><div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-red-400 uppercase">(-) Costo Venta</span><span class="text-xs font-black">$ ${a_cmv.toLocaleString()}</span></div><div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-red-400 uppercase">(-) Gastos</span><span class="text-xs font-black">$ ${a_gas.toLocaleString()}</span></div><div class="flex justify-between pt-4"><span class="text-sm font-black dark:text-white uppercase">Utilidad</span><span class="text-sm font-black text-emerald-500">$ ${(a_vne-a_cmv-a_gas).toLocaleString()}</span></div></div>`);
+            
             performanceChart = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
-                    datasets: [
-                        { label: 'Ventas', data: salesD, borderColor: '#3b82f6', tension: 0.4, fill: true, backgroundColor: 'rgba(59, 130, 246, 0.05)' },
-                        { label: 'Egresos', data: expenseD, borderColor: '#f43f5e', borderDash: [5, 5], tension: 0.4 }
-                    ]
-                },
-                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: db.config.theme === 'dark' ? '#94a3b8' : '#64748b', font: { size: 10, weight: 'bold' } } } } }
+                data: { labels: ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"], datasets: [{ label: 'Ventas', data: sD, borderColor: '#3b82f6', tension: 0.4 }, { label: 'Gastos', data: eD, borderColor: '#ef4444', tension: 0.4 }] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: db.config.theme === 'dark' ? '#1e293b' : '#e2e8f0' } } } }
             });
         }
     </script>
