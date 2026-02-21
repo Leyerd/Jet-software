@@ -35,7 +35,7 @@ async function dbStatus(_req, res) {
 
   return sendJson(res, 200, {
     ok: true,
-    sprint: '3.1',
+    sprint: '10',
     persistenceMode,
     usingPostgres,
     pgAvailable,

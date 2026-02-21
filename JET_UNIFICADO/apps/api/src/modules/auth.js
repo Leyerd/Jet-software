@@ -2,8 +2,27 @@ const crypto = require('crypto');
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 
+const SCRYPT_N = Number(process.env.SCRYPT_N || 16384);
+const SCRYPT_R = Number(process.env.SCRYPT_R || 8);
+const SCRYPT_P = Number(process.env.SCRYPT_P || 1);
+const KEY_LEN = 64;
+
 function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, KEY_LEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P }).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyPassword(password, storedHash = '') {
+  if (!storedHash.startsWith('scrypt$')) return false;
+  const parts = storedHash.split('$');
+  if (parts.length !== 3) return false;
+  const [, salt, hashHex] = parts;
+  const derived = crypto.scryptSync(password, salt, KEY_LEN, { N: SCRYPT_N, r: SCRYPT_R, p: SCRYPT_P }).toString('hex');
+  const a = Buffer.from(derived, 'hex');
+  const b = Buffer.from(hashHex, 'hex');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
 }
 
 function generateToken() {
@@ -104,7 +123,7 @@ async function login(req, res) {
 
   const state = await readStore();
   const user = state.usuarios.find(u => u.email === email);
-  if (!user || user.passwordHash !== hashPassword(password)) {
+  if (!user || !verifyPassword(password, user.passwordHash || '')) {
     return sendJson(res, 401, { ok: false, message: 'credenciales inválidas' });
   }
 

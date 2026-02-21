@@ -229,3 +229,14 @@ npm run ci:check
 ```
 
 En GitHub Actions se ejecuta CI automáticamente y CD queda listo para deploy con secrets de SSH.
+
+
+## Corrección punto 0 (brechas base)
+
+Se aplicaron correcciones inmediatas:
+- API en `docker-compose` queda por defecto en modo `postgres`.
+- Importadores de conciliación pasan a modo incremental (sin reemplazo total de dataset).
+- Autenticación migrada de `sha256` simple a `scrypt` con salt.
+- UI alinea régimen por defecto a `14D8` y elimina prompt de token directo para Mercado Libre.
+
+Nota: aún queda pendiente la eliminación completa del patrón `app_state` monolítico y la migración total de UI a backend-first sin `localStorage` como fuente primaria.

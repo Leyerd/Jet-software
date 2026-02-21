@@ -28,10 +28,13 @@ async function importCartola(req, res) {
   }));
 
   const state = await readStore();
-  state.cartolaMovimientos = rows;
+  const existing = Array.isArray(state.cartolaMovimientos) ? state.cartolaMovimientos : [];
+  const index = new Set(existing.map(r => `${r.id}-${r.fecha}`));
+  const toAdd = rows.filter(r => !index.has(`${r.id}-${r.fecha}`));
+  state.cartolaMovimientos = existing.concat(toAdd);
   await writeStore(state);
-  await appendAudit('reconciliation.import_cartola', { rows: rows.length }, auth.user.email);
-  return sendJson(res, 200, { ok: true, imported: rows.length });
+  await appendAudit('reconciliation.import_cartola', { received: rows.length, imported: toAdd.length }, auth.user.email);
+  return sendJson(res, 200, { ok: true, received: rows.length, imported: toAdd.length, skipped: rows.length - toAdd.length });
 }
 
 async function importRCVVentas(req, res) {
@@ -49,10 +52,13 @@ async function importRCVVentas(req, res) {
   }));
 
   const state = await readStore();
-  state.rcvVentas = rows;
+  const existing = Array.isArray(state.rcvVentas) ? state.rcvVentas : [];
+  const index = new Set(existing.map(r => `${r.folio || r.id}-${r.fecha}`));
+  const toAdd = rows.filter(r => !index.has(`${r.folio || r.id}-${r.fecha}`));
+  state.rcvVentas = existing.concat(toAdd);
   await writeStore(state);
-  await appendAudit('reconciliation.import_rcv_ventas', { rows: rows.length }, auth.user.email);
-  return sendJson(res, 200, { ok: true, imported: rows.length });
+  await appendAudit('reconciliation.import_rcv_ventas', { received: rows.length, imported: toAdd.length }, auth.user.email);
+  return sendJson(res, 200, { ok: true, received: rows.length, imported: toAdd.length, skipped: rows.length - toAdd.length });
 }
 
 async function importMarketplaceOrders(req, res) {
@@ -69,10 +75,13 @@ async function importMarketplaceOrders(req, res) {
   }));
 
   const state = await readStore();
-  state.marketplaceOrders = rows;
+  const existing = Array.isArray(state.marketplaceOrders) ? state.marketplaceOrders : [];
+  const index = new Set(existing.map(r => `${r.id}-${r.fecha}`));
+  const toAdd = rows.filter(r => !index.has(`${r.id}-${r.fecha}`));
+  state.marketplaceOrders = existing.concat(toAdd);
   await writeStore(state);
-  await appendAudit('reconciliation.import_marketplace', { rows: rows.length }, auth.user.email);
-  return sendJson(res, 200, { ok: true, imported: rows.length });
+  await appendAudit('reconciliation.import_marketplace', { received: rows.length, imported: toAdd.length }, auth.user.email);
+  return sendJson(res, 200, { ok: true, received: rows.length, imported: toAdd.length, skipped: rows.length - toAdd.length });
 }
 
 async function getReconciliationSummary(req, res) {

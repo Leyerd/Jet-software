@@ -1144,7 +1144,7 @@
             const yearInp = document.getElementById('config-year'); if (yearInp) yearInp.value = db.config.year;
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             // Establecer valores por defecto en los campos de régimen, giro y domicilio
-            const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D3';
+            const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
             const giroInp = document.getElementById('config-giro'); if (giroInp) giroInp.value = db.config.giro || '';
             const addrInp = document.getElementById('config-address'); if (addrInp) addrInp.value = db.config.address || '';
             const monthSel = document.getElementById('filter-month'); if (monthSel) monthSel.value = db.config.selectedMonth;
@@ -2175,34 +2175,26 @@ calculateReports(yearMovs);
             }
         }
 
-        // Sincronizar ventas directamente desde Mercado Libre (borrador)
+        // Sincronización Mercado Libre vía backend (sin exponer token en frontend)
         async function syncMercadoLibre() {
-            const token = prompt('Ingrese su token de Mercado Libre (Bearer)');
-            if (!token) return;
-            const seller = prompt('Ingrese su Seller ID');
-            if (!seller) return;
             try {
-                let offset = 0;
-                const limit = 50;
-                let total = 0;
-                do {
-                    const url = `https://api.mercadolibre.com/orders/search?seller_id=${seller}&order.status=paid&offset=${offset}&limit=${limit}`;
-                    const response = await fetch(url, {
-                        headers: { 'Authorization': 'Bearer ' + token }
-                    });
-                    if (!response.ok) throw new Error('Respuesta no válida');
-                    const data = await response.json();
-                    const orders = data.results || [];
-                    orders.forEach(o => importMLOrder(o));
-                    offset += limit;
-                    total = data.paging && data.paging.total ? data.paging.total : orders.length;
-                    // Si el API no retorna paging.total, salimos después de procesar la primera página
-                    if (!data.paging || data.paging.total === undefined) break;
-                } while (offset < total);
-                alert('Sincronización con Mercado Libre completada.');
+                const raw = prompt('Pega aquí el JSON de órdenes exportadas desde Mercado Libre para importación segura por backend');
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                const rows = Array.isArray(parsed) ? parsed : (parsed.results || parsed.rows || []);
+                if (!rows.length) throw new Error('No se encontraron órdenes en el JSON');
+
+                const response = await fetch('/integrations/mercadolibre/import-orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rows })
+                });
+
+                if (!response.ok) throw new Error('No se pudo importar en backend');
+                alert('Órdenes enviadas al backend. Revisa conciliación para validar resultados.');
             } catch (err) {
                 console.error(err);
-                alert('Error al conectar con Mercado Libre. Asegúrese de que el token y el seller ID sean válidos.');
+                alert('Error de importación. Verifica que el JSON sea válido y que el backend esté activo.');
             }
         }
         function deleteMov(id) {
