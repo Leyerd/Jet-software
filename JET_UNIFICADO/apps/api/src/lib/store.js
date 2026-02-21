@@ -32,13 +32,20 @@ const defaultState = {
     mercadolibre: { enabled: false, lastSyncAt: null },
     sii: { enabled: false, lastSyncAt: null }
   },
-  integrationSyncLog: []
+  integrationSyncLog: [],
+  backups: [],
+  backupPolicy: {
+    retentionMaxFiles: 20,
+    frequency: 'daily',
+    encryptionPlanned: true,
+    offsitePlanned: true
+  }
 };
 
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog'
+    'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'backups'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -54,6 +61,15 @@ function ensureArrays(state) {
       alibaba: { enabled: false, lastSyncAt: null },
       mercadolibre: { enabled: false, lastSyncAt: null },
       sii: { enabled: false, lastSyncAt: null }
+    };
+  }
+
+  if (!state.backupPolicy || typeof state.backupPolicy !== 'object') {
+    state.backupPolicy = {
+      retentionMaxFiles: 20,
+      frequency: 'daily',
+      encryptionPlanned: true,
+      offsitePlanned: true
     };
   }
   return state;

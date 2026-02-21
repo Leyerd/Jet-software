@@ -40,10 +40,10 @@ function req(method, path, body, token) {
   const health = await req('GET', '/health');
   if (!health.data.ok) throw new Error('Health falló');
 
-  const reg = await req('POST', '/auth/register', { nombre: 'QA', email, password: '123456', rol: 'dueno' });
+  const reg = await req('POST', '/auth/register', { nombre: 'QA', email, password: 'Clave123A', rol: 'dueno' });
   if (!reg.data.ok) throw new Error('Register falló');
 
-  const login = await req('POST', '/auth/login', { email, password: '123456' });
+  const login = await req('POST', '/auth/login', { email, password: 'Clave123A' });
   if (!login.data.ok || !login.data.token) throw new Error('Login falló');
   const token = login.data.token;
 
@@ -97,6 +97,19 @@ function req(method, path, body, token) {
 
   const integStatus = await req('GET', '/integrations/status', null, token);
   if (!integStatus.data.ok || !integStatus.data.providers) throw new Error('Integrations status falló');
+
+
+  const backupPolicy = await req('GET', '/backup/policy', null, token);
+  if (!backupPolicy.data.ok || !backupPolicy.data.policy) throw new Error('Backup policy falló');
+
+  const backupCreate = await req('POST', '/backup/create', { reason: 'qa-smoke-sprint9' }, token);
+  if (!backupCreate.data.ok || !backupCreate.data.backup?.id) throw new Error('Backup create falló');
+
+  const backupList = await req('GET', '/backup/list', null, token);
+  if (!backupList.data.ok || backupList.data.count < 1) throw new Error('Backup list falló');
+
+  const logout = await req('POST', '/auth/logout', {}, token);
+  if (!logout.data.ok) throw new Error('Logout falló');
 
   const coh = await req('GET', '/system/coherence-check');
   if (!coh.data.ok) throw new Error('Coherence check falló');

@@ -10,6 +10,16 @@ function generateToken() {
   return crypto.randomBytes(24).toString('hex');
 }
 
+const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS || 12);
+
+function validatePassword(password) {
+  if (typeof password !== 'string' || password.length < 8) return 'password debe tener al menos 8 caracteres';
+  if (!/[A-Z]/.test(password)) return 'password debe incluir al menos una mayúscula';
+  if (!/[a-z]/.test(password)) return 'password debe incluir al menos una minúscula';
+  if (!/[0-9]/.test(password)) return 'password debe incluir al menos un número';
+  return null;
+}
+
 function getBearerToken(req) {
   const header = req.headers.authorization || req.headers.Authorization;
   if (!header || typeof header !== 'string') return null;
@@ -24,6 +34,15 @@ async function getSessionUser(req) {
   const state = await readStore();
   const session = state.sesiones.find(s => s.token === token);
   if (!session) return null;
+
+  const createdAt = new Date(session.creadoEn).getTime();
+  const ttlMs = SESSION_TTL_HOURS * 60 * 60 * 1000;
+  if (Number.isFinite(createdAt) && Date.now() - createdAt > ttlMs) {
+    state.sesiones = state.sesiones.filter(s => s.token !== token);
+    await writeStore(state);
+    return null;
+  }
+
   return state.usuarios.find(u => u.id === session.userId) || null;
 }
 
@@ -48,6 +67,9 @@ async function register(req, res) {
   if (!nombre || !email || !password) {
     return sendJson(res, 400, { ok: false, message: 'nombre, email y password son requeridos' });
   }
+
+  const passwordError = validatePassword(password);
+  if (passwordError) return sendJson(res, 400, { ok: false, message: passwordError });
 
   const validRoles = ['dueno', 'contador_admin', 'operador', 'auditor'];
   if (!validRoles.includes(rol)) {
@@ -111,10 +133,24 @@ async function me(req, res) {
   });
 }
 
+async function logout(req, res) {
+  const token = getBearerToken(req);
+  if (!token) return sendJson(res, 401, { ok: false, message: 'No autenticado' });
+
+  const state = await readStore();
+  const before = state.sesiones.length;
+  state.sesiones = state.sesiones.filter(s => s.token !== token);
+  const removed = before - state.sesiones.length;
+  await writeStore(state);
+
+  return sendJson(res, 200, { ok: true, removedSessions: removed });
+}
+
 module.exports = {
   register,
   login,
   me,
+  logout,
   getSessionUser,
   requireRoles
 };

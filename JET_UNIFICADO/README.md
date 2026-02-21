@@ -14,6 +14,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 6 ejecutado (motor tributario versionado, default 14D8 transparente)
 - ✅ Sprint 7 ejecutado (kardex FIFO + costeo trazable por lotes)
 - ✅ Sprint 8 ejecutado (conectores externos Alibaba, Mercado Libre y SII)
+- ✅ Sprint 9 ejecutado (auth reforzada + políticas de respaldo y restore auditado)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -25,6 +26,7 @@ Documentos de avance:
 - `docs/SPRINT_6.md`
 - `docs/SPRINT_7.md`
 - `docs/SPRINT_8.md`
+- `docs/SPRINT_9.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
@@ -196,3 +198,16 @@ Endpoints nuevos:
 - `POST /integrations/sii/import-rcv`
 
 Con esto el backend único ya integra fuentes externas críticas para operación (Alibaba, Mercado Libre y SII).
+
+
+## Sprint 9: seguridad y respaldos
+
+Endpoints nuevos:
+- `POST /auth/logout`
+- `GET /backup/policy`
+- `POST /backup/policy`
+- `POST /backup/create`
+- `GET /backup/list`
+- `POST /backup/restore`
+
+Incluye política de contraseña robusta, expiración de sesión y gestión auditada de respaldos.
