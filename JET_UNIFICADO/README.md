@@ -2,6 +2,16 @@
 
 Este proyecto junta en **un solo software** todos los objetivos: contabilidad, tributación, inventario, conciliación y proyecciones.
 
+## Estado actual
+- ✅ Base unificada (web + api + db)
+- ✅ **Sprint 1 implementado** en backend:
+  - migración de backup JSON,
+  - cierre/reapertura de período,
+  - bloqueo de movimientos en períodos cerrados,
+  - auditoría básica de eventos.
+
+Detalle técnico del sprint: `docs/SPRINT_1.md`.
+
 ## 1) ¿Qué necesitas instalar?
 
 1. Docker Desktop
@@ -30,24 +40,32 @@ docker compose down
 ## 4) ¿Dónde está cada parte?
 
 - Interfaz visual: `apps/web/index.html`
-- API: `apps/api/server.js`
-- Base de datos (estructura): `db/schema.sql`
-- Plan de implementación completo: `docs/PLAN_10_OBJETIVOS_IMPLEMENTACION.md`
+- API: `apps/api/server.js` y `apps/api/src/*`
+- Persistencia temporal backend: `apps/api/data/store.json`
+- Base de datos (estructura siguiente fase): `db/schema.sql`
+- Plan macro: `docs/PLAN_10_OBJETIVOS_IMPLEMENTACION.md`
+- Avance Sprint 1: `docs/SPRINT_1.md`
 
 ## 5) ¿Es una sola versión?
 
 Sí. Esta carpeta (`JET_UNIFICADO`) es la **única base** para evolucionar todo.
 No necesitas crear 10 apps distintas: se implementa por módulos dentro de la misma.
 
-## 6) Siguiente paso recomendado
+## 6) Flujo rápido de prueba del Sprint 1
 
-Después de levantarlo, el equipo técnico debe implementar los módulos en este orden:
-1. Seguridad y usuarios
-2. Migración de datos históricos
-3. Cierre contable
-4. Conciliación
-5. Motor tributario
-6. Inventario avanzado
-7. Integraciones Mercado Libre
-8. Proyecciones
-9. QA y despliegue
+Con el stack arriba, prueba estos pasos:
+
+1. Ver salud de API:
+```bash
+curl -s http://localhost:4000/health
+```
+
+2. Cerrar período:
+```bash
+curl -s -X POST http://localhost:4000/periods/close -H "Content-Type: application/json" -d '{"anio":2026,"mes":4,"user":"dueno"}'
+```
+
+3. Intentar crear movimiento en ese mes (debe bloquear):
+```bash
+curl -s -X POST http://localhost:4000/movements -H "Content-Type: application/json" -d '{"fecha":"2026-04-10","tipo":"VENTA","total":10000}'
+```
