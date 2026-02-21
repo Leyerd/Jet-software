@@ -31,6 +31,10 @@ Documentos de avance:
 - `docs/SPRINT_10.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
+
+## Instalación guiada (recomendada para no programadores)
+Si quieres una explicación paso a paso, abre: `docs/GUIA_INSTALACION_PARA_PRINCIPIANTES.md`.
+
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
 Endpoints de apoyo:
@@ -239,4 +243,8 @@ Se aplicaron correcciones inmediatas:
 - Autenticación migrada de `sha256` simple a `scrypt` con salt.
 - UI alinea régimen por defecto a `14D8` y elimina prompt de token directo para Mercado Libre.
 
-Nota: aún queda pendiente la eliminación completa del patrón `app_state` monolítico y la migración total de UI a backend-first sin `localStorage` como fuente primaria.
+Nota: el runtime operativo ya migró fuera de `app_state` monolítico y la UI quedó en enfoque backend-first sin `localStorage` como fuente primaria.
+
+
+## Meta 2: migración segura y trazable
+Guía y comandos en: `docs/META2_MIGRACION_SEGURA_TRAZABLE.md`.

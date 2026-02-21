@@ -30,6 +30,7 @@ const {
   listBackups,
   restoreBackup
 } = require('./modules/backup');
+const { createEntry, publishEntry, listEntries } = require('./modules/journal');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -49,7 +50,9 @@ const modulesList = [
   'inventory-kardex-fifo-sprint7',
   'external-connectors-sprint8',
   'auth-roles-backup-policies-sprint9',
-  'quality-ci-cd-sprint10'
+  'quality-ci-cd-sprint10',
+  'meta1-postgres-normalized-runtime-auth-products-movements-periods-tax',
+  'journal-double-entry-publish-validation'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -122,6 +125,13 @@ function route(req, res) {
     if (req.method === 'POST') return handle(createMovement(req, res), res);
     return methodNotAllowed(res);
   }
+
+  if (path === '/accounting/entries') {
+    if (req.method === 'GET') return handle(listEntries(req, res), res);
+    if (req.method === 'POST') return handle(createEntry(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/entries/publish') return req.method === 'POST' ? handle(publishEntry(req, res), res) : methodNotAllowed(res);
 
   if (path === '/products') {
     if (req.method === 'GET') return handle(listProducts(req, res), res);

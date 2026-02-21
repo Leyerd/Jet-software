@@ -11,7 +11,9 @@
     "migrate:postgres:store": "node scripts/migrate-postgres-to-store.js",
     "qa:smoke": "node scripts/qa-smoke.js",
     "qa:run": "node scripts/qa-runner.js",
-    "ci:check": "node scripts/ci-check.js"
+    "ci:check": "node scripts/ci-check.js",
+    "migrate:reconcile": "node scripts/migration-reconcile.js",
+    "migrate:rollback:reset": "node scripts/migration-rollback-reset.js"
   },
   "dependencies": {
     "pg": "^8.12.0"
