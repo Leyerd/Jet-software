@@ -1,9 +1,9 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# La API Sprint 3 puede correr sin instalar dependencias externas.
-# (Los scripts de migración a PostgreSQL requieren 'pg' y se ejecutan manualmente fuera del contenedor).
 COPY package.json ./
+RUN npm install --omit=dev
+
 COPY server.js ./
 COPY src ./src
 COPY scripts ./scripts

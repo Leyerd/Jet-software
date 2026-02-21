@@ -18,17 +18,17 @@ function getBearerToken(req) {
   return token;
 }
 
-function getSessionUser(req) {
+async function getSessionUser(req) {
   const token = getBearerToken(req);
   if (!token) return null;
-  const state = readStore();
+  const state = await readStore();
   const session = state.sesiones.find(s => s.token === token);
   if (!session) return null;
   return state.usuarios.find(u => u.id === session.userId) || null;
 }
 
-function requireRoles(req, allowedRoles) {
-  const user = getSessionUser(req);
+async function requireRoles(req, allowedRoles) {
+  const user = await getSessionUser(req);
   if (!user) {
     return { ok: false, status: 401, message: 'No autenticado. Use token Bearer.' };
   }
@@ -54,7 +54,7 @@ async function register(req, res) {
     return sendJson(res, 400, { ok: false, message: 'rol inválido' });
   }
 
-  const state = readStore();
+  const state = await readStore();
   if (state.usuarios.find(u => u.email === email)) {
     return sendJson(res, 409, { ok: false, message: 'email ya registrado' });
   }
@@ -69,8 +69,8 @@ async function register(req, res) {
   };
 
   state.usuarios.push(user);
-  writeStore(state);
-  appendAudit('auth.register', { email, rol }, user.email);
+  await writeStore(state);
+  await appendAudit('auth.register', { email, rol }, user.email);
   return sendJson(res, 201, { ok: true, user: { id: user.id, nombre: user.nombre, email: user.email, rol: user.rol } });
 }
 
@@ -80,7 +80,7 @@ async function login(req, res) {
   const password = body.password;
   if (!email || !password) return sendJson(res, 400, { ok: false, message: 'email y password son requeridos' });
 
-  const state = readStore();
+  const state = await readStore();
   const user = state.usuarios.find(u => u.email === email);
   if (!user || user.passwordHash !== hashPassword(password)) {
     return sendJson(res, 401, { ok: false, message: 'credenciales inválidas' });
@@ -92,8 +92,8 @@ async function login(req, res) {
     userId: user.id,
     creadoEn: new Date().toISOString()
   });
-  writeStore(state);
-  appendAudit('auth.login', { email }, user.email);
+  await writeStore(state);
+  await appendAudit('auth.login', { email }, user.email);
 
   return sendJson(res, 200, {
     ok: true,
@@ -102,8 +102,8 @@ async function login(req, res) {
   });
 }
 
-function me(req, res) {
-  const user = getSessionUser(req);
+async function me(req, res) {
+  const user = await getSessionUser(req);
   if (!user) return sendJson(res, 401, { ok: false, message: 'No autenticado' });
   return sendJson(res, 200, {
     ok: true,

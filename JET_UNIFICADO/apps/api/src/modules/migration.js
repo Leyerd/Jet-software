@@ -26,24 +26,18 @@ function buildSummary(store) {
 }
 
 async function importJson(req, res) {
-  const auth = requireRoles(req, ['dueno', 'contador_admin']);
+  const auth = await requireRoles(req, ['dueno', 'contador_admin']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
   const body = await parseBody(req);
   const payload = body.payload || body;
 
   const validation = validateBackupShape(payload);
-  if (!validation.valid) {
-    return sendJson(res, 400, {
-      ok: false,
-      message: 'Backup inválido: faltan arreglos requeridos',
-      missing: validation.missing
-    });
-  }
+  if (!validation.valid) return sendJson(res, 400, { ok: false, message: 'Backup inválido: faltan arreglos requeridos', missing: validation.missing });
 
   const now = new Date().toISOString();
   const source = body.source || 'backup_json_manual';
-  const current = readStore();
+  const current = await readStore();
 
   const next = {
     ...current,
@@ -56,10 +50,9 @@ async function importJson(req, res) {
     source
   };
 
-  writeStore(next);
-  appendAudit('migration.import_json', {
-    source,
-    migratedAt: now,
+  await writeStore(next);
+  await appendAudit('migration.import_json', {
+    source, migratedAt: now,
     totals: {
       productos: payload.productos.length,
       movimientos: payload.movimientos.length,
@@ -69,14 +62,14 @@ async function importJson(req, res) {
     }
   }, auth.user.email);
 
-  return sendJson(res, 200, { ok: true, summary: buildSummary(readStore()) });
+  return sendJson(res, 200, { ok: true, summary: buildSummary(await readStore()) });
 }
 
-function getSummary(req, res) {
-  const auth = requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+async function getSummary(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
-  const store = readStore();
+  const store = await readStore();
   return sendJson(res, 200, { ok: true, summary: buildSummary(store) });
 }
 

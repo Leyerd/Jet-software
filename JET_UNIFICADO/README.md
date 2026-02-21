@@ -8,10 +8,13 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 2 implementado (auth+roles inicial, coherencia del backend y esquema DB ampliado)
 - ✅ Sprint 3 iniciado (preparación PostgreSQL + scripts de migración)
 
+- ✅ Sprint 3.1 iniciado (runtime PostgreSQL opcional + health DB real)
+
 Documentos de avance:
 - `docs/SPRINT_1.md`
 - `docs/SPRINT_2.md`
 - `docs/SPRINT_3.md`
+- `docs/SPRINT_3_1.md`
 
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
@@ -103,3 +106,24 @@ curl -s http://localhost:4000/health
 
 Si te mostró todo en 0 y no tienes datos históricos, **está bien**.
 Puedes partir desde base limpia sin problema y no necesitas migrar nada.
+
+
+## Sprint 3.1: modo PostgreSQL real (opcional)
+
+Si quieres guardar datos directo en PostgreSQL (en vez de archivo local):
+
+1. Edita `docker-compose.yml` y cambia en `api.environment`:
+```yaml
+PERSISTENCE_MODE: postgres
+```
+2. Reconstruye:
+```bash
+docker compose down
+docker compose up -d --build
+```
+3. Verifica:
+```bash
+curl -s http://localhost:4000/db/status
+```
+
+Si prefieres empezar simple, puedes dejar `PERSISTENCE_MODE: file` por ahora.

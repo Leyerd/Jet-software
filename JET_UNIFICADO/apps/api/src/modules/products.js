@@ -3,7 +3,7 @@ const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 
 async function createProduct(req, res) {
-  const auth = requireRoles(req, ['dueno', 'contador_admin', 'operador']);
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
   const body = await parseBody(req);
@@ -14,25 +14,19 @@ async function createProduct(req, res) {
 
   if (!nombre) return sendJson(res, 400, { ok: false, message: 'nombre es requerido' });
 
-  const state = readStore();
-  const product = {
-    id: `PROD-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    nombre,
-    sku,
-    stock,
-    costoPromedio
-  };
+  const state = await readStore();
+  const product = { id: `PROD-${Date.now()}-${Math.floor(Math.random() * 1000)}`, nombre, sku, stock, costoPromedio };
   state.productos.push(product);
-  writeStore(state);
-  appendAudit('product.create', product, auth.user.email);
+  await writeStore(state);
+  await appendAudit('product.create', product, auth.user.email);
   return sendJson(res, 201, { ok: true, product });
 }
 
-function listProducts(req, res) {
-  const auth = requireRoles(req, ['dueno', 'contador_admin', 'operador', 'auditor']);
+async function listProducts(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
-  const state = readStore();
+  const state = await readStore();
   return sendJson(res, 200, { ok: true, products: state.productos });
 }
 

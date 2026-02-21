@@ -17,82 +17,48 @@ const modulesList = [
   'productos-base',
   'auditoria-eventos',
   'coherence-check',
-  'postgres-migration-tooling'
+  'postgres-runtime-ready-3.1'
 ];
+
+function handle(promiseLike, res, status = 400) {
+  return Promise.resolve(promiseLike).catch(err => sendJson(res, status, { ok: false, message: err.message }));
+}
 
 function route(req, res) {
   const parsed = url.parse(req.url, true);
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: 3, version: 'v1.3-sprint3' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '3.1', version: 'v1.3.1-sprint3.1' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
     return sendJson(res, 200, { ok: true, modules: modulesList });
   }
 
-  if (req.method === 'GET' && path === '/system/coherence-check') {
-    return coherenceCheck(req, res);
-  }
+  if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
+  if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
 
-  if (req.method === 'GET' && path === '/db/status') {
-    return dbStatus(req, res);
-  }
+  if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/me') return req.method === 'GET' ? handle(me(req, res), res) : methodNotAllowed(res);
 
-  if (path === '/auth/register') {
-    if (req.method !== 'POST') return methodNotAllowed(res);
-    return register(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-  }
+  if (path === '/migration/import-json') return req.method === 'POST' ? handle(importJson(req, res), res, 500) : methodNotAllowed(res);
+  if (path === '/migration/summary') return req.method === 'GET' ? handle(getSummary(req, res), res) : methodNotAllowed(res);
 
-  if (path === '/auth/login') {
-    if (req.method !== 'POST') return methodNotAllowed(res);
-    return login(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-  }
-
-  if (path === '/auth/me') {
-    if (req.method !== 'GET') return methodNotAllowed(res);
-    return me(req, res);
-  }
-
-  if (path === '/migration/import-json') {
-    if (req.method !== 'POST') return methodNotAllowed(res);
-    return importJson(req, res).catch(err => sendJson(res, 500, { ok: false, message: err.message }));
-  }
-
-  if (path === '/migration/summary') {
-    if (req.method !== 'GET') return methodNotAllowed(res);
-    return getSummary(req, res);
-  }
-
-  if (path === '/periods/close') {
-    if (req.method !== 'POST') return methodNotAllowed(res);
-    return closePeriod(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-  }
-
-  if (path === '/periods/reopen') {
-    if (req.method !== 'POST') return methodNotAllowed(res);
-    return reopenPeriod(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-  }
-
-  if (path === '/periods') {
-    if (req.method !== 'GET') return methodNotAllowed(res);
-    return listPeriods(req, res);
-  }
+  if (path === '/periods/close') return req.method === 'POST' ? handle(closePeriod(req, res), res) : methodNotAllowed(res);
+  if (path === '/periods/reopen') return req.method === 'POST' ? handle(reopenPeriod(req, res), res) : methodNotAllowed(res);
+  if (path === '/periods') return req.method === 'GET' ? handle(listPeriods(req, res), res) : methodNotAllowed(res);
 
   if (path === '/movements') {
-    if (req.method === 'GET') return listMovements(req, res);
-    if (req.method === 'POST') {
-      return createMovement(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-    }
+    if (req.method === 'GET') return handle(listMovements(req, res), res);
+    if (req.method === 'POST') return handle(createMovement(req, res), res);
     return methodNotAllowed(res);
   }
 
   if (path === '/products') {
-    if (req.method === 'GET') return listProducts(req, res);
-    if (req.method === 'POST') {
-      return createProduct(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
-    }
+    if (req.method === 'GET') return handle(listProducts(req, res), res);
+    if (req.method === 'POST') return handle(createProduct(req, res), res);
     return methodNotAllowed(res);
   }
 
