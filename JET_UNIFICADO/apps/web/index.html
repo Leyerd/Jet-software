@@ -1096,7 +1096,7 @@
                 contabMonthBalance: new Date().getMonth(),
                 retRate: 14.5, // porcentaje retención honorarios por defecto (2026)
                 // Régimen tributario por defecto (14D3 Pro Pyme General o 14D8 Pro Pyme Transparente)
-                regimen: '14D3',
+                regimen: '14D8',
                 // Giro principal (SII): código de actividad económica
                 giro: '479100',
                 // Domicilio principal de la empresa (para fines de importaciones y fiscalización)
@@ -1112,10 +1112,7 @@
         function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
 
         document.addEventListener('DOMContentLoaded', () => {
-            const saved = localStorage.getItem('jet_db_v30_pro');
-            if (saved) {
-                db = JSON.parse(saved);
-            }
+            // En modo backend-first, no se usa localStorage como fuente principal de datos.
             // Initialize or migrate previous versions if any
             if (!db.cuentas || db.cuentas.length === 0) {
                 db.cuentas = [
@@ -1134,7 +1131,7 @@
             if (db.config.contabMonthMayor === undefined) db.config.contabMonthMayor = db.config.selectedMonth;
             if (db.config.contabMonthBalance === undefined) db.config.contabMonthBalance = db.config.selectedMonth;
             // Asegurar que existan los campos de régimen, giro y domicilio
-            if (db.config.regimen === undefined) db.config.regimen = '14D3';
+            if (db.config.regimen === undefined) db.config.regimen = '14D8';
             if (db.config.giro === undefined) db.config.giro = '479100';
             if (db.config.address === undefined) db.config.address = '';
             // Asegurar que existan los registros de RCV, incluso si no fueron guardados previamente
@@ -1175,9 +1172,8 @@
             }).catch(() => safeSetText('usd-val', `$ ${db.config.usdRate}`));
         }
         function save() {
-            // Recalcula asientos contables antes de guardar
+            // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
             rebuildAsientos();
-            localStorage.setItem('jet_db_v30_pro', JSON.stringify(db));
             render();
         }
 
@@ -1225,7 +1221,7 @@
         }
         function resetApp() {
             if (confirm('¿Reiniciar todo? Se perderán datos.')) {
-                localStorage.removeItem('jet_db_v30_pro'); location.reload();
+                location.reload();
             }
         }
 

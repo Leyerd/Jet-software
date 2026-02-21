@@ -1,22 +1,11 @@
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
-
-function defaultTaxConfig() {
-  return {
-    regime: '14D8', // Transparente por defecto
-    year: new Date().getFullYear(),
-    ppmRate: 0.2,
-    ivaRate: 0.19,
-    retentionRate: 14.5
-  };
-}
+const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
 
 function ensureTaxConfig(state) {
-  if (!state.taxConfig || typeof state.taxConfig !== 'object') {
-    state.taxConfig = defaultTaxConfig();
-  }
-  if (!state.taxConfig.regime) state.taxConfig.regime = '14D8';
+  if (!state.taxConfig || typeof state.taxConfig !== 'object') state.taxConfig = {};
+  if (!['14D8', '14D3'].includes(state.taxConfig.regime)) state.taxConfig.regime = '14D8';
   if (state.taxConfig.ppmRate === undefined) state.taxConfig.ppmRate = state.taxConfig.regime === '14D8' ? 0.2 : 0.25;
   if (state.taxConfig.ivaRate === undefined) state.taxConfig.ivaRate = 0.19;
   if (state.taxConfig.retentionRate === undefined) state.taxConfig.retentionRate = 14.5;
@@ -54,13 +43,42 @@ function computeTaxByRegime(rli, regime) {
     const idpc = Math.max(0, Math.round(rli * 0.25));
     return { regime, idpc, transparentAttribution: 0 };
   }
-  // 14D8 transparente
   return { regime, idpc: 0, transparentAttribution: Math.max(0, Math.round(rli)) };
 }
 
 async function getTaxConfig(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  if (isPostgresMode()) {
+    const year = new Date().getFullYear();
+    const taxConfig = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate"
+         FROM tax_config
+         WHERE anio = $1
+         ORDER BY id DESC
+         LIMIT 1`,
+        [year]
+      );
+      if (rs.rows.length) return rs.rows[0];
+      const created = {
+        year,
+        regime: '14D8',
+        ppmRate: 0.2,
+        ivaRate: 0.19,
+        retentionRate: 14.5
+      };
+      await client.query(
+        `INSERT INTO tax_config (anio, regimen, ppm_rate, iva_rate, ret_rate)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (anio, regimen) DO UPDATE SET ppm_rate = EXCLUDED.ppm_rate, iva_rate = EXCLUDED.iva_rate, ret_rate = EXCLUDED.ret_rate`,
+        [created.year, created.regime, created.ppmRate, created.ivaRate, created.retentionRate]
+      );
+      return created;
+    });
+    return sendJson(res, 200, { ok: true, taxConfig });
+  }
 
   const state = await readStore();
   const taxConfig = ensureTaxConfig(state);
@@ -73,6 +91,46 @@ async function updateTaxConfig(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
   const body = await parseBody(req);
+
+  if (isPostgresMode()) {
+    const nowYear = new Date().getFullYear();
+    const current = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate"
+         FROM tax_config
+         WHERE anio = $1
+         ORDER BY id DESC
+         LIMIT 1`,
+        [nowYear]
+      );
+      return rs.rows[0] || { year: nowYear, regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
+    });
+
+    const regime = body.regime || current.regime;
+    if (!['14D8', '14D3'].includes(regime)) return sendJson(res, 400, { ok: false, message: 'regime inválido: use 14D8 o 14D3' });
+
+    const taxConfig = {
+      regime,
+      year: Number(body.year || current.year || nowYear),
+      ppmRate: Number(body.ppmRate !== undefined ? body.ppmRate : (regime === '14D8' ? 0.2 : 0.25)),
+      ivaRate: Number(body.ivaRate !== undefined ? body.ivaRate : current.ivaRate),
+      retentionRate: Number(body.retentionRate !== undefined ? body.retentionRate : current.retentionRate)
+    };
+
+    await withPgClient(async (client) => {
+      await client.query(
+        `INSERT INTO tax_config (anio, regimen, ppm_rate, iva_rate, ret_rate)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (anio, regimen)
+         DO UPDATE SET ppm_rate = EXCLUDED.ppm_rate, iva_rate = EXCLUDED.iva_rate, ret_rate = EXCLUDED.ret_rate`,
+        [taxConfig.year, taxConfig.regime, taxConfig.ppmRate, taxConfig.ivaRate, taxConfig.retentionRate]
+      );
+    });
+
+    await appendAuditLog('tax.config.update', taxConfig, auth.user.email);
+    return sendJson(res, 200, { ok: true, taxConfig });
+  }
+
   const state = await readStore();
   const current = ensureTaxConfig(state);
 
@@ -97,14 +155,41 @@ async function getTaxSummary(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
   const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
-  const state = await readStore();
-  const cfg = ensureTaxConfig(state);
-  const year = Number(query.get('year') || cfg.year || new Date().getFullYear());
+  const year = Number(query.get('year') || new Date().getFullYear());
   const month = Number(query.get('month') || (new Date().getMonth() + 1));
 
-  const yearMovs = (state.movimientos || []).filter(m => new Date(m.fecha).getFullYear() === year);
-  const monthMovs = yearMovs.filter(m => (new Date(m.fecha).getMonth() + 1) === month);
+  let cfg;
+  let yearMovs;
 
+  if (isPostgresMode()) {
+    cfg = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate"
+         FROM tax_config
+         WHERE anio = $1
+         ORDER BY id DESC
+         LIMIT 1`,
+        [year]
+      );
+      return rs.rows[0] || { year, regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
+    });
+
+    yearMovs = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT fecha, tipo, total, neto, iva
+         FROM movimientos
+         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+        [year]
+      );
+      return rs.rows;
+    });
+  } else {
+    const state = await readStore();
+    cfg = ensureTaxConfig(state);
+    yearMovs = (state.movimientos || []).filter(m => new Date(m.fecha).getFullYear() === year);
+  }
+
+  const monthMovs = yearMovs.filter(m => (new Date(m.fecha).getMonth() + 1) === month);
   const f29 = computeMonthlyF29(monthMovs, cfg);
   const yearly = computeYearlyRli(yearMovs);
   const selectedRegime = computeTaxByRegime(yearly.rli, cfg.regime);
