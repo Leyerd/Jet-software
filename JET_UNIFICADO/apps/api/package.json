@@ -1,0 +1,19 @@
+{
+  "name": "jet-unificado-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API base para la version unificada del ERP contable",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "migrate:store:dry": "node scripts/migrate-store-to-postgres.js --dry-run",
+    "migrate:store:postgres": "node scripts/migrate-store-to-postgres.js",
+    "migrate:postgres:store": "node scripts/migrate-postgres-to-store.js",
+    "qa:smoke": "node scripts/qa-smoke.js",
+    "qa:run": "node scripts/qa-runner.js",
+    "ci:check": "node scripts/ci-check.js"
+  },
+  "dependencies": {
+    "pg": "^8.12.0"
+  }
+}
