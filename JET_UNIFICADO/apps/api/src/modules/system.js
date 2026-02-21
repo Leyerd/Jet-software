@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { sendJson } = require('../lib/http');
 
-function coherenceCheck(_req, res) {
+async function coherenceCheck(_req, res) {
   const requiredFiles = [
     'src/routes.js',
     'src/modules/auth.js',
@@ -11,9 +11,11 @@ function coherenceCheck(_req, res) {
     'src/modules/movements.js',
     'src/modules/products.js',
     'src/modules/db.js',
+    'src/modules/finance.js',
     'src/lib/http.js',
     'src/lib/store.js',
-    'scripts/migrate-store-to-postgres.js'
+    'scripts/migrate-store-to-postgres.js',
+    'scripts/qa-smoke.js'
   ];
 
   const root = path.join(__dirname, '..', '..');
@@ -22,7 +24,7 @@ function coherenceCheck(_req, res) {
 
   return sendJson(res, 200, {
     ok: missing.length === 0,
-    sprint: 3,
+    sprint: 4,
     message: missing.length === 0 ? 'Coherencia básica OK' : 'Faltan archivos críticos',
     checks,
     missing

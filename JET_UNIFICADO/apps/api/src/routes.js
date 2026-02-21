@@ -7,6 +7,7 @@ const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
 const { coherenceCheck } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
+const { getProjection } = require('./modules/finance');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -17,7 +18,8 @@ const modulesList = [
   'productos-base',
   'auditoria-eventos',
   'coherence-check',
-  'postgres-runtime-ready-3.1'
+  'postgres-runtime-ready-3.1',
+  'finance-projections-sprint4'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -29,7 +31,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '3.1', version: 'v1.3.1-sprint3.1' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '4', version: 'v1.4-sprint4' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -38,6 +40,7 @@ function route(req, res) {
 
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
+  if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);

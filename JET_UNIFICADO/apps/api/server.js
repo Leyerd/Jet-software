@@ -8,5 +8,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`JET API (Sprint 3.1) escuchando en puerto ${PORT}`);
+  console.log(`JET API (Sprint 4) escuchando en puerto ${PORT}`);
 });

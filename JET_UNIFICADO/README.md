@@ -9,12 +9,14 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 3 iniciado (preparación PostgreSQL + scripts de migración)
 
 - ✅ Sprint 3.1 iniciado (runtime PostgreSQL opcional + health DB real)
+- ✅ Sprint 4 ejecutado (proyecciones financieras + QA smoke)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
 - `docs/SPRINT_2.md`
 - `docs/SPRINT_3.md`
 - `docs/SPRINT_3_1.md`
+- `docs/SPRINT_4.md`
 
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
@@ -127,3 +129,17 @@ curl -s http://localhost:4000/db/status
 ```
 
 Si prefieres empezar simple, puedes dejar `PERSISTENCE_MODE: file` por ahora.
+
+
+## Sprint 4: proyecciones financieras
+
+Nuevo endpoint protegido:
+```bash
+GET /finance/projection
+```
+
+Para validar rápido:
+```bash
+cd apps/api
+npm run qa:smoke
+```
