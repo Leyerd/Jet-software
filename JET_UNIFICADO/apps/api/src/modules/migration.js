@@ -1,5 +1,6 @@
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
+const { requireRoles } = require('./auth');
 
 function validateBackupShape(payload) {
   const requiredArrays = ['productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja'];
@@ -12,6 +13,7 @@ function buildSummary(store) {
     migratedAt: store.migratedAt,
     source: store.source,
     totals: {
+      usuarios: store.usuarios.length,
       productos: store.productos.length,
       movimientos: store.movimientos.length,
       cuentas: store.cuentas.length,
@@ -24,6 +26,9 @@ function buildSummary(store) {
 }
 
 async function importJson(req, res) {
+  const auth = requireRoles(req, ['dueno', 'contador_admin']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const body = await parseBody(req);
   const payload = body.payload || body;
 
@@ -62,12 +67,15 @@ async function importJson(req, res) {
       terceros: payload.terceros.length,
       flujoCaja: payload.flujoCaja.length
     }
-  }, body.user || 'system');
+  }, auth.user.email);
 
   return sendJson(res, 200, { ok: true, summary: buildSummary(readStore()) });
 }
 
-function getSummary(_req, res) {
+function getSummary(req, res) {
+  const auth = requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const store = readStore();
   return sendJson(res, 200, { ok: true, summary: buildSummary(store) });
 }

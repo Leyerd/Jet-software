@@ -1,5 +1,6 @@
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
+const { requireRoles } = require('./auth');
 
 function key(anio, mes) {
   return `${anio}-${String(mes).padStart(2, '0')}`;
@@ -39,10 +40,12 @@ function isPeriodClosed(state, isoDate) {
 }
 
 async function closePeriod(req, res) {
+  const auth = requireRoles(req, ['dueno', 'contador_admin']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const body = await parseBody(req);
   const anio = Number(body.anio);
   const mes = Number(body.mes);
-  const user = body.user || 'system';
   assertAnioMes(anio, mes);
 
   const state = readStore();
@@ -52,18 +55,20 @@ async function closePeriod(req, res) {
   }
 
   period.estado = 'cerrado';
-  period.cerradoPor = user;
+  period.cerradoPor = auth.user.email;
   period.cerradoEn = new Date().toISOString();
   writeStore(state);
-  appendAudit('period.close', { anio, mes }, user);
+  appendAudit('period.close', { anio, mes }, auth.user.email);
   return sendJson(res, 200, { ok: true, period });
 }
 
 async function reopenPeriod(req, res) {
+  const auth = requireRoles(req, ['contador_admin']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const body = await parseBody(req);
   const anio = Number(body.anio);
   const mes = Number(body.mes);
-  const user = body.user || 'system';
   const motivo = body.motivo || 'sin motivo';
   assertAnioMes(anio, mes);
 
@@ -74,11 +79,11 @@ async function reopenPeriod(req, res) {
   }
 
   period.estado = 'reabierto';
-  period.reabiertoPor = user;
+  period.reabiertoPor = auth.user.email;
   period.reabiertoEn = new Date().toISOString();
   period.motivoReapertura = motivo;
   writeStore(state);
-  appendAudit('period.reopen', { anio, mes, motivo }, user);
+  appendAudit('period.reopen', { anio, mes, motivo }, auth.user.email);
   return sendJson(res, 200, { ok: true, period });
 }
 

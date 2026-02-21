@@ -1,14 +1,17 @@
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { isPeriodClosed } = require('./accountingClose');
+const { requireRoles } = require('./auth');
 
 async function createMovement(req, res) {
+  const auth = requireRoles(req, ['dueno', 'contador_admin', 'operador']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const body = await parseBody(req);
   const fecha = body.fecha;
   const tipo = body.tipo;
   const total = Number(body.total || 0);
   const desc = body.descripcion || '';
-  const user = body.user || 'system';
 
   if (!fecha || !tipo) {
     return sendJson(res, 400, { ok: false, message: 'fecha y tipo son requeridos' });
@@ -29,12 +32,15 @@ async function createMovement(req, res) {
 
   state.movimientos.push(movement);
   writeStore(state);
-  appendAudit('movement.create', movement, user);
+  appendAudit('movement.create', movement, auth.user.email);
 
   return sendJson(res, 201, { ok: true, movement });
 }
 
-function listMovements(_req, res) {
+function listMovements(req, res) {
+  const auth = requireRoles(req, ['dueno', 'contador_admin', 'operador', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
   const state = readStore();
   const movements = [...state.movimientos].sort((a, b) => (a.fecha < b.fecha ? -1 : 1));
   return sendJson(res, 200, { ok: true, movements });

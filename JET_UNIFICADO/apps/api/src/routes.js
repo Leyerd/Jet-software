@@ -1,17 +1,21 @@
 const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
+const { register, login, me } = require('./modules/auth');
 const { importJson, getSummary } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
+const { coherenceCheck } = require('./modules/system');
 
 const modulesList = [
   'arquitectura-unificada',
+  'auth-roles-basico',
   'migracion-datos',
-  'cierre-contable',
+  'cierre-contable-con-permisos',
   'movimientos-con-bloqueo-periodo',
   'productos-base',
-  'auditoria-eventos'
+  'auditoria-eventos',
+  'coherence-check'
 ];
 
 function route(req, res) {
@@ -19,11 +23,30 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: 1, version: 'v1.1-sprint1' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: 2, version: 'v1.2-sprint2' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
     return sendJson(res, 200, { ok: true, modules: modulesList });
+  }
+
+  if (req.method === 'GET' && path === '/system/coherence-check') {
+    return coherenceCheck(req, res);
+  }
+
+  if (path === '/auth/register') {
+    if (req.method !== 'POST') return methodNotAllowed(res);
+    return register(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
+  }
+
+  if (path === '/auth/login') {
+    if (req.method !== 'POST') return methodNotAllowed(res);
+    return login(req, res).catch(err => sendJson(res, 400, { ok: false, message: err.message }));
+  }
+
+  if (path === '/auth/me') {
+    if (req.method !== 'GET') return methodNotAllowed(res);
+    return me(req, res);
   }
 
   if (path === '/migration/import-json') {
