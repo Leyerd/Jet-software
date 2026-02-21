@@ -13,6 +13,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 5 ejecutado (inventario + conciliación + QA runner estable)
 - ✅ Sprint 6 ejecutado (motor tributario versionado, default 14D8 transparente)
 - ✅ Sprint 7 ejecutado (kardex FIFO + costeo trazable por lotes)
+- ✅ Sprint 8 ejecutado (conectores externos Alibaba, Mercado Libre y SII)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -23,6 +24,7 @@ Documentos de avance:
 - `docs/SPRINT_5.md`
 - `docs/SPRINT_6.md`
 - `docs/SPRINT_7.md`
+- `docs/SPRINT_8.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
@@ -182,3 +184,15 @@ Endpoints nuevos:
 - `GET /inventory/kardex`
 
 Estos endpoints implementan trazabilidad por lote y costeo FIFO.
+
+
+## Sprint 8: conectores externos
+
+Endpoints nuevos:
+- `POST /integrations/config`
+- `GET /integrations/status`
+- `POST /integrations/alibaba/import-products`
+- `POST /integrations/mercadolibre/import-orders`
+- `POST /integrations/sii/import-rcv`
+
+Con esto el backend único ya integra fuentes externas críticas para operación (Alibaba, Mercado Libre y SII).

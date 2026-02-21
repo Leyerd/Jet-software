@@ -16,6 +16,13 @@ const {
   importMarketplaceOrders
 } = require('./modules/reconciliation');
 const { getTaxConfig, updateTaxConfig, getTaxSummary } = require('./modules/tax');
+const {
+  updateIntegrationConfig,
+  getIntegrationsStatus,
+  importAlibabaCatalog,
+  importMercadoLibre,
+  importSii
+} = require('./modules/integrations');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -32,7 +39,8 @@ const modulesList = [
   'reconciliation-summary-sprint5',
   'reconciliation-imports-cartola-rcv-marketplace',
   'tax-engine-sprint6-default-14d8',
-  'inventory-kardex-fifo-sprint7'
+  'inventory-kardex-fifo-sprint7',
+  'external-connectors-sprint8'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -44,7 +52,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '7', version: 'v1.7-sprint7' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '8', version: 'v1.8-sprint8' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -70,6 +78,13 @@ function route(req, res) {
     return methodNotAllowed(res);
   }
   if (path === '/tax/summary' && req.method === 'GET') return handle(getTaxSummary(req, res), res);
+
+
+  if (path === '/integrations/config') return req.method === 'POST' ? handle(updateIntegrationConfig(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/status' && req.method === 'GET') return handle(getIntegrationsStatus(req, res), res);
+  if (path === '/integrations/alibaba/import-products') return req.method === 'POST' ? handle(importAlibabaCatalog(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/mercadolibre/import-orders') return req.method === 'POST' ? handle(importMercadoLibre(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/sii/import-rcv') return req.method === 'POST' ? handle(importSii(req, res), res) : methodNotAllowed(res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);

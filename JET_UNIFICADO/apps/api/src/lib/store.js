@@ -25,13 +25,20 @@ const defaultState = {
   // Fuentes externas para conciliación Sprint 5
   cartolaMovimientos: [],
   rcvVentas: [],
-  marketplaceOrders: []
+  marketplaceOrders: [],
+  rcvCompras: [],
+  integrationConfigs: {
+    alibaba: { enabled: false, lastSyncAt: null },
+    mercadolibre: { enabled: false, lastSyncAt: null },
+    sii: { enabled: false, lastSyncAt: null }
+  },
+  integrationSyncLog: []
 };
 
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'cartolaMovimientos', 'rcvVentas', 'marketplaceOrders'
+    'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -40,6 +47,14 @@ function ensureArrays(state) {
   if (state.source === undefined) state.source = null;
   if (!state.taxConfig || typeof state.taxConfig !== 'object') {
     state.taxConfig = { regime: '14D8', year: new Date().getFullYear(), ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
+  }
+
+  if (!state.integrationConfigs || typeof state.integrationConfigs !== 'object') {
+    state.integrationConfigs = {
+      alibaba: { enabled: false, lastSyncAt: null },
+      mercadolibre: { enabled: false, lastSyncAt: null },
+      sii: { enabled: false, lastSyncAt: null }
+    };
   }
   return state;
 }

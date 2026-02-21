@@ -78,6 +78,26 @@ function req(method, path, body, token) {
   const rec = await req('GET', '/reconciliation/summary', null, token);
   if (!rec.data.ok || !Array.isArray(rec.data.summary)) throw new Error('Reconciliation summary falló');
 
+
+  const alibaba = await req('POST', '/integrations/alibaba/import-products', {
+    rows: [{ sku: `ALI-${Date.now()}`, nombre: 'Producto Alibaba QA', unitCost: 2500, proveedor: 'Alibaba QA' }]
+  }, token);
+  if (!alibaba.data.ok || !alibaba.data.result) throw new Error('Integración Alibaba falló');
+
+  const meli = await req('POST', '/integrations/mercadolibre/import-orders', {
+    rows: [{ orderId: `ML-${Date.now()}`, fecha: '2026-02-12', total: 50000, comision: 5000, netoLiquidado: 45000 }]
+  }, token);
+  if (!meli.data.ok || !meli.data.result) throw new Error('Integración Mercado Libre falló');
+
+  const sii = await req('POST', '/integrations/sii/import-rcv', {
+    kind: 'ventas',
+    rows: [{ folio: `F-${Date.now()}`, fecha: '2026-02-12', total: 50000, iva: 9500 }]
+  }, token);
+  if (!sii.data.ok || !sii.data.result) throw new Error('Integración SII falló');
+
+  const integStatus = await req('GET', '/integrations/status', null, token);
+  if (!integStatus.data.ok || !integStatus.data.providers) throw new Error('Integrations status falló');
+
   const coh = await req('GET', '/system/coherence-check');
   if (!coh.data.ok) throw new Error('Coherence check falló');
 
