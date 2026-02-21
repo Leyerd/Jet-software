@@ -10,6 +10,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 
 - ✅ Sprint 3.1 iniciado (runtime PostgreSQL opcional + health DB real)
 - ✅ Sprint 4 ejecutado (proyecciones financieras + QA smoke)
+- ✅ Sprint 5 ejecutado (inventario + conciliación + QA runner estable)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -17,6 +18,7 @@ Documentos de avance:
 - `docs/SPRINT_3.md`
 - `docs/SPRINT_3_1.md`
 - `docs/SPRINT_4.md`
+- `docs/SPRINT_5.md`
 
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
@@ -142,4 +144,16 @@ Para validar rápido:
 ```bash
 cd apps/api
 npm run qa:smoke
+```
+
+
+## Sprint 5: endpoints nuevos
+
+- `GET /inventory/overview`
+- `GET /reconciliation/summary`
+
+QA recomendado (más estable):
+```bash
+cd apps/api
+npm run qa:run
 ```

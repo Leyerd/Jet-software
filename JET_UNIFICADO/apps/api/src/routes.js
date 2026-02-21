@@ -8,6 +8,8 @@ const { createProduct, listProducts } = require('./modules/products');
 const { coherenceCheck } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
+const { getInventoryOverview } = require('./modules/inventory');
+const { getReconciliationSummary } = require('./modules/reconciliation');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -19,7 +21,9 @@ const modulesList = [
   'auditoria-eventos',
   'coherence-check',
   'postgres-runtime-ready-3.1',
-  'finance-projections-sprint4'
+  'finance-projections-sprint4',
+  'inventory-overview-sprint5',
+  'reconciliation-summary-sprint5'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -31,7 +35,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '4', version: 'v1.4-sprint4' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '5', version: 'v1.5-sprint5' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -41,6 +45,8 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
+  if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);
+  if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 const http = require('http');
 
+const BASE_URL = process.env.QA_BASE_URL || 'http://localhost:4000';
+const U = new URL(BASE_URL);
+
 function req(method, path, body, token) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
     const r = http.request({
-      hostname: 'localhost',
-      port: 4000,
+      hostname: U.hostname,
+      port: Number(U.port || 80),
       path,
       method,
       headers: {
@@ -20,7 +23,7 @@ function req(method, path, body, token) {
       res.on('end', () => {
         try {
           resolve({ status: res.statusCode, data: JSON.parse(out || '{}') });
-        } catch (e) {
+        } catch (_) {
           reject(new Error(`Respuesta no JSON en ${method} ${path}`));
         }
       });
@@ -46,6 +49,12 @@ function req(method, path, body, token) {
 
   const proj = await req('GET', '/finance/projection', null, token);
   if (!proj.data.ok || !proj.data.projection?.scenarios?.base) throw new Error('Projection falló');
+
+  const inv = await req('GET', '/inventory/overview', null, token);
+  if (!inv.data.ok || !inv.data.overview) throw new Error('Inventory overview falló');
+
+  const rec = await req('GET', '/reconciliation/summary', null, token);
+  if (!rec.data.ok || !rec.data.totals) throw new Error('Reconciliation summary falló');
 
   const coh = await req('GET', '/system/coherence-check');
   if (!coh.data.ok) throw new Error('Coherence check falló');
