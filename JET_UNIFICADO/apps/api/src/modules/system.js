@@ -10,8 +10,10 @@ function coherenceCheck(_req, res) {
     'src/modules/accountingClose.js',
     'src/modules/movements.js',
     'src/modules/products.js',
+    'src/modules/db.js',
     'src/lib/http.js',
-    'src/lib/store.js'
+    'src/lib/store.js',
+    'scripts/migrate-store-to-postgres.js'
   ];
 
   const root = path.join(__dirname, '..', '..');
@@ -20,7 +22,7 @@ function coherenceCheck(_req, res) {
 
   return sendJson(res, 200, {
     ok: missing.length === 0,
-    sprint: 2,
+    sprint: 3,
     message: missing.length === 0 ? 'Coherencia básica OK' : 'Faltan archivos críticos',
     checks,
     missing

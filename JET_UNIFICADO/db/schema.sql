@@ -173,3 +173,11 @@ CREATE TABLE IF NOT EXISTS audit_log (
   usuario TEXT,
   fecha TIMESTAMP DEFAULT NOW()
 );
+
+
+CREATE TABLE IF NOT EXISTS app_state (
+  id SERIAL PRIMARY KEY,
+  key TEXT UNIQUE NOT NULL,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
+);

@@ -6,6 +6,7 @@ const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accounting
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
 const { coherenceCheck } = require('./modules/system');
+const { dbStatus } = require('./modules/db');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -15,7 +16,8 @@ const modulesList = [
   'movimientos-con-bloqueo-periodo',
   'productos-base',
   'auditoria-eventos',
-  'coherence-check'
+  'coherence-check',
+  'postgres-migration-tooling'
 ];
 
 function route(req, res) {
@@ -23,7 +25,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: 2, version: 'v1.2-sprint2' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: 3, version: 'v1.3-sprint3' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -32,6 +34,10 @@ function route(req, res) {
 
   if (req.method === 'GET' && path === '/system/coherence-check') {
     return coherenceCheck(req, res);
+  }
+
+  if (req.method === 'GET' && path === '/db/status') {
+    return dbStatus(req, res);
   }
 
   if (path === '/auth/register') {
