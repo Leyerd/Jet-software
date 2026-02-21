@@ -77,3 +77,29 @@ cd apps/api
 npm install
 npm run migrate:store:dry
 ```
+
+
+## Problema reportado: `http://localhost:4000/health` rechazaba conexión
+
+Causa corregida en el código: el contenedor API antes no incluía carpeta `src/` en la imagen Docker.
+
+### Si te vuelve a pasar
+1. Reconstruye contenedores:
+```bash
+docker compose down
+docker compose up -d --build
+```
+2. Revisa estado:
+```bash
+docker compose ps
+docker compose logs api --tail=100
+```
+3. Prueba salud API:
+```bash
+curl -s http://localhost:4000/health
+```
+
+## Sobre `npm run migrate:store:dry` en 0
+
+Si te mostró todo en 0 y no tienes datos históricos, **está bien**.
+Puedes partir desde base limpia sin problema y no necesitas migrar nada.

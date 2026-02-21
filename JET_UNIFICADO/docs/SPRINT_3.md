@@ -60,3 +60,11 @@ Tu interfaz original sigue intacta en:
 - `apps/web/index.html`
 
 En Sprint 3 no se tocó UI para priorizar persistencia y migración. El objetivo de mantener diseño moderno, iconos claros y botones amigables se mantiene para los sprints de frontend.
+
+
+## Ajuste post-feedback
+- Se corrigió Docker de API para incluir `src/`, `scripts/` y `data/` dentro de la imagen.
+- Resultado esperado: `http://localhost:4000/health` ya no debería rechazar conexión tras `docker compose up -d --build`.
+
+## Si no tienes datos históricos
+Si `npm run migrate:store:dry` devuelve todo en `0`, y partirás desde cero, puedes omitir migración y continuar operando normalmente.
