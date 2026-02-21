@@ -1,0 +1,10 @@
+{
+  "name": "jet-unificado-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "API base para la version unificada del ERP contable",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}

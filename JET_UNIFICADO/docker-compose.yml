@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: jet_db
+    environment:
+      POSTGRES_DB: jet_erp
+      POSTGRES_USER: jet_user
+      POSTGRES_PASSWORD: jet_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+
+  api:
+    build: ./apps/api
+    container_name: jet_api
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://jet_user:jet_pass@db:5432/jet_erp
+    ports:
+      - "4000:4000"
+    depends_on:
+      - db
+
+  web:
+    build: ./apps/web
+    container_name: jet_web
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  db_data:

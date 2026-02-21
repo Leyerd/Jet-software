@@ -1,0 +1,2515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JET PRO - ERP Contable & Tributario CL (Profesional)</title>
+    <!-- TailwindCSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide icons for UI icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js for charts -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+        :root {
+            --bg-main: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-main: #0f172a;
+            --border-color: #e2e8f0;
+            --accent-blue: #3b82f6;
+        }
+        .dark {
+            --bg-main: #020617;
+            --bg-card: #1e293b;
+            --text-main: #f1f5f9;
+            --border-color: #334155;
+            --accent-blue: #60a5fa;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .sidebar-link.active {
+            background-color: #334155;
+            color: #60a5fa;
+            border-right: 3px solid #60a5fa;
+        }
+        .card {
+            background-color: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .tab-content.hidden { display: none; }
+        input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=number] { -moz-appearance: textfield; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #64748b; border-radius: 10px; }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); }
+        .btn-jet { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .btn-jet:active { transform: scale(0.96); }
+        .sii-code { font-family: monospace; background: #e2e8f0; padding: 2px 4px; border-radius: 4px; color: #334155; font-size: 0.8em; }
+        .dark .sii-code { background: #334155; color: #cbd5e1; }
+        .help-box { border-left: 4px solid #3b82f6; background: rgba(59, 130, 246, 0.1); padding: 1rem; border-radius: 0 10px 10px 0; margin-bottom: 1rem; }
+        .dark .help-box { background: rgba(59, 130, 246, 0.2); }
+        .badge-prediction { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 99px; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+        .dark .badge-prediction { background: #0c4a6e; color: #bae6fd; }
+
+        /* Ensure select option visibility in dark mode */
+        /* In light mode, keep default option colours for readability */
+        select option {
+            background-color: #ffffff;
+            color: var(--text-main);
+        }
+        /* Dark mode styling for select dropdown options */
+        .dark select option {
+            background-color: #1e293b;
+            color: #f1f5f9;
+        }
+    </style>
+    <script> tailwind.config = { darkMode: 'class' } </script>
+</head>
+<body class="flex min-h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-950 text-slate-400 flex-shrink-0 hidden md:flex flex-col border-r border-slate-800">
+        <div class="p-8 border-b border-slate-800">
+            <h1 class="text-2xl font-black text-white flex items-center gap-2 tracking-tighter">
+                <i data-lucide="rocket" class="text-blue-500 fill-blue-500/20"></i> JET PRO
+            </h1>
+            <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2">ERP Chile v3.0</p>
+        </div>
+        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+            <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operativa</div>
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i> Dashboard
+            </button>
+            <button onclick="switchTab('tesoreria')" id="btn-tesoreria" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-emerald-400">
+                <i data-lucide="wallet" class="w-4 h-4"></i> Caja & Bancos
+            </button>
+            <button onclick="switchTab('movimientos')" id="btn-movimientos" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
+                <i data-lucide="activity" class="w-4 h-4"></i> Libro Diario
+            </button>
+            <button onclick="switchTab('inventario')" id="btn-inventario" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
+                <i data-lucide="box" class="w-4 h-4"></i> Bodega / Stock
+            </button>
+            <button onclick="switchTab('terceros')" id="btn-terceros" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-orange-400">
+                <i data-lucide="users" class="w-4 h-4"></i> Directorio RUTs
+            </button>
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Inteligencia SII</div>
+            <button onclick="switchTab('proyecciones')" id="btn-proyecciones" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-purple-400">
+                <i data-lucide="radar" class="w-4 h-4"></i> Proyecciones
+            </button>
+            <button onclick="switchTab('f29')" id="btn-f29" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
+                <i data-lucide="file-text" class="w-4 h-4"></i> F29 Mensual
+            </button>
+            <button onclick="switchTab('ddjj')" id="btn-ddjj" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-blue-400">
+                <i data-lucide="file-badge-2" class="w-4 h-4"></i> DDJJ Juradas
+            </button>
+            <!-- Renta F22 now loads the F22 declaration tab -->
+            <button onclick="switchTab('f22')" id="btn-f22" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
+                <i data-lucide="landmark" class="w-4 h-4"></i> Renta F22
+            </button>
+            <button onclick="switchTab('kpi')" id="btn-kpi" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-pink-400">
+                <i data-lucide="trending-up" class="w-4 h-4"></i> Indicadores
+            </button>
+            <!-- Nuevo módulo de Auditoría para revisiones automáticas -->
+            <button onclick="switchTab('auditoria')" id="btn-auditoria" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-red-400">
+                <i data-lucide="shield-check" class="w-4 h-4"></i> Auditoría
+            </button>
+            <!-- Nuevo módulo de Contabilidad Formal -->
+            <button onclick="switchTab('contabilidad')" id="btn-contabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-yellow-400">
+                <i data-lucide="book-open" class="w-4 h-4"></i> Contabilidad
+            </button>
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
+            <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
+                <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
+            </button>
+            <button onclick="openBackupModal()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
+                <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup
+            </button>
+        </nav>
+        <div class="p-4 bg-slate-900/50 m-4 rounded-2xl border border-slate-800/50">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Año Fiscal</span>
+                <input type="number" id="config-year" onchange="updateYear(this.value)" class="w-16 bg-slate-800 text-white text-xs font-black rounded px-2 py-1 outline-none text-center" value="2026">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PPM (%)</span>
+                <input type="number" id="config-ppm" onchange="updatePPM(this.value)" class="w-16 bg-slate-800 text-white text-xs font-black rounded px-2 py-1 outline-none text-center" value="1">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Retención (Honor.)</span>
+                <span id="ret-rate" class="text-[10px] font-black text-white"></span>
+            </div>
+            <!-- Configuraciones adicionales de la empresa -->
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Régimen</span>
+                <select id="config-regimen" onchange="updateRegimen(this.value)" class="bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
+                    <option value="14D3">14 D3 (ProPyme General)</option>
+                    <option value="14D8">14 D8 (ProPyme Transparente)</option>
+                </select>
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Giro</span>
+                <input type="text" id="config-giro" onchange="updateGiro(this.value)" placeholder="479100" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Domicilio</span>
+                <input type="text" id="config-address" onchange="updateAddress(this.value)" placeholder="Dirección" class="w-32 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col overflow-hidden h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
+        <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-20 shadow-sm transition-colors">
+            <div class="flex items-center gap-4">
+                <span id="tab-title" class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.25em]">Dashboard</span>
+            </div>
+            <div class="flex items-center gap-8">
+                    <div class="hidden lg:flex flex-col items-end text-right">
+                    <p id="current-date" class="text-[9px] text-slate-400 font-black uppercase tracking-[0.1em]"></p>
+                    <div class="flex items-center gap-2 text-right">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span></p>
+                    </div>
+                        <!-- Selector de año rápido en el header para mejorar la accesibilidad -->
+                        <div class="flex items-center gap-2 text-right mt-1">
+                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Año</span>
+                            <input type="number" id="config-year-header" onchange="updateYear(this.value)" class="w-16 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-black rounded px-2 py-1 outline-none text-center" />
+                        </div>
+                        <!-- Se eliminan indicadores UF, UTM e IPC ya que no se usan en los cálculos -->
+                </div>
+                <div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+                <button onclick="resetApp()" class="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Limpiar Base de Datos">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </header>
+        <section id="content-area" class="flex-1 overflow-y-auto p-8 transition-colors">
+            <!-- Dashboard -->
+            <div id="tab-dashboard" class="tab-content space-y-6">
+                <!-- Smart Alerts for Liquidity and Inventory -->
+                <div id="smart-alerts" class="hidden grid grid-cols-1 gap-4"></div>
+                <!-- Cards Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="card p-8 border-b-4 border-emerald-500 bg-emerald-50/50 dark:bg-slate-900">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponible Real</p>
+                                <h3 id="dash-disponible" class="text-2xl font-black text-emerald-600">$ 0</h3>
+                            </div>
+                            <div class="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600">
+                                <i data-lucide="banknote" class="w-5 h-5"></i>
+                            </div>
+                        </div>
+                        <p class="text-[9px] text-slate-400 font-bold mt-2 uppercase">Caja Total - IVA por Pagar</p>
+                    </div>
+                    <div class="card p-8 border-b-4 border-blue-600">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Ventas Netas (Año)</p>
+                        <h3 id="dash-ventas" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                    <div class="card p-8 border-b-4 border-indigo-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">IVA por Pagar (Est.)</p>
+                        <h3 id="dash-iva-pagar" class="text-2xl font-black text-indigo-600">$ 0</h3>
+                    </div>
+                    <div class="card p-8 border-b-4 border-slate-950 dark:border-blue-900">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Capital en Stock</p>
+                        <h3 id="dash-stock" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                </div>
+                <!-- Tributary Panel & Fiscal Calendar -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-8">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Panel Tributario</h4>
+                        <div id="tax-panel" class="space-y-2"></div>
+                    </div>
+                    <div class="card p-8">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Calendario Fiscal</h4>
+                        <ul id="fiscal-calendar" class="text-xs font-bold space-y-2"></ul>
+                    </div>
+                </div>
+                <!-- Treasury & Inventory Alerts -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="card p-8">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Resumen de Tesorería</h4>
+                        <div id="treasury-summary" class="space-y-4"></div>
+                    </div>
+                    <div class="card p-8">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-[0.2em] mb-6">Alertas de Inventario</h4>
+                        <div id="low-stock-alert" class="text-center py-8">
+                            <i data-lucide="check-circle" class="w-8 h-8 text-emerald-100 mx-auto mb-3"></i>
+                            <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest">Suministro Estable</p>
+                        </div>
+                        <ul id="stock-list" class="space-y-4"></ul>
+                    </div>
+                </div>
+            </div>
+            <!-- Proyecciones -->
+            <div id="tab-proyecciones" class="tab-content hidden space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-8 bg-slate-900 text-white border-none shadow-2xl relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-4 opacity-10"><i data-lucide="flame" class="w-24 h-24"></i></div>
+                        <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Burn Rate (Gasto Mensual Promedio)</p>
+                        <h3 id="proj-burn-rate" class="text-3xl font-black">$ 0</h3>
+                        <div class="mt-4 pt-4 border-t border-slate-800">
+                            <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Runway (Vida de Caja)</p>
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="hourglass" class="w-4 h-4 text-blue-400"></i>
+                                <span id="proj-runway" class="text-lg font-bold text-blue-400">Calculando...</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-8">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Proyección Cierre de Mes</h4>
+                        <div class="space-y-4">
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Ventas Actuales</span><span id="proj-sales-current" class="text-slate-500"></span></div>
+                                <div class="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2"><div id="proj-bar-sales" class="bg-blue-500 h-2 rounded-full" style="width: 0%"></div></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Proyección Final</span><span id="proj-sales-forecast" class="text-blue-600"></span></div>
+                            </div>
+                            <!-- Indicadores adicionales: utilidad proyectada y crecimiento interanual -->
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Utilidad Proyectada</span><span id="proj-profit-forecast" class="text-indigo-600"></span></div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs font-bold mb-1"><span class="dark:text-white">Crecimiento Interanual</span><span id="proj-yoy-growth" class="text-indigo-600"></span></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card p-8 border-l-4 border-indigo-500">
+                        <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">Estimación F29 (Día 20)</h4>
+                        <h3 id="proj-iva-est" class="text-2xl font-black text-indigo-600">$ 0</h3>
+                        <p class="text-[9px] text-slate-400 mt-2 font-bold">Incluye Retenciones y PPM</p>
+                    </div>
+                </div>
+                <div class="card overflow-hidden border-none shadow-md">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Predicción de Inventario (Inteligencia)</h4>
+                    </div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Producto</th>
+                                <th class="px-6 py-4 text-center">Stock Actual</th>
+                                <th class="px-6 py-4 text-center">Venta Diaria (Prom.)</th>
+                                <th class="px-6 py-4 text-center">Días Restantes</th>
+                                <th class="px-6 py-4 text-center">Fecha Quiebre</th>
+                                <th class="px-6 py-4 text-center">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-projections" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Terceros -->
+            <div id="tab-terceros" class="tab-content hidden space-y-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Directorio RUTs</h2>
+                    <button onclick="openModal('modal-tercero')" class="btn-jet bg-orange-500 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> Nuevo Contacto
+                    </button>
+                </div>
+                <div class="card overflow-hidden border-none shadow-md">
+                    <table class="w-full text-sm">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Razón Social / Nombre</th>
+                                <th class="px-6 py-4">RUT</th>
+                                <th class="px-6 py-4">Tipo</th>
+                                <th class="px-6 py-4 text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-terceros" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Tesorería -->
+            <div id="tab-tesoreria" class="tab-content hidden space-y-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Control de Fondos</h2>
+                    <div class="flex gap-2">
+                        <button onclick="openModal('modal-capital')" class="btn-jet bg-indigo-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="user-check" class="w-4 h-4"></i> Socio / Dueño
+                        </button>
+                        <button onclick="openModal('modal-transfer')" class="btn-jet bg-emerald-600 text-white px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                            <i data-lucide="arrow-left-right" class="w-4 h-4"></i> Transferir
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8" id="treasury-cards"></div>
+                <div class="card overflow-hidden border-none shadow-md">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Últimos Movimientos de Dinero</h4>
+                    </div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Fecha</th>
+                                <th class="px-6 py-4">Cuenta</th>
+                                <th class="px-6 py-4">Concepto</th>
+                                <th class="px-6 py-4 text-right">Ingreso</th>
+                                <th class="px-6 py-4 text-right">Egreso</th>
+                                <th class="px-6 py-4 text-right">Saldo Final</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-caja" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Analítica Anual -->
+            <div id="tab-resumen-anual" class="tab-content hidden space-y-6">
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Balance 8 Columnas (Simplificado)</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">Resumen financiero para presentar salud contable del año en curso.</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card p-10 border-none shadow-xl">
+                        <h4 class="font-black text-slate-900 dark:text-white mb-10 uppercase text-[10px] tracking-[0.3em] border-b dark:border-slate-800 pb-5">Evolución Operacional</h4>
+                        <canvas id="chart-performance" height="200"></canvas>
+                    </div>
+                    <div class="card p-10 border-none shadow-xl">
+                        <h4 class="font-black text-blue-600 dark:text-blue-400 mb-10 uppercase text-[10px] tracking-[0.3em] border-b border-slate-100 dark:border-slate-800 pb-5">Resultados Consolidados</h4>
+                        <div id="annual-pnl" class="space-y-6"></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Movimientos / Libro Diario -->
+            <div id="tab-movimientos" class="tab-content hidden space-y-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                    <div class="flex flex-col gap-2">
+                        <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Libro Diario Operacional</h2>
+                        <div class="flex items-center gap-3 bg-white dark:bg-slate-800 p-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                            <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
+                            <select id="filter-month" onchange="updateMonthFilter(this.value)" class="bg-slate-50 dark:bg-slate-800 text-xs font-black uppercase tracking-widest outline-none dark:text-white pr-4">
+                                <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option><option value="3">Abril</option>
+                                <option value="4">Mayo</option><option value="5">Junio</option><option value="6">Julio</option><option value="7">Agosto</option>
+                                <option value="8">Septiembre</option><option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-3">
+                        <button onclick="openModal('modal-import-ml')" class="btn-jet bg-orange-600 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-700 shadow-xl flex items-center gap-2">
+                            <i data-lucide="file-down" class="w-4 h-4"></i> Masivo
+                        </button>
+                        <button onclick="openModal('modal-venta')" class="btn-jet bg-blue-600 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 shadow-xl flex items-center gap-2">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Venta
+                        </button>
+                        <button onclick="openModal('modal-import')" class="btn-jet bg-emerald-600 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 shadow-xl flex items-center gap-2">
+                            <i data-lucide="ship" class="w-4 h-4"></i> Importación
+                        </button>
+                        <button onclick="openModal('modal-gasto')" class="btn-jet bg-slate-700 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 shadow-xl flex items-center gap-2">
+                            <i data-lucide="wallet" class="w-4 h-4"></i> Gasto
+                        </button>
+                        <!-- Sincronizar ventas desde Mercado Libre -->
+                        <button onclick="syncMercadoLibre()" class="btn-jet bg-yellow-500 text-white px-5 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-yellow-600 shadow-xl flex items-center gap-2">
+                            <i data-lucide="cloud" class="w-4 h-4"></i> Sync ML
+                        </button>
+                    </div>
+                </div>
+                <div class="card overflow-hidden border-none shadow-md">
+                    <table class="w-full text-sm">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-black uppercase text-[9px] tracking-widest border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-8 py-6">Fecha</th>
+                                <th class="px-8 py-6">Doc / RUT</th>
+                                <th class="px-8 py-6">Concepto</th>
+                                <th class="px-8 py-6 text-right">Neto ($)</th>
+                                <th class="px-8 py-6 text-right">Impuestos ($)</th>
+                                <th class="px-8 py-6 text-right font-black">Total ($)</th>
+                                <th class="px-8 py-6 text-center w-32">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-movimientos" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                    <div id="empty-state-mov" class="hidden p-20 text-center flex flex-col items-center gap-4">
+                        <i data-lucide="inbox" class="w-12 h-12 text-slate-200"></i>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sin registros este mes</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Inventario -->
+            <div id="tab-inventario" class="tab-content hidden space-y-6">
+                <div class="flex justify-between items-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Gestión de Stock</h2>
+                    <button onclick="openModal('modal-producto')" class="btn-jet bg-slate-950 dark:bg-blue-600 text-white px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <i data-lucide="package-plus" class="w-4 h-4"></i> Nuevo SKU
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="grid-inventario"></div>
+            </div>
+            <!-- F29 -->
+            <div id="tab-f29" class="tab-content hidden space-y-8">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Impuestos Mensuales (F29)</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Guía de Llenado F29</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">
+                        <b>[538] Débito:</b> Suma del IVA Ventas.<br>
+                        <b>[520] Crédito:</b> IVA Compras.<br>
+                        <b>[151] Retención 2da Cat:</b> <span id="rate-help">14.5%</span> sobre Boletas Honorarios Recibidas.<br>
+                        <b>[89] A Pagar:</b> (Débito - Crédito - Remanente) + Retenciones + PPM.
+                    </p>
+                </div>
+                <div class="card overflow-hidden transition-colors border-none shadow-2xl">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-950 text-white font-black text-[9px] uppercase tracking-[0.2em]">
+                            <tr>
+                                <th class="px-6 py-6">Mes</th>
+                                <th class="px-6 py-6 text-right">Débito <span class="sii-code">[538]</span></th>
+                                <th class="px-6 py-6 text-right">Crédito <span class="sii-code">[520]</span></th>
+                                <th class="px-6 py-6 text-right text-orange-400">Ret. Hon <span class="sii-code">[151]</span></th>
+                                <th class="px-6 py-6 text-right text-emerald-400">Remanente <span class="sii-code">[77]</span></th>
+                                <th class="px-6 py-6 text-right font-black">Pagar <span class="sii-code">[89]</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-f29" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                </div>
+            </div>
+            <!-- Declaraciones Juradas -->
+            <div id="tab-ddjj" class="tab-content hidden space-y-8">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Declaraciones Juradas</h2>
+                <!-- DJ 1887 -->
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-xs font-black text-slate-500 uppercase tracking-widest">DJ 1887 / Honorarios</h4>
+                        <span class="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-bold">Anual</span>
+                    </div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[9px] uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-2">RUT</th>
+                                <th class="px-4 py-2">Nombre</th>
+                                <th class="px-4 py-2 text-right">Monto Bruto</th>
+                                <th class="px-4 py-2 text-right">Retención</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-dj-honorarios" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+                <!-- DJ 1948 / 1879 combined -->
+                <div class="card p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 id="dj-misc-label" class="text-xs font-black text-slate-500 uppercase tracking-widest">DJ 1948 / DJ 1879</h4>
+                        <span class="text-[10px] bg-purple-100 text-purple-600 px-2 py-1 rounded font-bold">Anual</span>
+                    </div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[9px] uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-2">Detalle</th>
+                                <th class="px-4 py-2 text-right">Monto</th>
+                                <th class="px-4 py-2 text-right">Factor/Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-dj-misc" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+
+                <!-- Botones para exportar declaraciones juradas a CSV -->
+                <div class="flex flex-wrap gap-4 mt-4">
+                    <button onclick="exportDJ('1887')" class="btn-jet bg-blue-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Exportar DJ 1887</button>
+                    <button onclick="exportDJ('1948')" class="btn-jet bg-purple-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Exportar DJ 1948 / 1879</button>
+                    <button onclick="exportDJ('1947')" class="btn-jet bg-green-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Exportar DJ 1947</button>
+                </div>
+            </div>
+            <!-- F22 -->
+            <div id="tab-f22" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Declaración Anual (F22)</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Renta Líquida Imponible (RLI)</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">
+                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b>ProPyme General (14 D3)</b> optimizado con control de inventario (CMV). Incluye PPM pagados y Retenciones.
+                    </p>
+                </div>
+                <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
+                    <div class="text-center pb-12 border-b-2 border-slate-100 dark:border-slate-800">
+                        <h3 class="text-3xl font-black text-slate-950 dark:text-white tracking-tighter">Base Imponible Tributaria</h3>
+                        <p class="text-[11px] text-slate-400 uppercase font-black mt-3 tracking-[0.5em]">Año <span class="current-year-display"></span></p>
+                    </div>
+                    <div class="space-y-8 pt-12">
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Ingresos Totales Neto</span>
+                            <span id="f22-ventas" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">(-) Costo de Venta (CMV)</span>
+                            <span id="f22-costos" class="font-black text-red-500 text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">(-) Gastos Aceptados (Comisiones/Otros)</span>
+                            <span id="f22-gastos" class="font-black text-red-500 text-xl">$ 0</span>
+                        </div>
+                        <!-- Mostrar los gastos no aceptados de referencia (no se restan de la RLI) -->
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Gastos No Aceptados (Ref.)</span>
+                            <span id="f22-noaceptados" class="font-black text-orange-500 text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">(-) PPM Pagados</span>
+                            <span id="f22-ppm" class="font-black text-red-500 text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">(-) Retenciones Honorarios</span>
+                            <span id="f22-retenciones" class="font-black text-red-500 text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-8 bg-slate-50 dark:bg-slate-800 px-10 rounded-[2.5rem] border-2 border-slate-950 dark:border-blue-900">
+                            <div>
+                                <span class="block text-slate-950 dark:text-white font-black text-sm uppercase tracking-widest">Renta Líquida Imponible</span>
+                                <span class="text-[9px] text-slate-400 uppercase font-bold">Monto sobre el cual pagas impuesto (1ra Categoría)</span>
+                            </div>
+                            <span id="f22-utilidad" class="font-black text-blue-600 dark:text-blue-400 text-3xl">$ 0</span>
+                        </div>
+                        <!-- Impuesto de Primera Categoría según régimen (25% para 14D3) -->
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto (25%)</span>
+                            <span id="f22-idpc" class="font-black text-blue-500 text-xl">$ 0</span>
+                        </div>
+                        <!-- Impuesto Neto a Pagar (impuesto - PPM - retenciones) -->
+                        <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto Neto</span>
+                            <span id="f22-idpc-net" class="font-black text-indigo-600 text-xl">$ 0</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-t border-slate-50 dark:border-slate-800 mt-4 pt-4">
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Retiros Efectivos (Global Compl.)</span>
+                            <span id="f22-retiros" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Indicadores / KPI -->
+            <div id="tab-kpi" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Indicadores y KPI</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-8 border-l-4 border-emerald-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Rotación de Stock</p>
+                        <h3 id="kpi-stock-rotation" class="text-3xl font-black text-emerald-600">0.0</h3>
+                    </div>
+                    <div class="card p-8 border-l-4 border-indigo-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Crecimiento MoM</p>
+                        <h3 id="kpi-mom" class="text-3xl font-black text-indigo-600">0.0%</h3>
+                    </div>
+                    <div class="card p-8 border-l-4 border-blue-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilidad Acumulada</p>
+                        <h3 id="kpi-profit" class="text-3xl font-black text-blue-600">$ 0</h3>
+                    </div>
+                </div>
+                <!-- Marketing y Métricas de E-commerce -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-4">
+                    <div class="card p-8 border-l-4 border-teal-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">CAC (Costo Adquisición Cliente)</p>
+                        <h3 id="kpi-cac" class="text-2xl font-black text-teal-600">$ 0</h3>
+                    </div>
+                    <div class="card p-8 border-l-4 border-teal-600">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">LTV (Valor de Vida)</p>
+                        <h3 id="kpi-ltv" class="text-2xl font-black text-teal-700">$ 0</h3>
+                    </div>
+                    <div class="card p-8 border-l-4 border-teal-700">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">LTV : CAC</p>
+                        <h3 id="kpi-ltv-cac" class="text-2xl font-black text-teal-800">0.0</h3>
+                    </div>
+                    <div class="card p-8 border-l-4 border-teal-800">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">ROAS / Punto Equilibrio</p>
+                        <h3 id="kpi-roas" class="text-lg font-black text-teal-900 leading-tight">ROAS: 0.0<br>Break-even: 0.0</h3>
+                    </div>
+                </div>
+                <div class="card overflow-hidden border-none shadow-md">
+                    <div class="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                        <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Unit Economics y Ranking</h4>
+                    </div>
+                    <table class="w-full text-sm">
+                        <thead class="bg-white dark:bg-slate-900 text-slate-400 font-bold text-[9px] uppercase tracking-wider border-b dark:border-slate-800">
+                            <tr>
+                                <th class="px-6 py-4">Producto</th>
+                                <th class="px-6 py-4 text-right">Unidades Vendidas</th>
+                                <th class="px-6 py-4 text-right">Precio Prom.</th>
+                                <th class="px-6 py-4 text-right">Costo Prom.</th>
+                                <th class="px-6 py-4 text-right">Margen/Unidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-kpi" class="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Auditoría -->
+            <div id="tab-auditoria" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Auditoría Automática</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-red-600 dark:text-red-400 uppercase mb-1">Revisión Tributaria y Contable</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">
+                        Este módulo analiza tus registros de compras, ventas, inventario y flujo de caja para detectar inconsistencias con el <b>Registro de Compras y Ventas (RCV)</b>, diferencias en conciliación bancaria, márgenes imposibles y otros riesgos comunes. Utiliza esta herramienta como una revisión previa antes de presentar tus declaraciones ante el SII.
+                    </p>
+                </div>
+                <div class="card p-6 overflow-auto">
+                    <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest mb-4">Resumen de Observaciones</h4>
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[9px] uppercase tracking-wider">
+                            <tr>
+                                <th class="px-4 py-2">Tipo de Observación</th>
+                                <th class="px-4 py-2">Detalle</th>
+                                <th class="px-4 py-2 text-right">Monto / Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-auditoria" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab de Contabilidad Formal -->
+            <div id="tab-contabilidad" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Contabilidad Formal</h2>
+                <!-- Filtros de mes independientes para cada libro contable -->
+                <!-- Los selectores de mes se ubican junto a cada sección -->
+                <!-- Plan de Cuentas -->
+                <div class="card p-8">
+                    <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest mb-4">Plan de Cuentas</h4>
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase tracking-wider">
+                                <th class="px-4 py-2">Código</th>
+                                <th class="px-4 py-2">Cuenta</th>
+                                <th class="px-4 py-2">Tipo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-plan-cuentas" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+                <!-- Libro Diario Contable -->
+                <div class="card p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest">Libro Diario Contable</h4>
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
+                            <select id="filter-month-diario" onchange="updateContabMonthDiario(this.value)" class="bg-slate-50 dark:bg-slate-800 text-xs font-black uppercase tracking-widest outline-none dark:text-white pr-4">
+                                <option value="-1">Acumulado</option>
+                                <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option><option value="3">Abril</option>
+                                <option value="4">Mayo</option><option value="5">Junio</option><option value="6">Julio</option><option value="7">Agosto</option>
+                                <option value="8">Septiembre</option><option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase tracking-wider">
+                                <th class="px-4 py-2">Fecha</th>
+                                <th class="px-4 py-2">Cuenta Debe</th>
+                                <th class="px-4 py-2 text-right">Monto Debe</th>
+                                <th class="px-4 py-2">Cuenta Haber</th>
+                                <th class="px-4 py-2 text-right">Monto Haber</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-asientos" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+                <!-- Libro Mayor -->
+                <div class="card p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest">Libro Mayor</h4>
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
+                            <select id="filter-month-mayor" onchange="updateContabMonthMayor(this.value)" class="bg-slate-50 dark:bg-slate-800 text-xs font-black uppercase tracking-widest outline-none dark:text-white pr-4">
+                                <option value="-1">Acumulado</option>
+                                <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option><option value="3">Abril</option>
+                                <option value="4">Mayo</option><option value="5">Junio</option><option value="6">Julio</option><option value="7">Agosto</option>
+                                <option value="8">Septiembre</option><option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Cuenta</label>
+                        <select id="mayor-cuenta-select" onchange="renderLibroMayor()" class="w-64 border-2 border-slate-100 dark:border-slate-800 p-2 rounded-md text-xs bg-white dark:bg-slate-800 font-bold dark:text-white"></select>
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase tracking-wider">
+                                <th class="px-4 py-2">Fecha</th>
+                                <th class="px-4 py-2 text-right">Debe</th>
+                                <th class="px-4 py-2 text-right">Haber</th>
+                                <th class="px-4 py-2 text-right">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-libro-mayor" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+                <!-- Balance de Sumas y Saldos -->
+                <div class="card p-8">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest">Balance de Sumas y Saldos</h4>
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="calendar" class="w-4 h-4 text-blue-500"></i>
+                            <select id="filter-month-balance" onchange="updateContabMonthBalance(this.value)" class="bg-slate-50 dark:bg-slate-800 text-xs font-black uppercase tracking-widest outline-none dark:text-white pr-4">
+                                <option value="-1">Acumulado</option>
+                                <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option><option value="3">Abril</option>
+                                <option value="4">Mayo</option><option value="5">Junio</option><option value="6">Julio</option><option value="7">Agosto</option>
+                                <option value="8">Septiembre</option><option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase tracking-wider">
+                                <th class="px-4 py-2">Cuenta</th>
+                                <th class="px-4 py-2 text-right">Saldo</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-balance" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modales -->
+    <!-- Modal Nuevo Tercero -->
+    <div id="modal-tercero" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+        <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl">
+            <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Nuevo Contacto</h3>
+            <form onsubmit="handleTercero(event)" class="space-y-6">
+                <div class="space-y-4">
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">RUT</label><input type="text" id="tercero-rut" placeholder="12.345.678-9" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none"></div>
+                    <div><label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre / Razón Social</label><input type="text" id="tercero-nombre" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none"></div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Tipo</label>
+                        <select id="tercero-tipo" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none">
+                            <option value="CLIENTE">Cliente</option>
+                            <option value="PROVEEDOR">Proveedor</option>
+                            <option value="PRESTADOR">Prestador Servicios (Honorarios)</option>
+                            <option value="SOCIO">Socio / Dueño</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-4 pt-6">
+                    <button type="button" onclick="closeModal('modal-tercero')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cancelar</button>
+                    <button type="submit" class="flex-1 bg-orange-500 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+<!-- Modales Venta / Gasto / Import / Productos / Capital / Transfer / Import ML -->
+<!-- Modal Venta -->
+<div id="modal-venta" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-lg w-full shadow-2xl transition-colors">
+        <h3 id="modal-venta-title" class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Operación Venta</h3>
+        <form onsubmit="handleVenta(event)" class="space-y-8">
+            <input type="hidden" id="venta-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Fecha</label>
+                    <input type="date" id="venta-fecha" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none focus:border-blue-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Producto</label>
+                    <select id="venta-prod" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none focus:border-blue-500"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Cant.</label>
+                    <input type="number" id="venta-cant" required min="1" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-3 tracking-widest">Precio Bruto</label>
+                    <input type="number" id="venta-bruto" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none focus:border-blue-500">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-orange-500 uppercase mb-3 tracking-widest">Comisiones + Flete (Bruto Total)</label>
+                    <input type="number" id="venta-comision" value="0" class="w-full border-2 border-orange-50 dark:border-orange-900/20 p-5 rounded-3xl text-sm bg-transparent font-bold text-orange-600 dark:text-orange-400 outline-none">
+                </div>
+                <div class="md:col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                        <i data-lucide="wallet" class="w-3 h-3"></i> Ingreso a Cuenta
+                    </label>
+                    <select id="venta-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none"></select>
+                </div>
+            </div>
+            <div class="flex gap-4 pt-4">
+                <button type="button" onclick="closeModal('modal-venta')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400 tracking-widest">Cancelar</button>
+                <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Capital -->
+<div id="modal-capital" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl transition-colors">
+        <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Gestión Socio</h3>
+        <form onsubmit="handleCapital(event)" class="space-y-8">
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Tipo Operación</label>
+                    <select id="capital-tipo" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none">
+                        <option value="APORTE">Aporte de Capital (Ingreso)</option>
+                        <option value="RETIRO">Retiro de Utilidades (Egreso)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Cuenta Afectada</label>
+                    <select id="capital-cuenta" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Monto</label>
+                    <input type="number" id="capital-monto" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Detalle</label>
+                    <input type="text" id="capital-desc" placeholder="Ej: Préstamo dueño" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+            </div>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal('modal-capital')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cancelar</button>
+                <button type="submit" class="flex-1 bg-indigo-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl">Registrar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Transfer -->
+<div id="modal-transfer" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl transition-colors">
+        <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Transferir Fondos</h3>
+        <form onsubmit="handleTransfer(event)" class="space-y-8">
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Origen</label>
+                    <select id="transfer-origen" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Destino</label>
+                    <select id="transfer-destino" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Monto</label>
+                    <input type="number" id="transfer-monto" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none">
+                </div>
+            </div>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal('modal-transfer')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cancelar</button>
+                <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl">Mover</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Producto -->
+<div id="modal-producto" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-lg w-full shadow-2xl transition-colors">
+        <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Nuevo SKU</h3>
+        <form onsubmit="handleProducto(event)" class="space-y-6">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Categoría ML</label>
+                    <select id="prod-cat" onchange="generateSKU()" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none">
+                        <option value="">Seleccione...</option>
+                        <option value="E">Electrónica</option><option value="H">Hogar</option><option value="P">Mascotas</option>
+                        <option value="B">Belleza</option><option value="F">Moda</option><option value="D">Deportes</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Nombre Comercial</label>
+                    <input type="text" id="prod-nombre" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Enlace Proveedor</label>
+                    <input type="url" id="prod-link" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none" placeholder="https://alibaba.com/...">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Código SKU (Automático)</label>
+                    <input type="text" id="prod-sku" readonly class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-black dark:text-blue-400 outline-none">
+                </div>
+            </div>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal('modal-producto')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cerrar</button>
+                <button type="submit" class="flex-1 bg-slate-950 dark:bg-blue-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em]">Crear SKU</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Importación -->
+<div id="modal-import" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-xl w-full shadow-2xl overflow-y-auto max-h-[90vh] transition-colors">
+        <h3 id="modal-import-title" class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Importación (CIF)</h3>
+        <form onsubmit="handleImport(event)" class="space-y-6">
+            <input type="hidden" id="import-id">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Fecha DIN</label>
+                    <input type="date" id="import-fecha" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Folio</label>
+                    <input type="text" id="import-doc" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Producto</label>
+                    <select id="import-prod" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Cant.</label>
+                    <input type="number" id="import-cant" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-emerald-600 uppercase mb-2">FOB (USD)</label>
+                    <input type="number" id="import-fob" required step="0.01" class="w-full border-2 border-emerald-50 dark:border-emerald-900/10 p-5 rounded-3xl text-sm bg-transparent font-bold text-emerald-600 dark:text-emerald-400 outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Flete (USD)</label>
+                    <input type="number" id="import-flete" value="0" step="0.01" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Seguro (USD)</label>
+                    <input type="number" id="import-seguro" value="0" step="0.01" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <!-- Form F: indica si existe certificado TLC China para exonerar Ad Valorem -->
+                <div class="md:col-span-2 flex items-center pt-2 gap-2">
+                    <input type="checkbox" id="import-formf" class="h-4 w-4 text-blue-600 bg-transparent border-slate-300 dark:border-slate-700 rounded focus:ring-blue-500">
+                    <label for="import-formf" class="text-[10px] font-black text-blue-500 uppercase tracking-widest">Form F (TLC China - Ad Valorem 0%)</label>
+                </div>
+                <div class="md:col-span-2 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                        <i data-lucide="wallet" class="w-3 h-3"></i> Pago desde Cuenta
+                    </label>
+                    <select id="import-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none"></select>
+                </div>
+            </div>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal('modal-import')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cerrar</button>
+                <button type="submit" class="flex-1 bg-emerald-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em] shadow-xl">Ingresar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Gasto -->
+<div id="modal-gasto" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-md w-full shadow-2xl transition-colors">
+        <h3 id="modal-gasto-title" class="text-3xl font-black text-slate-950 dark:text-white mb-10 uppercase tracking-tighter">Registro Egreso</h3>
+        <form onsubmit="handleGasto(event)" class="space-y-8">
+            <input type="hidden" id="gasto-id">
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Fecha</label>
+                    <input type="date" id="gasto-fecha" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none focus:border-slate-900">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Tipo</label>
+                    <select id="gasto-tipo" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none">
+                        <option value="GASTO_LOCAL">Gasto Local (Factura)</option>
+                        <option value="HONORARIOS">Honorarios (Servicios)</option>
+                        <option value="RETIRO">Retiro Personal (Utilidad)</option>
+                    </select>
+                </div>
+                <!-- Clasificación SII: gasto aceptado o no aceptado -->
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Clasificación</label>
+                    <select id="gasto-aceptado" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none">
+                        <option value="true">Gasto Aceptado</option>
+                        <option value="false">No Aceptado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Proveedor (RUT)</label>
+                    <select id="gasto-prov" class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-slate-50 dark:bg-slate-800 font-bold dark:text-white outline-none"></select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Descripción</label>
+                    <input type="text" id="gasto-desc" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-bold dark:text-white outline-none">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase mb-2">Monto Bruto</label>
+                    <input type="number" id="gasto-monto" required class="w-full border-2 border-slate-100 dark:border-slate-800 p-5 rounded-3xl text-sm bg-transparent font-black dark:text-white outline-none">
+                </div>
+                <div class="pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <label class="block text-[10px] font-black text-emerald-500 uppercase mb-3 tracking-widest flex items-center gap-2">
+                        <i data-lucide="wallet" class="w-3 h-3"></i> Origen de Fondos
+                    </label>
+                    <select id="gasto-cuenta" class="w-full border-2 border-emerald-100 dark:border-emerald-900/30 p-5 rounded-3xl text-sm bg-emerald-50 dark:bg-emerald-900/10 font-bold dark:text-white text-emerald-700 outline-none"></select>
+                </div>
+            </div>
+            <div class="flex gap-4 pt-6">
+                <button type="button" onclick="closeModal('modal-gasto')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cancelar</button>
+                <button type="submit" class="flex-1 bg-slate-950 dark:bg-blue-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em]">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<!-- Modal Importación Masiva -->
+<div id="modal-import-ml" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-xl w-full shadow-2xl transition-colors">
+        <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-6 uppercase tracking-tighter">Procesador Lotes</h3>
+        <textarea id="ml-import-data" class="w-full h-56 border-2 border-slate-100 dark:border-slate-800 p-6 rounded-3xl text-xs bg-slate-50 dark:bg-slate-800 dark:text-white outline-none font-mono" placeholder="Fecha, SKU, Cant, Bruto, Comisión"></textarea>
+        <div class="flex gap-4 mt-6">
+            <button type="button" onclick="closeModal('modal-import-ml')" class="flex-1 px-4 py-5 rounded-3xl text-[11px] font-black uppercase text-slate-400">Cerrar</button>
+            <button type="button" onclick="handleBulkImport()" class="flex-1 bg-orange-600 text-white px-4 py-5 rounded-3xl text-[11px] font-black uppercase tracking-[0.25em]">Procesar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Backup -->
+<div id="modal-backup" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[3rem] p-12 max-w-sm w-full shadow-2xl transition-colors">
+        <h3 class="text-3xl font-black text-slate-950 dark:text-white mb-6 uppercase tracking-tighter">Gestión Backup</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-4">Seleccione una acción:</p>
+        <div class="flex flex-col gap-4">
+            <button onclick="exportData(); closeModal('modal-backup')" class="btn-jet bg-blue-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Descargar Datos</button>
+            <div class="relative">
+                <input type="file" id="backup-file" class="hidden" accept=".json" onchange="importData(event); closeModal('modal-backup')">
+                <button onclick="document.getElementById('backup-file').click()" class="btn-jet bg-emerald-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest w-full">Cargar Datos</button>
+            </div>
+            <button onclick="closeModal('modal-backup')" class="btn-jet bg-slate-700 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+    
+
+    <!-- Scripts -->
+    <script>
+        // Data storage
+        let db = {
+            movimientos: [],
+            productos: [],
+            cuentas: [
+                { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                { id: 'caja', nombre: 'Caja Chica', tipo: 'efectivo', saldo: 0 }
+            ],
+            terceros: [],
+            flujoCaja: [],
+            // Registros de compras y ventas del SII (RCV) para validación cruzada
+            rcvCompras: [],
+            rcvVentas: [],
+            config: {
+                usdRate: 950,
+                ppmRate: 1, // porcentaje PPM (1% por defecto)
+                year: 2026,
+                theme: 'light',
+                selectedMonth: new Date().getMonth(),
+                // Mes seleccionado para la contabilidad formal (por defecto mismo mes actual)
+                contabMonth: new Date().getMonth(),
+                // Meses específicos para cada libro de la contabilidad formal
+                contabMonthDiario: new Date().getMonth(),
+                contabMonthMayor: new Date().getMonth(),
+                contabMonthBalance: new Date().getMonth(),
+                retRate: 14.5, // porcentaje retención honorarios por defecto (2026)
+                // Régimen tributario por defecto (14D3 Pro Pyme General o 14D8 Pro Pyme Transparente)
+                regimen: '14D3',
+                // Giro principal (SII): código de actividad económica
+                giro: '479100',
+                // Domicilio principal de la empresa (para fines de importaciones y fiscalización)
+                address: ''
+            }
+        };
+
+        let performanceChart = null;
+
+        // Safe helpers
+        function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
+        function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
+        function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('jet_db_v30_pro');
+            if (saved) {
+                db = JSON.parse(saved);
+            }
+            // Initialize or migrate previous versions if any
+            if (!db.cuentas || db.cuentas.length === 0) {
+                db.cuentas = [
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 }
+                ];
+                db.flujoCaja = [];
+            }
+            if (!db.terceros) db.terceros = [];
+            if (db.config.selectedMonth === undefined) db.config.selectedMonth = new Date().getMonth();
+            // Asegurar que exista el mes de contabilidad (contabMonth)
+            if (db.config.contabMonth === undefined) db.config.contabMonth = db.config.selectedMonth;
+            if (db.config.contabMonthDiario === undefined) db.config.contabMonthDiario = db.config.selectedMonth;
+            if (db.config.contabMonthMayor === undefined) db.config.contabMonthMayor = db.config.selectedMonth;
+            if (db.config.contabMonthBalance === undefined) db.config.contabMonthBalance = db.config.selectedMonth;
+            // Asegurar que existan los campos de régimen, giro y domicilio
+            if (db.config.regimen === undefined) db.config.regimen = '14D3';
+            if (db.config.giro === undefined) db.config.giro = '479100';
+            if (db.config.address === undefined) db.config.address = '';
+            // Asegurar que existan los registros de RCV, incluso si no fueron guardados previamente
+            if (!db.rcvCompras) db.rcvCompras = [];
+            if (!db.rcvVentas) db.rcvVentas = [];
+            safeSetText('current-date', new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
+            const yearInp = document.getElementById('config-year'); if (yearInp) yearInp.value = db.config.year;
+            const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
+            // Establecer valores por defecto en los campos de régimen, giro y domicilio
+            const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D3';
+            const giroInp = document.getElementById('config-giro'); if (giroInp) giroInp.value = db.config.giro || '';
+            const addrInp = document.getElementById('config-address'); if (addrInp) addrInp.value = db.config.address || '';
+            const monthSel = document.getElementById('filter-month'); if (monthSel) monthSel.value = db.config.selectedMonth;
+            // Sincronizar selectores de mes en la sección de Contabilidad
+            const diarioSel = document.getElementById('filter-month-diario'); if (diarioSel) diarioSel.value = db.config.contabMonthDiario;
+            const mayorSel = document.getElementById('filter-month-mayor'); if (mayorSel) mayorSel.value = db.config.contabMonthMayor;
+            const balanceSel = document.getElementById('filter-month-balance'); if (balanceSel) balanceSel.value = db.config.contabMonthBalance;
+            // Reflejar el año en los elementos que lo muestran (por ejemplo F22)
+            document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
+            // Asignar valor inicial al selector de año en el header, si existe
+            const yearInpHeader = document.getElementById('config-year-header');
+            if (yearInpHeader) yearInpHeader.value = db.config.year;
+            // Inicializar contabilidad y reconstruir asientos desde los movimientos guardados
+            initPlanCuentas();
+            rebuildAsientos();
+            updateRetRate();
+            applyTheme();
+            // Actualizar valor del dólar; UF/UTM/IPC se eliminan por no ser utilizados
+            updateUSD();
+            render();
+        });
+
+        function updateUSD() {
+            fetch('https://mindicador.cl/api/dolar').then(res => res.json()).then(data => {
+                db.config.usdRate = Math.round(data.serie[0].valor);
+                safeSetText('usd-val', `$ ${db.config.usdRate}`);
+                save();
+            }).catch(() => safeSetText('usd-val', `$ ${db.config.usdRate}`));
+        }
+        function save() {
+            // Recalcula asientos contables antes de guardar
+            rebuildAsientos();
+            localStorage.setItem('jet_db_v30_pro', JSON.stringify(db));
+            render();
+        }
+
+        // Exportar datos: crea un archivo JSON con todo el contenido de la base de datos
+        function exportData() {
+            try {
+                const dataStr = JSON.stringify(db);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jet_backup_${db.config.year}_${Date.now()}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('No se pudo exportar el backup');
+            }
+        }
+
+        // Importar datos desde un archivo JSON
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const imported = JSON.parse(evt.target.result);
+                    db = imported;
+                    // Asegurar que existan los nuevos campos de configuración
+                    if (!db.config) db.config = {};
+                    initPlanCuentas();
+                    rebuildAsientos();
+                    updateRetRate();
+                    applyTheme();
+                    updateUSD();
+                    save();
+                    alert('Backup importado correctamente');
+                } catch (err) {
+                    alert('Error al importar el backup');
+                }
+            };
+            reader.readAsText(file);
+        }
+        function resetApp() {
+            if (confirm('¿Reiniciar todo? Se perderán datos.')) {
+                localStorage.removeItem('jet_db_v30_pro'); location.reload();
+            }
+        }
+
+        // Configuration updates
+        function updateYear(v) {
+            const newYear = parseInt(v);
+            if (!isNaN(newYear)) {
+                // Al cambiar de año se restablecen los selectores de mes para evitar sumar datos de años pasados
+                if (newYear !== db.config.year) {
+                    db.config.year = newYear;
+                    // Reiniciar filtros mensuales a enero (0)
+                    db.config.selectedMonth = 0;
+                    db.config.contabMonthDiario = 0;
+                    db.config.contabMonthMayor = 0;
+                    db.config.contabMonthBalance = 0;
+                    // Actualizar valores en los selectores de mes
+                    const monthSel = document.getElementById('filter-month'); if (monthSel) monthSel.value = db.config.selectedMonth;
+                    const diarioSel = document.getElementById('filter-month-diario'); if (diarioSel) diarioSel.value = db.config.contabMonthDiario;
+                    const mayorSel = document.getElementById('filter-month-mayor'); if (mayorSel) mayorSel.value = db.config.contabMonthMayor;
+                    const balanceSel = document.getElementById('filter-month-balance'); if (balanceSel) balanceSel.value = db.config.contabMonthBalance;
+                } else {
+                    db.config.year = newYear;
+                }
+                // Sincronizar los campos de selección de año en la interfaz
+                const yearSidebar = document.getElementById('config-year');
+                if (yearSidebar) yearSidebar.value = db.config.year;
+                const yearHeader = document.getElementById('config-year-header');
+                if (yearHeader) yearHeader.value = db.config.year;
+                updateRetRate();
+                // Actualizar textos que muestran el año actual (por ejemplo en F22)
+                document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
+                save();
+            }
+        }
+        function updatePPM(v) { db.config.ppmRate = parseFloat(v); save(); }
+
+        // Actualizar régimen tributario (14D3 o 14D8)
+        function updateRegimen(v) {
+            db.config.regimen = v;
+            // Ajustar tasa PPM por defecto cuando se elige régimen (si el usuario no la ha cambiado)
+            // 14D3: 0,25%; 14D8: 0,2%.
+            if (v === '14D3' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
+                db.config.ppmRate = 0.25;
+                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
+            }
+            if (v === '14D8' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
+                db.config.ppmRate = 0.2;
+                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
+            }
+            save();
+        }
+
+        // Actualizar código de giro principal
+        function updateGiro(v) {
+            db.config.giro = v;
+            save();
+        }
+
+        // Actualizar domicilio fiscal
+        function updateAddress(v) {
+            db.config.address = v;
+            save();
+        }
+        function updateRetRate() {
+            // Actualizar porcentaje de retención honorarios según año fiscal
+            // 2026: 15,25%; 2027: 16,00%; 2028 en adelante: 17% (según tabla de aumentos del SII【81246665095724†L250-L312】)
+            const y = db.config.year;
+            let rate;
+            if (y >= 2028) rate = 17;
+            else if (y >= 2027) rate = 16;
+            else if (y >= 2026) rate = 15.25;
+            else if (y >= 2025) rate = 14.5;
+            else rate = 13.75;
+            db.config.retRate = rate;
+            safeSetText('rate-help', `${db.config.retRate}%`);
+            safeSetText('ret-rate', `${db.config.retRate}%`);
+        }
+
+        // Theme
+        function toggleTheme() {
+            db.config.theme = db.config.theme === 'light' ? 'dark' : 'light';
+            applyTheme(); save();
+        }
+        function applyTheme() {
+            if (db.config.theme === 'dark') document.documentElement.classList.add('dark');
+            else document.documentElement.classList.remove('dark');
+            safeCreateIcons(); if (performanceChart) renderAnnualSummary();
+        }
+
+        // Tab switcher
+        function switchTab(t) {
+            // Ocultar todos los contenidos
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            // Mostrar el contenido solicitado
+            const target = document.getElementById(`tab-${t}`);
+            if (target) target.classList.remove('hidden');
+            // Actualizar título
+            safeSetText('tab-title', t.toUpperCase());
+            // Actualizar resúmenes según tab
+            if (t === 'resumen-anual') renderAnnualSummary();
+            if (t === 'proyecciones') renderProjections();
+            if (t === 'ddjj') renderDDJJ();
+            if (t === 'kpi') renderKPI();
+            if (t === 'contabilidad') renderContabilidad();
+            if (t === 'auditoria') renderAuditoria();
+            // Actualizar la navegación activa
+            document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+            const navBtn = document.getElementById(`btn-${t}`);
+            if (navBtn) navBtn.classList.add('active');
+            // Actualizar iconos
+            safeCreateIcons();
+        }
+
+        // Modal utils (basic)
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); /* populate selects as needed */ }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        // Abrir modal de backup: permite elegir entre descargar y cargar datos
+        function openBackupModal() {
+            const modal = document.getElementById('modal-backup');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        // Core operations: registrar flujo (no cambios)
+        function registrarFlujo(fecha, cuentaId, concepto, monto, tipo, refId) {
+            const c = db.cuentas.find(x => x.id === cuentaId);
+            if (!c) return;
+            if (tipo === 'INGRESO') c.saldo += monto; else c.saldo -= monto;
+            db.flujoCaja.push({ id: Date.now() + Math.random(), fecha, cuentaId, concepto, monto, tipoMovimiento: tipo, refId, saldoParcial: c.saldo });
+        }
+
+        // Safe reversal for editing (no cambios)
+        function revertMovement(m) {
+            const p = db.productos.find(x => x.id === m.prodId);
+            if (p && m.tipo === 'VENTA') p.stock += m.cant;
+            if (p && m.tipo === 'IMPORTACION') p.stock -= m.cant;
+        }
+
+        // SKU generator (unchanged)
+        function generateSKU() {
+            const cat = document.getElementById('prod-cat')?.value;
+            if (!cat) { document.getElementById('prod-sku').value = ''; return; }
+            const count = db.productos.filter(p => p.sku.startsWith(cat + '-')).length;
+            document.getElementById('prod-sku').value = `${cat}-${count + 1}`;
+        }
+
+        // Stock runout (unchanged)
+        function calculateStockRunout(prodId) {
+            const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+            const sales = db.movimientos.filter(m => m.tipo === 'VENTA' && m.prodId == prodId && new Date(m.fecha) >= thirtyDaysAgo).reduce((a, b) => a + b.cant, 0);
+            const dailySales = sales / 30;
+            const prod = db.productos.find(p => p.id == prodId);
+            if (dailySales === 0) return { days: 999, date: 'Estable' };
+            const daysLeft = Math.floor(prod.stock / dailySales);
+            const runoutDate = new Date(); runoutDate.setDate(runoutDate.getDate() + daysLeft);
+            return { days: daysLeft, date: runoutDate.toLocaleDateString() };
+        }
+
+        // Burn Rate (unchanged)
+        function calculateBurnRate() {
+            const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const expenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS' || m.tipo === 'IMPORTACION') && new Date(m.fecha) >= threeMonthsAgo).reduce((a, b) => a + b.total, 0);
+            return Math.round(expenses / 3);
+        }
+
+        // Generar alertas legales básicas (F29, F22/DJ)
+        function checkAlerts() {
+            const alerts = [];
+            const today = new Date();
+            const day = today.getDate();
+            const month = today.getMonth();
+            // F29: día 20 de cada mes
+            if (day >= 15 && day <= 20) {
+                alerts.push({ type: 'f29', message: 'Recordatorio: el Formulario 29 vence el día 20 de cada mes.' });
+            }
+            // Declaraciones Juradas y F22: marzo y abril
+            if ((month === 2 && day >= 15) || (month === 3 && day <= 30)) {
+                alerts.push({ type: 'f22', message: 'Recordatorio: periodo de Declaraciones Juradas (DJ) y Renta (F22). Verifica tus documentos.' });
+            }
+            return alerts;
+        }
+
+        // Handle honorario expense with dynamic retention rate
+        function handleGasto(e) {
+            e.preventDefault();
+            const id = document.getElementById('gasto-id')?.value || Date.now().toString();
+            // Eliminar movimiento existente y flujos asociados si se está editando
+            db.movimientos = db.movimientos.filter(x => x.id != id);
+            db.flujoCaja = db.flujoCaja.filter(f => f.refId != id);
+            const monto = parseInt(document.getElementById('gasto-monto').value);
+            const tipo = document.getElementById('gasto-tipo').value;
+            const cuenta = document.getElementById('gasto-cuenta').value;
+            const rutProv = document.getElementById('gasto-prov').value;
+            const fecha = new Date(document.getElementById('gasto-fecha').value + 'T00:00:00');
+            // Clasificación: aceptado por defecto salvo que el usuario indique lo contrario
+            const aceptadoEl = document.getElementById('gasto-aceptado');
+            const accepted = aceptadoEl ? aceptadoEl.value !== 'false' : true;
+            let neto = monto, iva = 0, ret = 0;
+            if (tipo === 'GASTO_LOCAL') { neto = Math.round(monto / 1.19); iva = monto - neto; }
+            else if (tipo === 'HONORARIOS') { ret = Math.round(monto * (db.config.retRate / 100)); neto = monto - ret; }
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo, desc: document.getElementById('gasto-desc').value, neto, iva, total: monto, retention: ret, nDoc: 'Egr.', terceroId: rutProv, accepted });
+            registrarFlujo(fecha.toISOString(), cuenta, `Pago: ${document.getElementById('gasto-desc').value}`, monto, 'EGRESO', id);
+            save(); closeModal('modal-gasto');
+        }
+
+        // Calculate IVA payable for a given set of movements (dynamic PPM & retention)
+        function calculateIVAPagar(movs) {
+            // Calcula el IVA a pagar para el mes seleccionado, considerando el remanente de meses anteriores
+            const yearMovs = movs.filter(x => new Date(x.fecha).getFullYear() === db.config.year);
+            let rem = 0;
+            let toPay = 0;
+            for (let idx = 0; idx <= db.config.selectedMonth; idx++) {
+                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
+                const debit = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
+                // El crédito fiscal se compone sólo de gastos aceptados
+                const credit = m.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'IMPORTACION') && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
+                // Las retenciones siempre se suman al total a pagar (no dependen de aceptación)
+                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
+                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+                const ppm = netoSales * (db.config.ppmRate / 100);
+                let neto = debit - credit - rem;
+                if (neto < 0) { rem = Math.abs(neto); neto = 0; } else { rem = 0; }
+                if (idx === db.config.selectedMonth) {
+                    toPay = neto + retHon + ppm;
+                }
+            }
+            return toPay;
+        }
+
+        // Tax panel calculation across year
+        function calculateTaxState(yearMovs) {
+            let rem = 0; let totalIva = 0;
+            for (let idx = 0; idx < 12; idx++) {
+                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
+                const debit = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
+                // IVA crédito sólo considera gastos aceptados
+                const credit = m.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'IMPORTACION') && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
+                // Las retenciones siempre aplican (honorarios)
+                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
+                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+                const ppm = netoSales * (db.config.ppmRate / 100);
+                let neto = debit - credit - rem;
+                if (neto < 0) { rem = Math.abs(neto); neto = 0; } else { rem = 0; }
+                totalIva += neto + retHon + ppm;
+            }
+            return totalIva;
+        }
+
+        // Render dashboard & others
+        function render() {
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const monthMovs = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
+            // Dashboard summary
+            const cajaTotal = db.cuentas.reduce((a, c) => a + c.saldo, 0);
+            const ivaPagar = calculateIVAPagar(yearMovs);
+            safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString('es-CL')}`);
+            safeSetText('dash-ventas', `$ ${yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0).toLocaleString('es-CL')}`);
+            safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString('es-CL')}`);
+            safeSetText('dash-stock', `$ ${db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0).toLocaleString('es-CL')}`);
+            // Treasury cards
+            safeSetHTML('treasury-cards', db.cuentas.map(c => `
+                <div class="card p-6 border-l-4 ${c.saldo >= 0 ? 'border-emerald-500' : 'border-red-500'}">
+                    <div class="flex justify-between mb-2"><span class="text-[10px] font-black uppercase text-slate-400">${c.tipo}</span></div>
+                    <h3 class="text-xl font-black text-slate-900 dark:text-white">$ ${c.saldo.toLocaleString('es-CL')}</h3>
+                    <p class="text-xs font-bold text-slate-500 mt-1">${c.nombre}</p>
+                </div>`).join(''));
+            // Cash table
+            safeSetHTML('table-caja', db.flujoCaja.sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 10).map(f => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                    <td class="px-6 py-3 text-[10px] text-slate-400 font-bold">${new Date(f.fecha).toLocaleDateString('es-CL')}</td>
+                    <td class="px-6 py-3 text-[10px] uppercase font-bold text-blue-500">${db.cuentas.find(c => c.id === f.cuentaId)?.nombre || '?'}</td>
+                    <td class="px-6 py-3 text-xs font-bold dark:text-white">${f.concepto}</td>
+                    <td class="px-6 py-3 text-right font-black text-emerald-500">${f.tipoMovimiento === 'INGRESO' ? '$ ' + f.monto.toLocaleString('es-CL') : ''}</td>
+                    <td class="px-6 py-3 text-right font-black text-red-500">${f.tipoMovimiento === 'EGRESO' ? '$ ' + f.monto.toLocaleString('es-CL') : ''}</td>
+                    <td class="px-6 py-3 text-right text-xs font-bold text-slate-500">$ ${f.saldoParcial?.toLocaleString('es-CL') || '-'}</td>
+                </tr>`).join(''));
+            // Movimientos table
+            const tM = document.getElementById('table-movimientos'); const emptyS = document.getElementById('empty-state-mov');
+            if (tM && monthMovs.length === 0) { tM.innerHTML = ''; if (emptyS) emptyS.classList.remove('hidden'); }
+            else if (tM) {
+                if (emptyS) emptyS.classList.add('hidden');
+                tM.innerHTML = monthMovs.slice().sort((a, b) => new Date(b.fecha) - new Date(a.fecha)).map(m => `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                        <td class="px-8 py-4 text-[10px] font-black text-slate-400">${new Date(m.fecha).toLocaleDateString('es-CL')}</td>
+                        <td class="px-8 py-4 text-[10px] font-black uppercase text-slate-400">${m.nDoc || '-'}<br><span class="text-blue-500">${m.terceroId || ''}</span></td>
+                        <td class="px-8 py-4 text-xs font-black uppercase dark:text-white">${m.desc}</td>
+                        <td class="px-8 py-4 text-right text-xs font-bold dark:text-slate-300">$ ${m.neto.toLocaleString('es-CL')}</td>
+                        <td class="px-8 py-4 text-right text-[10px] font-bold text-blue-500">${m.iva.toLocaleString('es-CL')}</td>
+                        <td class="px-8 py-4 text-right font-black dark:text-white">$ ${m.total.toLocaleString('es-CL')}</td>
+                        <td class="px-8 py-4 text-center"><div class="flex justify-center gap-3"><button onclick="editMov('${m.id}')"><i data-lucide="edit-3" class="w-4 h-4 text-slate-300 hover:text-blue-500"></i></button><button onclick="deleteMov('${m.id}')"><i data-lucide="trash-2" class="w-4 h-4 text-slate-300 hover:text-red-500"></i></button></div></td>
+                    </tr>`).join('');
+            }
+            // Update tax panel and calendar
+            renderTaxPanel(yearMovs); renderFiscalCalendar();
+            safeCreateIcons();
+            // Inventory grid
+            safeSetHTML('grid-inventario', db.productos.map(p => `
+                <div class="card p-6 border-l-4 border-slate-900 dark:border-blue-600">
+                    <h4 class="font-black text-sm dark:text-white">${p.nombre}</h4>
+                    <div class="flex justify-between mt-2 text-xs text-slate-500 font-bold"><span>${p.sku}</span><span>${p.stock} UN</span></div>
+                    ${p.link ? `<a href="${p.link}" target="_blank" class="block mt-2 text-[10px] text-blue-500 uppercase font-black text-right">Comprar ↗</a>` : ''}
+                </div>`).join(''));
+            // Terceros table
+            safeSetHTML('table-terceros', db.terceros.map(t => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                    <td class="px-6 py-4 font-bold text-xs dark:text-white">${t.nombre}</td>
+                    <td class="px-6 py-4 text-xs text-slate-500 font-mono">${t.rut}</td>
+                    <td class="px-6 py-4 text-xs font-black uppercase text-blue-500">${t.tipo}</td>
+                    <td class="px-6 py-4 text-right"><button onclick="deleteTercero('${t.id}')"><i data-lucide="trash-2" class="w-4 h-4 text-slate-300 hover:text-red-500"></i></button></td>
+                </tr>`).join(''));
+            // Reports (F29 & F22)
+            
+// Update treasury summary
+const ingresosTotal = db.flujoCaja.filter(f => f.tipoMovimiento === 'INGRESO').reduce((a,b) => a + b.monto, 0);
+const egresosTotal = db.flujoCaja.filter(f => f.tipoMovimiento === 'EGRESO').reduce((a,b) => a + b.monto, 0);
+safeSetHTML('treasury-summary', `
+    <p class="text-xs font-bold text-slate-500">Ingresos Totales: <span class="text-slate-900 dark:text-white">$ ${ingresosTotal.toLocaleString('es-CL')}</span></p>
+    <p class="text-xs font-bold text-slate-500">Egresos Totales: <span class="text-slate-900 dark:text-white">$ ${egresosTotal.toLocaleString('es-CL')}</span></p>
+    <p class="text-xs font-bold text-slate-500">Saldo Neto: <span class="text-slate-900 dark:text-white">$ ${(ingresosTotal - egresosTotal).toLocaleString('es-CL')}</span></p>
+`);
+// Update low stock list
+const lowItems = db.productos.filter(p => p.stock <= 5);
+if (lowItems.length === 0) {
+    const alertDiv = document.getElementById('low-stock-alert'); if (alertDiv) alertDiv.classList.remove('hidden');
+    safeSetHTML('stock-list','');
+        } else {
+    const alertDiv = document.getElementById('low-stock-alert'); if (alertDiv) alertDiv.classList.add('hidden');
+    safeSetHTML('stock-list', lowItems.map(item => {
+        return `<li class="flex justify-between items-center bg-red-50 dark:bg-red-900/20 p-3 rounded-xl">
+            <span class="text-xs font-bold dark:text-white">${item.nombre}</span>
+            <span class="text-xs font-black text-red-600">${item.stock} un.</span>
+        </li>`;
+    }).join(''));
+}
+
+            // Generar alertas legales y tributarias
+            const alerts = checkAlerts();
+            const alertContainer = document.getElementById('smart-alerts');
+            if (alertContainer) {
+                if (alerts.length === 0) {
+                    alertContainer.classList.add('hidden');
+                    alertContainer.innerHTML = '';
+                } else {
+                    alertContainer.classList.remove('hidden');
+                    alertContainer.innerHTML = alerts.map(a => `
+                        <div class="p-4 bg-red-100 dark:bg-red-900/30 rounded-xl border-l-4 border-red-500 text-[11px] font-black text-red-700 dark:text-red-300 uppercase tracking-widest">
+                            ${a.message}
+                        </div>
+                    `).join('');
+                }
+            }
+
+        // Se eliminó la función updateIndicators; UF, UTM e IPC no se utilizan para los cálculos actuales
+calculateReports(yearMovs);
+        }
+
+        // Tax panel & calendar
+        function renderTaxPanel(yearMovs) {
+            const accumulated = calculateTaxState(yearMovs);
+            let status = 'verde'; if (accumulated > 0 && accumulated < 500000) status = 'amarillo'; if (accumulated >= 500000) status = 'rojo';
+            const color = status === 'verde' ? 'text-emerald-600' : status === 'amarillo' ? 'text-orange-500' : 'text-red-600';
+            safeSetHTML('tax-panel', `<div class="flex items-center gap-3">
+                <span class="w-3 h-3 rounded-full ${status === 'verde' ? 'bg-emerald-500' : status === 'amarillo' ? 'bg-orange-500' : 'bg-red-500'} animate-pulse"></span>
+                <div>
+                    <p class="text-[10px] font-black uppercase text-slate-400">IVA Acumulado</p>
+                    <h3 class="text-xl font-black ${color}">$ ${accumulated.toLocaleString('es-CL')}</h3>
+                </div>
+            </div>`);
+        }
+        function renderFiscalCalendar() {
+            const dates = [];
+            for (let m = 1; m <= 12; m++) {
+                dates.push({ name: `F29 ${m}/${db.config.year}`, date: new Date(db.config.year, m - 1, 20) });
+            }
+            dates.push({ name: `F22 ${db.config.year}`, date: new Date(db.config.year, 3, 30) });
+            dates.push({ name: 'Patente Comercial', date: new Date(db.config.year, 6, 31) });
+            safeSetHTML('fiscal-calendar', dates.map(d => `<li>${d.name}: <span class="text-blue-500">${d.date.toLocaleDateString('es-CL')}</span></li>`).join(''));
+        }
+
+        // Projections
+        function renderProjections() {
+            const now = new Date(); const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); const currentDay = now.getDate();
+            const currentMonthSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const dailyAvg = currentMonthSales / currentDay; const projectedTotal = Math.round(dailyAvg * daysInMonth);
+            safeSetText('proj-sales-current', `$ ${currentMonthSales.toLocaleString('es-CL')}`);
+            safeSetText('proj-sales-forecast', `$ ${projectedTotal.toLocaleString('es-CL')}`);
+            const pBar = document.getElementById('proj-bar-sales'); if (pBar) pBar.style.width = `${Math.min(100, (currentMonthSales / projectedTotal) * 100)}%`;
+            const br = calculateBurnRate(); const cash = db.cuentas.reduce((a, c) => a + c.saldo, 0); const runway = br > 0 ? (cash / br).toFixed(1) : '∞';
+            safeSetText('proj-burn-rate', `$ ${br.toLocaleString('es-CL')}`);
+            safeSetText('proj-runway', `${runway} Meses`);
+            const ivaEst = calculateIVAPagar(db.movimientos);
+            safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString('es-CL')}`);
+            // Calcular utilidad mensual proyectada y crecimiento interanual
+            // Costo de mercaderías vendidas este mes
+            const currentMonthCost = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            // Gastos (aceptados y honorarios) del mes
+            const currentMonthExpenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const projectedCost = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthCost : 0;
+            const projectedExpenses = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthExpenses : 0;
+            const projectedProfit = projectedTotal - projectedCost - projectedExpenses;
+            safeSetText('proj-profit-forecast', `$ ${Math.round(projectedProfit).toLocaleString('es-CL')}`);
+            // Crecimiento interanual: comparación entre las ventas netas del año actual y del año anterior
+            const currentYear = now.getFullYear();
+            const currentYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === currentYear).reduce((a, b) => a + b.neto, 0);
+            const prevYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === (currentYear - 1)).reduce((a, b) => a + b.neto, 0);
+            let yoy = 0;
+            if (prevYearSales > 0) yoy = ((currentYearSales - prevYearSales) / prevYearSales) * 100;
+            safeSetText('proj-yoy-growth', `${yoy.toFixed(1)}%`);
+            // Table projections
+            safeSetHTML('table-projections', db.productos.map(p => {
+                const info = calculateStockRunout(p.id);
+                let badge = '<span class="badge-prediction bg-emerald-100 text-emerald-700">OK</span>';
+                if (info.days < 10) badge = '<span class="badge-prediction bg-red-100 text-red-700">CRÍTICO</span>';
+                else if (info.days < 30) badge = '<span class="badge-prediction bg-orange-100 text-orange-700">ATENCIÓN</span>';
+                const dailySale = info.days !== 999 ? (p.stock / info.days).toFixed(1) : '0.0';
+                return `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                        <td class="px-6 py-3 font-bold text-xs dark:text-white">${p.nombre}</td>
+                        <td class="px-6 py-3 text-center text-xs">${p.stock}</td>
+                        <td class="px-6 py-3 text-center text-xs font-bold text-blue-500">${dailySale}/día</td>
+                        <td class="px-6 py-3 text-center font-black">${info.days === 999 ? '∞' : info.days} días</td>
+                        <td class="px-6 py-3 text-center text-xs text-slate-400">${info.date}</td>
+                        <td class="px-6 py-3 text-center">${badge}</td>
+                    </tr>`;
+            }).join(''));
+        }
+
+        // Annual summary & P&L
+        function calculateReports(yearMovs) {
+            const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+            let remanente = 0; let f29H = ''; let totalPPM = 0; let totalRet = 0;
+            meses.forEach((mes, idx) => {
+                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
+                const ivaV = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
+                // IVA crédito: sólo gastos aceptados
+                const ivaC = m.filter(x => x.tipo === 'GASTO_LOCAL' && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
+                const ivaD = m.filter(x => x.tipo === 'IMPORTACION' && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
+                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
+                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+                const ppm = Math.round(netoSales * (db.config.ppmRate / 100)); totalPPM += ppm; totalRet += retHon;
+                let neto = ivaV - ivaC - ivaD - remanente;
+                if (neto < 0) { remanente = Math.abs(neto); neto = 0; } else { remanente = 0; }
+                f29H += `<tr>
+                    <td class="px-6 py-4 font-black text-xs">${mes}</td>
+                    <td class="text-right text-xs">$ ${ivaV.toLocaleString('es-CL')}</td>
+                    <td class="text-right text-xs text-emerald-500">$ ${ (ivaC + ivaD).toLocaleString('es-CL') }</td>
+                    <td class="text-right text-xs text-orange-500">$ ${retHon.toLocaleString('es-CL')}</td>
+                    <td class="text-right text-xs text-blue-500">$ ${remanente.toLocaleString('es-CL')}</td>
+                    <td class="text-right font-black text-xs">$ ${(neto + retHon + ppm).toLocaleString('es-CL')}</td>
+                </tr>`;
+            });
+            safeSetHTML('table-f29', f29H);
+            // F22
+            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+            const cMV = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            // Gastos Operativos aceptados (se descartan los no aceptados)
+            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + b.neto, 0);
+            // Gastos no aceptados (para información)
+            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + b.neto, 0);
+            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + b.total, 0);
+            const utilidad = vN - cMV - gO; // RLI (Ingresos - Costos - Gastos)
+            safeSetText('f22-ventas', `$ ${vN.toLocaleString('es-CL')}`);
+            safeSetText('f22-costos', `$ ${cMV.toLocaleString('es-CL')}`);
+            safeSetText('f22-gastos', `$ ${gO.toLocaleString('es-CL')}`);
+            safeSetText('f22-noaceptados', `$ ${gNo.toLocaleString('es-CL')}`);
+            safeSetText('f22-ppm', `$ ${totalPPM.toLocaleString('es-CL')}`);
+            safeSetText('f22-retenciones', `$ ${totalRet.toLocaleString('es-CL')}`);
+            safeSetText('f22-utilidad', `$ ${utilidad.toLocaleString('es-CL')}`);
+            safeSetText('f22-retiros', `$ ${retiros.toLocaleString('es-CL')}`);
+            // Impuesto de primera categoría (25%) para régimen 14D3
+            let idpc = 0;
+            if (db.config.regimen === '14D3') {
+                idpc = Math.round(utilidad * 0.25);
+            }
+            safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
+            // Impuesto neto a pagar: impuesto menos PPM menos retenciones
+            const idpcNet = idpc - totalPPM - totalRet;
+            safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+            // DJ tables
+            renderDDJJTables(yearMovs, totalPPM, totalRet);
+        }
+
+        function renderDDJJTables(yearMovs, totalPPM, totalRet) {
+            // DJ 1887
+            const honorarios = yearMovs.filter(m => m.tipo === 'HONORARIOS'); const mapHon = {};
+            honorarios.forEach(h => {
+                const rut = h.terceroId || 'S/N';
+                if (!mapHon[rut]) mapHon[rut] = { nombre: db.terceros.find(t => t.id === rut)?.nombre || 'Desconocido', bruto: 0, ret: 0 };
+                mapHon[rut].bruto += h.total; mapHon[rut].ret += (h.retention || 0);
+            });
+            safeSetHTML('table-dj-honorarios', Object.keys(mapHon).map(k => `
+                <tr class="border-b dark:border-slate-700">
+                    <td class="px-4 py-2 font-mono text-xs dark:text-slate-300">${k}</td>
+                    <td class="px-4 py-2 text-xs font-bold dark:text-white">${mapHon[k].nombre}</td>
+                    <td class="px-4 py-2 text-right text-xs">$ ${mapHon[k].bruto.toLocaleString('es-CL')}</td>
+                    <td class="px-4 py-2 text-right text-xs font-black text-orange-500">$ ${mapHon[k].ret.toLocaleString('es-CL')}</td>
+                </tr>`).join(''));
+            // DJ 1948 / 1879
+            const totalVentasNetas = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+            const totalComprasCred = yearMovs.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'IMPORTACION') && m.iva > 0).reduce((a, b) => a + b.neto, 0);
+            const totalRetiros = yearMovs.filter(m => m.tipo === 'RETIRO').reduce((a, b) => a + b.total, 0);
+            safeSetHTML('table-dj-misc', `
+                <tr class="border-b dark:border-slate-700"><td class="px-4 py-2 text-xs font-bold">Total Ventas Netas (1948)</td><td class="px-4 py-2 text-right text-xs">$ ${totalVentasNetas.toLocaleString('es-CL')}</td><td class="px-4 py-2 text-right text-xs text-slate-400">Base</td></tr>
+                <tr class="border-b dark:border-slate-700"><td class="px-4 py-2 text-xs font-bold">Total Compras Creditable (1948)</td><td class="px-4 py-2 text-right text-xs">$ ${totalComprasCred.toLocaleString('es-CL')}</td><td class="px-4 py-2 text-right text-xs text-slate-400">Base</td></tr>
+                <tr class="border-b dark:border-slate-700"><td class="px-4 py-2 text-xs font-bold">Total Retiros del Dueño (1879)</td><td class="px-4 py-2 text-right text-xs">$ ${totalRetiros.toLocaleString('es-CL')}</td><td class="px-4 py-2 text-right text-xs text-slate-400">Histórico</td></tr>
+            `);
+        }
+
+        // KPI rendering
+        function renderKPI() {
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            // Rotacion: promedio mensual ventas / inventario promedio
+            const salesByMonth = {}; yearMovs.forEach(m => { const k = new Date(m.fecha).getMonth(); if (m.tipo === 'VENTA') salesByMonth[k] = (salesByMonth[k] || 0) + m.neto; });
+            const avgMonthlySales = Object.values(salesByMonth).length ? Object.values(salesByMonth).reduce((a, b) => a + b, 0) / Object.values(salesByMonth).length : 0;
+            const avgInventoryValue = db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0);
+            const rotation = avgInventoryValue > 0 ? (avgMonthlySales / avgInventoryValue) : 0;
+            safeSetText('kpi-stock-rotation', rotation.toFixed(2));
+            // MoM growth: last month vs previous
+            const months = Object.keys(salesByMonth).sort(); let growth = 0;
+            if (months.length >= 2) {
+                const last = salesByMonth[months[months.length - 1]]; const prev = salesByMonth[months[months.length - 2]];
+                growth = prev > 0 ? ((last - prev) / prev) * 100 : 0;
+            }
+            safeSetText('kpi-mom', `${growth.toFixed(1)}%`);
+            // Profit: ventas netas - sum costos mercaderia - gastos (neto)
+            const totalSales = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+            const totalCost = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const totalGastos = yearMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + b.neto, 0);
+            const profit = totalSales - totalCost - totalGastos;
+            safeSetText('kpi-profit', `$ ${profit.toLocaleString('es-CL')}`);
+            // Unit Economics table
+            const ranking = db.productos.map(p => {
+                // Units sold
+                const sales = yearMovs.filter(m => m.tipo === 'VENTA' && m.prodId === p.id);
+                const units = sales.reduce((a, b) => a + b.cant, 0);
+                const totalNet = sales.reduce((a, b) => a + b.neto, 0);
+                const totalComm = yearMovs.filter(m => m.parentId && m.desc.includes('Comisión') && sales.find(s => s.id === m.parentId)).reduce((a, b) => a + b.total, 0);
+                const price = units > 0 ? totalNet / units : 0;
+                const mlFeeUnit = units > 0 ? totalComm / units : 0;
+                const margin = (price - (p.costoPromedio || 0) - mlFeeUnit);
+                return { sku: p.sku, name: p.nombre, units, price, cost: p.costoPromedio || 0, margin };
+            }).sort((a, b) => b.margin - a.margin);
+            safeSetHTML('table-kpi', ranking.map(item => `
+                <tr class="hover:bg-slate-50 dark:hover:bg-slate-800 border-b dark:border-slate-800">
+                    <td class="px-6 py-4 text-xs font-bold dark:text-white">${item.name}</td>
+                    <td class="px-6 py-4 text-right text-xs">${item.units}</td>
+                    <td class="px-6 py-4 text-right text-xs">$ ${item.price.toFixed(0)}</td>
+                    <td class="px-6 py-4 text-right text-xs">$ ${item.cost.toFixed(0)}</td>
+                    <td class="px-6 py-4 text-right text-xs font-black ${item.margin >= 0 ? 'text-emerald-600' : 'text-red-600'}">$ ${item.margin.toFixed(0)}</td>
+                </tr>`).join(''));
+            safeCreateIcons();
+
+            // === Métricas de Marketing ===
+            // Marketing spend: gastos cuyo concepto incluye palabras clave como "ads", "publicidad", "marketing" (insensible a mayúsculas)
+            const marketingGastos = yearMovs.filter(m => {
+                if (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') {
+                    const desc = (m.desc || '').toLowerCase();
+                    return desc.includes('ads') || desc.includes('publicidad') || desc.includes('marketing') || desc.includes('mercado ads') || desc.includes('adwords');
+                }
+                return false;
+            });
+            const marketingSpend = marketingGastos.reduce((sum, m) => sum + m.neto + m.iva, 0);
+            // Número de clientes: cantidad de terceros marcados como CLIENTE o únicos clientes que realizaron compras
+            const clientes = db.terceros.filter(t => t.tipo === 'CLIENTE');
+            const numClientes = clientes.length || 1;
+            // Número de ventas
+            const numVentas = yearMovs.filter(m => m.tipo === 'VENTA').length || 1;
+            // Unidades vendidas
+            const totalUnits = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + (b.cant || 0), 0) || 1;
+            // Promedio de venta neta
+            const avgOrderValue = totalSales > 0 && numVentas > 0 ? totalSales / numVentas : 0;
+            // Frecuencia de compra por cliente
+            const avgFrequency = numVentas / numClientes;
+            // CAC: gasto marketing / nuevos clientes
+            const cac = numClientes > 0 ? marketingSpend / numClientes : 0;
+            // LTV: valor promedio del pedido * frecuencia de compra
+            const ltv = avgOrderValue * avgFrequency;
+            // LTV : CAC ratio
+            const ltvCac = cac > 0 ? (ltv / cac) : 0;
+            // ROAS: ingresos / gasto marketing
+            const roas = marketingSpend > 0 ? (totalSales / marketingSpend) : 0;
+            // Costos fijos: gastos aceptados
+            const fixedCosts = yearMovs.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && (m.accepted !== false)).reduce((a, b) => a + b.neto, 0);
+            // Costo variable promedio por unidad
+            const variableCostPerUnit = totalUnits > 0 ? (totalCost / totalUnits) : 0;
+            // Precio promedio por unidad
+            const pricePerUnit = totalUnits > 0 ? (totalSales / totalUnits) : 0;
+            const contributionMargin = pricePerUnit - variableCostPerUnit;
+            const breakEvenUnits = contributionMargin > 0 ? (fixedCosts / contributionMargin) : 0;
+            const breakEven = breakEvenUnits * pricePerUnit;
+            // Mostrar resultados
+            safeSetText('kpi-cac', `$ ${Math.round(cac).toLocaleString('es-CL')}`);
+            safeSetText('kpi-ltv', `$ ${Math.round(ltv).toLocaleString('es-CL')}`);
+            safeSetText('kpi-ltv-cac', `${ltvCac.toFixed(2)}`);
+            // Para ROAS y Punto de equilibrio mostramos con salto de línea usando HTML
+            safeSetHTML('kpi-roas', `ROAS: ${roas.toFixed(2)}<br>Punto de equilibrio: ${breakEvenUnits.toFixed(1)} un.`);
+        }
+
+        // Annual summary (chart and P&L) reused from original
+        function renderAnnualSummary() {
+            const ctx = document.getElementById('chart-performance').getContext('2d'); if (performanceChart) performanceChart.destroy();
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const sD = Array(12).fill(0); const eD = Array(12).fill(0);
+            let a_vne = 0, a_cmv = 0, a_gas = 0;
+            yearMovs.forEach(m => {
+                const idx = new Date(m.fecha).getMonth();
+                if (m.tipo === 'VENTA') { sD[idx] += m.neto; a_vne += m.neto; a_cmv += (m.costoMercaderia || 0); }
+                else { eD[idx] += m.neto; if (m.tipo !== 'IMPORTACION') a_gas += m.neto; }
+            });
+            safeSetHTML('annual-pnl', `<div class="space-y-3">
+                <div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-slate-400 uppercase">Ventas</span><span class="text-xs font-black dark:text-white">$ ${a_vne.toLocaleString('es-CL')}</span></div>
+                <div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-red-400 uppercase">(-) Costo Venta</span><span class="text-xs font-black">$ ${a_cmv.toLocaleString('es-CL')}</span></div>
+                <div class="flex justify-between border-b pb-2"><span class="text-xs font-black text-red-400 uppercase">(-) Gastos</span><span class="text-xs font-black">$ ${a_gas.toLocaleString('es-CL')}</span></div>
+                <div class="flex justify-between pt-4"><span class="text-sm font-black dark:text-white uppercase">Utilidad</span><span class="text-sm font-black text-emerald-500">$ ${(a_vne - a_cmv - a_gas).toLocaleString('es-CL')}</span></div>
+            </div>`);
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels: ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'], datasets: [ { label: 'Ventas', data: sD, borderColor: '#3b82f6', tension: 0.4 }, { label: 'Gastos', data: eD, borderColor: '#ef4444', tension: 0.4 } ] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, grid: { color: db.config.theme === 'dark' ? '#1e293b' : '#e2e8f0' } } } }
+            });
+        }
+
+        // Render DDJJ (calls separate tables)
+        function renderDDJJ() {
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            // The tables are prepared by calculateReports -> renderDDJJTables
+            calculateReports(yearMovs);
+            // Actualizar el encabezado de la DJ miscelánea según el régimen
+            const miscLabel = document.getElementById('dj-misc-label');
+            if (miscLabel) {
+                if (db.config.regimen === '14D8') miscLabel.innerText = 'DJ 1947';
+                else miscLabel.innerText = 'DJ 1948 / DJ 1879';
+            }
+        }
+
+        
+        // Función de Auditoría: genera observaciones basadas en inconsistencias contables y tributarias
+        function renderAuditoria() {
+            const observations = [];
+            // 1) Margen negativo: costo de mercadería mayor al neto de venta
+            db.movimientos.forEach(m => {
+                if (m.tipo === 'VENTA' && m.costoMercaderia && m.costoMercaderia > m.neto) {
+                    const diff = m.costoMercaderia - m.neto;
+                    observations.push({ tipo: 'Margen Negativo', detalle: m.desc, valor: diff });
+                }
+            });
+            // 2) Conciliación bancaria: diferencia entre ingresos registrados y ventas netas
+            const totalVentas = db.movimientos.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+            // Suma de ingresos en cuentas bancarias y Mercado Pago
+            const totalIngresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'INGRESO').reduce((a, b) => a + b.monto, 0);
+            const totalEgresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'EGRESO').reduce((a, b) => a + b.monto, 0);
+            const conciliacionDiff = Math.abs(totalVentas - (totalIngresos - totalEgresos));
+            if (conciliacionDiff > 0.01) {
+                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Diferencia entre ventas y flujos de caja', valor: conciliacionDiff });
+            }
+            // 3) Gastos no aceptados: gastos marcados como no aceptados
+            db.movimientos.forEach(m => {
+                if ((m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && m.accepted === false) {
+                    observations.push({ tipo: 'Gasto Rechazado', detalle: m.desc, valor: m.total });
+                }
+            });
+            // 4) Inventario negativo o costo cero
+            db.productos.forEach(p => {
+                if (p.stock < 0) {
+                    observations.push({ tipo: 'Inventario Negativo', detalle: p.nombre, valor: p.stock });
+                }
+                if (!p.costoPromedio || p.costoPromedio <= 0) {
+                    observations.push({ tipo: 'Costo sin registrar', detalle: p.nombre, valor: 0 });
+                }
+            });
+            // 5) IVA crédito sin respaldo: importaciones con IVA pero sin base
+            db.movimientos.forEach(m => {
+                if (m.tipo === 'IMPORTACION' && (!m.neto || m.neto <= 0)) {
+                    observations.push({ tipo: 'IVA sin base', detalle: m.desc, valor: m.iva });
+                }
+            });
+            // Renderizar tabla
+            const tableBody = document.getElementById('table-auditoria');
+            if (!tableBody) return;
+            if (observations.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-xs text-slate-500 dark:text-slate-400">Sin observaciones críticas</td></tr>`;
+            } else {
+                tableBody.innerHTML = observations.map(obs => {
+                    return `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800">
+                        <td class="px-4 py-2 text-xs font-bold text-red-600 dark:text-red-400 uppercase">${obs.tipo}</td>
+                        <td class="px-4 py-2 text-xs dark:text-white">${obs.detalle}</td>
+                        <td class="px-4 py-2 text-right text-xs font-black text-slate-900 dark:text-white">$ ${obs.valor.toLocaleString('es-CL')}</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        // CRUD handlers and utilities restored from original version
+        function handleTercero(e) {
+            e.preventDefault();
+            const rut = document.getElementById('tercero-rut').value;
+            const nombre = document.getElementById('tercero-nombre').value;
+            const tipo = document.getElementById('tercero-tipo').value;
+            db.terceros.push({ id: rut, rut, nombre, tipo });
+            save();
+            closeModal('modal-tercero');
+        }
+        function deleteTercero(id) {
+            if (!confirm('¿Eliminar contacto?')) return;
+            db.terceros = db.terceros.filter(t => t.id != id);
+            save();
+        }
+        function handleVenta(e) {
+            e.preventDefault();
+            const id = document.getElementById('venta-id').value || Date.now().toString();
+            const old = db.movimientos.find(x => x.id == id);
+            if (old) {
+                // revert inventory and remove existing entries
+                revertMovement(old);
+                db.movimientos = db.movimientos.filter(x => x.id != id && x.parentId != id);
+                // eliminar flujos relacionados a la venta y sus comisiones
+                db.flujoCaja = db.flujoCaja.filter(f => f.refId != id && f.refId != 'COM-' + id);
+            }
+            const prodId = document.getElementById('venta-prod').value;
+            const cant = parseInt(document.getElementById('venta-cant').value);
+            const bruto = parseInt(document.getElementById('venta-bruto').value);
+            const com = parseInt(document.getElementById('venta-comision').value || 0);
+            const cuenta = document.getElementById('venta-cuenta').value;
+            const fechaRaw = document.getElementById('venta-fecha').value;
+            const fecha = new Date(fechaRaw + 'T00:00:00');
+            const prod = db.productos.find(p => p.id === prodId);
+            if (!prod || prod.stock < cant) { alert('Stock insuficiente'); return; }
+            const neto = Math.round(bruto / 1.19);
+            const iva = bruto - neto;
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Venta: ${prod.nombre}`, neto, iva, total: bruto, prodId, cant, costoMercaderia: Math.round(prod.costoPromedio * cant), nDoc: 'Boleta' });
+            if (com > 0) {
+                const netoC = Math.round(com / 1.19);
+                db.movimientos.push({ id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL', desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: com - netoC, total: com, nDoc: 'Factura ML' });
+                registrarFlujo(fecha.toISOString(), cuenta, `Pago Comisión (${prod.nombre})`, com, 'EGRESO', id);
+            }
+            registrarFlujo(fecha.toISOString(), cuenta, `Venta: ${prod.nombre}`, bruto, 'INGRESO', id);
+            prod.stock -= cant;
+            save();
+            closeModal('modal-venta');
+        }
+        function handleImport(e) {
+            e.preventDefault();
+            const id = document.getElementById('import-id').value || Date.now().toString();
+            const old = db.movimientos.find(x => x.id == id);
+            if (old) {
+                // Revertir movimiento anterior y eliminar entradas relacionadas
+                revertMovement(old);
+                db.movimientos = db.movimientos.filter(x => x.id != id);
+                db.flujoCaja = db.flujoCaja.filter(f => f.refId != id);
+            }
+            const prodId = document.getElementById('import-prod').value;
+            const cant = parseInt(document.getElementById('import-cant').value);
+            const fob = parseFloat(document.getElementById('import-fob').value);
+            const flete = parseFloat(document.getElementById('import-flete').value || 0);
+            const seg = parseFloat(document.getElementById('import-seguro').value || 0);
+            const cuenta = document.getElementById('import-cuenta').value;
+            const fecha = new Date(document.getElementById('import-fecha').value + 'T00:00:00');
+            // Verificar que exista domicilio registrado antes de importar
+            if (!db.config.address || db.config.address.trim() === '') {
+                alert('Debe registrar un domicilio en la configuración de la empresa antes de realizar importaciones.');
+                return;
+            }
+            // Calcular CIF. Si no hay seguro (seg == 0), Aduana utiliza 2% del FOB como seguro
+            const segLocal = seg > 0 ? seg : (fob * 0.02);
+            const cifUSD = fob + flete + segLocal;
+            const cif = Math.round(cifUSD * db.config.usdRate);
+            // Determinar si existe Form F (tratado TLC China) que exime del 6% de ad valorem
+            const formF = document.getElementById('import-formf')?.checked;
+            const adVal = formF ? 0 : Math.round(cif * 0.06);
+            // Base imponible para IVA de importación: CIF + Ad Valorem
+            const baseImport = cif + adVal;
+            const ivaImport = Math.round(baseImport * 0.19);
+            const total = baseImport + ivaImport;
+            const prod = db.productos.find(p => p.id === prodId);
+            // Actualizar costo promedio de inventario con la base (costo + ad valorem) en CLP
+            prod.costoPromedio = Math.round(((prod.stock * prod.costoPromedio) + baseImport) / (prod.stock + cant));
+            prod.stock += cant;
+            db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'IMPORTACION', desc: `Import: ${prod.nombre}`, neto: baseImport, iva: ivaImport, total, prodId, cant, nDoc: document.getElementById('import-doc').value, fob, adVal, accepted: true });
+            registrarFlujo(fecha.toISOString(), cuenta, `Pago Import (${prod.nombre})`, total, 'EGRESO', id);
+            save();
+            closeModal('modal-import');
+        }
+        function handleProducto(e) {
+            e.preventDefault();
+            db.productos.push({ id: Date.now().toString(), nombre: document.getElementById('prod-nombre').value, sku: document.getElementById('prod-sku').value, link: document.getElementById('prod-link').value, stock: 0, costoPromedio: 0 });
+            save();
+            closeModal('modal-producto');
+        }
+        function handleCapital(e) {
+            e.preventDefault();
+            const tipo = document.getElementById('capital-tipo').value;
+            const cuenta = document.getElementById('capital-cuenta').value;
+            const monto = parseInt(document.getElementById('capital-monto').value);
+            const desc = document.getElementById('capital-desc').value;
+            const fecha = new Date().toISOString();
+            const id = 'CAP-' + Date.now();
+            if (tipo === 'APORTE') {
+                registrarFlujo(fecha, cuenta, `Aporte Capital: ${desc}`, monto, 'INGRESO', id);
+            } else {
+                registrarFlujo(fecha, cuenta, `Retiro Utilidad: ${desc}`, monto, 'EGRESO', id);
+                db.movimientos.push({ id, fecha, tipo: 'RETIRO', desc: `Retiro Dueño: ${desc}`, neto: 0, iva: 0, total: monto, retiro: monto, nDoc: 'Retiro' });
+            }
+            save();
+            closeModal('modal-capital');
+        }
+        function handleTransfer(e) {
+            e.preventDefault();
+            const origen = document.getElementById('transfer-origen').value;
+            const destino = document.getElementById('transfer-destino').value;
+            const monto = parseInt(document.getElementById('transfer-monto').value);
+            if (origen === destino) {
+                alert('Misma cuenta'); return;
+            }
+            if (db.cuentas.find(c => c.id === origen).saldo < monto) {
+                alert('Saldo insuficiente'); return;
+            }
+            const fecha = new Date().toISOString();
+            registrarFlujo(fecha, origen, `Traspaso a ${destino}`, monto, 'EGRESO', 'TRF');
+            registrarFlujo(fecha, destino, `Traspaso de ${origen}`, monto, 'INGRESO', 'TRF');
+            save();
+            closeModal('modal-transfer');
+        }
+        function handleBulkImport() {
+            const text = document.getElementById('ml-import-data').value.trim();
+            if (!text) return;
+            // Split the pasted data by newline.  Use \n instead of a literal newline to avoid breaking the script.
+            const lines = text.split('\n');
+            let success = 0;
+            lines.forEach(line => {
+                const p = line.split(',');
+                if (p.length < 5) return;
+                const [fechaStr, sku, cant, bruto, com] = p;
+                const prod = db.productos.find(x => x.sku === sku.trim());
+                if (prod && prod.stock >= parseInt(cant)) {
+                    const id = 'B-' + Date.now().toString() + Math.random();
+                    const fecha = new Date(fechaStr.trim() + 'T00:00:00');
+                    const cantN = parseInt(cant);
+                    const brutoN = parseInt(bruto);
+                    const comN = parseInt(com);
+                    const netoV = Math.round(brutoN / 1.19);
+                    db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'VENTA', desc: `Imp: ${prod.nombre}`, neto: netoV, iva: brutoN - netoV, total: brutoN, prodId: prod.id, cant: cantN, costoMercaderia: Math.round(prod.costoPromedio * cantN), nDoc: 'Imp.' });
+                    if (comN > 0) {
+                        const netoC = Math.round(comN / 1.19);
+                        db.movimientos.push({ id: 'COM-' + id, parentId: id, fecha: fecha.toISOString(), tipo: 'GASTO_LOCAL', desc: `Comisión: ${prod.nombre}`, neto: netoC, iva: comN - netoC, total: comN, nDoc: 'Fact.' });
+                    }
+                    prod.stock -= cantN;
+                    success++;
+                }
+            });
+            alert(`Procesado: ${success}`);
+            save();
+            closeModal('modal-import-ml');
+        }
+
+        // Exportar declaraciones juradas en formato CSV según tipo (1887, 1948, 1947)
+        function exportDJ(type) {
+            const year = db.config.year;
+            // Filtrar movimientos del año
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year);
+            let csv = '';
+            let filename = '';
+            if (type === '1887') {
+                // DJ 1887: Honorarios pagados
+                csv = 'RUT;Nombre;MontoBruto;Retencion\n';
+                const honMap = {};
+                yearMovs.filter(m => m.tipo === 'HONORARIOS').forEach(h => {
+                    const rut = h.terceroId || 'S/N';
+                    if (!honMap[rut]) honMap[rut] = { nombre: (db.terceros.find(t => t.id === rut) || {}).nombre || 'Desconocido', bruto: 0, ret: 0 };
+                    honMap[rut].bruto += h.total;
+                    honMap[rut].ret += (h.retention || 0);
+                });
+                Object.keys(honMap).forEach(rut => {
+                    const row = honMap[rut];
+                    csv += `${rut};${row.nombre};${row.bruto};${row.ret}\n`;
+                });
+                filename = `DJ1887_${year}.csv`;
+            } else if (type === '1948') {
+                // DJ 1948 / 1879: Totales base de ingresos/gastos/retiros
+                csv = 'Detalle;Monto;Notas\n';
+                const totalVentasNetas = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+                const totalComprasCred = yearMovs.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'IMPORTACION') && m.iva > 0).reduce((a, b) => a + b.neto, 0);
+                const totalRetiros = yearMovs.filter(m => m.tipo === 'RETIRO').reduce((a, b) => a + b.total, 0);
+                csv += `Total Ventas Netas;${totalVentasNetas};1948\n`;
+                csv += `Total Compras Creditable;${totalComprasCred};1948\n`;
+                csv += `Total Retiros del Dueño;${totalRetiros};1879\n`;
+                filename = `DJ1948_${year}.csv`;
+            } else if (type === '1947') {
+                // DJ 1947: régimen 14D8 (utilidad del dueño)
+                csv = 'Concepto;Monto\n';
+                const ingresos = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
+                const gastos = yearMovs.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS')).reduce((a, b) => a + b.neto, 0);
+                const utilidad = ingresos - gastos;
+                csv += `Ingresos;${ingresos}\n`;
+                csv += `Gastos;${gastos}\n`;
+                csv += `Utilidad;${utilidad}\n`;
+                filename = `DJ1947_${year}.csv`;
+            }
+            if (csv) {
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        // Procesar una orden de Mercado Libre y convertirla en movimientos de venta
+        function importMLOrder(order) {
+            try {
+                if (!order || !order.order_items) return;
+                const payments = order.payments || [];
+                const paidAmount = payments.reduce((sum, p) => sum + (p.total_paid_amount || 0), 0);
+                let usedPaid = 0;
+                order.order_items.forEach(item => {
+                    const sku = item.seller_sku || (item.item ? (item.item.seller_sku || item.item.id) : undefined);
+                    const quantity = item.quantity || 1;
+                    const unitPrice = item.unit_price || (item.full_unit_price ? item.full_unit_price : 0);
+                    if (!sku || unitPrice === 0) return;
+                    const product = db.productos.find(p => p.sku === sku || p.id === sku);
+                    if (!product || product.stock < quantity) return;
+                    const gross = unitPrice * quantity;
+                    const net = Math.round(gross / 1.19);
+                    const iva = gross - net;
+                    const saleId = 'ML-' + Date.now().toString() + Math.random().toString(36).substring(2, 6);
+                    db.movimientos.push({ id: saleId, fecha: new Date().toISOString(), tipo: 'VENTA', desc: `Venta ML: ${product.nombre}`, neto: net, iva: iva, total: gross, prodId: product.id, cant: quantity, costoMercaderia: Math.round(product.costoPromedio * quantity), nDoc: order.id });
+                    product.stock -= quantity;
+                    // Registrar flujo de ingreso en cuenta Mercado Pago
+                    registrarFlujo(new Date().toISOString(), 'mp', `Venta ML: ${product.nombre}`, gross, 'INGRESO', saleId);
+                    usedPaid += gross;
+                });
+                // Calcular comisión aproximada
+                const commission = Math.round(Math.max(0, paidAmount - usedPaid));
+                if (commission > 0) {
+                    const commNet = Math.round(commission / 1.19);
+                    const commIva = commission - commNet;
+                    const commId = 'COM-ML-' + Date.now().toString() + Math.random().toString(36).substring(2, 6);
+                    db.movimientos.push({ id: commId, parentId: null, fecha: new Date().toISOString(), tipo: 'GASTO_LOCAL', desc: 'Comisión Mercado Libre', neto: commNet, iva: commIva, total: commission, nDoc: 'ML' });
+                    registrarFlujo(new Date().toISOString(), 'mp', 'Comisión ML', commission, 'EGRESO', commId);
+                }
+                save();
+            } catch (err) {
+                console.error('Error al procesar orden ML', err);
+            }
+        }
+
+        // Sincronizar ventas directamente desde Mercado Libre (borrador)
+        async function syncMercadoLibre() {
+            const token = prompt('Ingrese su token de Mercado Libre (Bearer)');
+            if (!token) return;
+            const seller = prompt('Ingrese su Seller ID');
+            if (!seller) return;
+            try {
+                let offset = 0;
+                const limit = 50;
+                let total = 0;
+                do {
+                    const url = `https://api.mercadolibre.com/orders/search?seller_id=${seller}&order.status=paid&offset=${offset}&limit=${limit}`;
+                    const response = await fetch(url, {
+                        headers: { 'Authorization': 'Bearer ' + token }
+                    });
+                    if (!response.ok) throw new Error('Respuesta no válida');
+                    const data = await response.json();
+                    const orders = data.results || [];
+                    orders.forEach(o => importMLOrder(o));
+                    offset += limit;
+                    total = data.paging && data.paging.total ? data.paging.total : orders.length;
+                    // Si el API no retorna paging.total, salimos después de procesar la primera página
+                    if (!data.paging || data.paging.total === undefined) break;
+                } while (offset < total);
+                alert('Sincronización con Mercado Libre completada.');
+            } catch (err) {
+                console.error(err);
+                alert('Error al conectar con Mercado Libre. Asegúrese de que el token y el seller ID sean válidos.');
+            }
+        }
+        function deleteMov(id) {
+            if (!confirm('¿Eliminar?')) return;
+            const m = db.movimientos.find(x => x.id == id);
+            if (m) revertMovement(m);
+            db.movimientos = db.movimientos.filter(x => x.id != id && x.parentId != id);
+            save();
+        }
+        function editMov(id) {
+            const m = db.movimientos.find(x => x.id == id);
+            if (!m) return;
+            if (m.tipo === 'VENTA') openModal('modal-venta', id);
+            else if (m.tipo === 'IMPORTACION') openModal('modal-import', id);
+            else if (m.tipo === 'RETIRO') return; // no edit for retiros
+            else openModal('modal-gasto', id);
+        }
+        function updateMonthFilter(v) {
+            db.config.selectedMonth = parseInt(v);
+            save();
+        }
+
+        // Cambiar el mes de la contabilidad formal sin afectar otros módulos
+        function updateContabMonth(v) {
+            // v puede ser "-1" para el modo acumulado
+            db.config.contabMonth = parseInt(v);
+            save();
+            // Al cambiar el mes contable, actualizar las vistas contables inmediatamente
+            renderContabilidad();
+        }
+
+        // Cambia el mes del Libro Diario contable
+        function updateContabMonthDiario(v) {
+            db.config.contabMonthDiario = parseInt(v);
+            save();
+            // Actualiza las vistas contables al cambiar
+            renderContabilidad();
+        }
+
+        // Cambia el mes del Libro Mayor
+        function updateContabMonthMayor(v) {
+            db.config.contabMonthMayor = parseInt(v);
+            save();
+            renderContabilidad();
+        }
+
+        // Cambia el mes del Balance de Sumas y Saldos
+        function updateContabMonthBalance(v) {
+            db.config.contabMonthBalance = parseInt(v);
+            save();
+            renderContabilidad();
+        }
+        // Enhanced openModal to populate selects and defaults
+        function openModal(id, eid) {
+            const modal = document.getElementById(id);
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            // Populate product selects
+            const prodOptions = db.productos.map(p => `<option value="${p.id}">${p.nombre} [${p.stock}]</option>`).join('');
+            ['venta-prod', 'import-prod'].forEach(sid => { const el = document.getElementById(sid); if (el) el.innerHTML = prodOptions; });
+            // Populate account selects
+            const accountOptions = db.cuentas.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+            ['venta-cuenta','gasto-cuenta','import-cuenta','transfer-origen','transfer-destino','capital-cuenta'].forEach(aid => { const el = document.getElementById(aid); if (el) el.innerHTML = accountOptions; });
+            // Populate socio selects
+            const sociosOptions = db.terceros.filter(t => t.tipo === 'SOCIO').map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+            const capSoc = document.getElementById('capital-socio'); if (capSoc) capSoc.innerHTML = sociosOptions;
+            // Populate cliente selects
+            const clientOptions = `<option value="">Público General</option>` + db.terceros.filter(t => t.tipo === 'CLIENTE').map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+            const ventaCli = document.getElementById('venta-cliente'); if (ventaCli) ventaCli.innerHTML = clientOptions;
+            // Populate proveedor selects for gastos
+            const provOptions = `<option value="">Otros</option>` + db.terceros.filter(t => t.tipo === 'PROVEEDOR' || t.tipo === 'PRESTADOR').map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+            const gastoProv = document.getElementById('gasto-prov'); if (gastoProv) gastoProv.innerHTML = provOptions;
+            // Default date: preseleccionar la fecha actual al abrir el modal (si no se está editando)
+            const dInp = modal.querySelector('input[type="date"]');
+            if (dInp && !eid) {
+                const now = new Date();
+                // El formato ISO produce "YYYY-MM-DD" en la zona local al aplicar split('T')[0]
+                dInp.value = now.toISOString().split('T')[0];
+            }
+            if (eid) {
+                const mov = db.movimientos.find(x => x.id == eid);
+                if (!mov) return;
+                if (id === 'modal-venta') {
+                    document.getElementById('venta-id').value = mov.id;
+                    document.getElementById('venta-prod').value = mov.prodId;
+                    document.getElementById('venta-cant').value = mov.cant;
+                    document.getElementById('venta-bruto').value = mov.total;
+                    document.getElementById('venta-comision').value = db.movimientos.find(x => x.parentId == mov.id)?.total || 0;
+                }
+                if (id === 'modal-import') {
+                    document.getElementById('import-id').value = mov.id;
+                    document.getElementById('import-prod').value = mov.prodId;
+                    document.getElementById('import-cant').value = mov.cant;
+                    document.getElementById('import-fob').value = mov.fob;
+                }
+                if (id === 'modal-gasto') {
+                    document.getElementById('gasto-id').value = mov.id;
+                    document.getElementById('gasto-tipo').value = mov.tipo;
+                    document.getElementById('gasto-desc').value = mov.desc;
+                    document.getElementById('gasto-monto').value = mov.total;
+                    // Prefijar fecha, proveedor, cuenta y clasificación de gasto
+                    const fechaG = new Date(mov.fecha);
+                    const dStr = fechaG.toISOString().split('T')[0];
+                    const fInp = document.getElementById('gasto-fecha'); if (fInp) fInp.value = dStr;
+                    const provSel = document.getElementById('gasto-prov'); if (provSel) provSel.value = mov.terceroId || '';
+                    const cuentaId = getCuentaIdForMov(mov.id); const cuentaSel = document.getElementById('gasto-cuenta'); if (cuentaSel && cuentaId) cuentaSel.value = cuentaId;
+                    const classSel = document.getElementById('gasto-aceptado'); if (classSel) classSel.value = (mov.accepted === false ? 'false' : 'true');
+                }
+            } else {
+                // reset form fields
+                const form = modal.querySelector('form');
+                if (form) form.reset();
+                const hidden = modal.querySelector('input[type="hidden"]');
+                if (hidden) hidden.value = '';
+            }
+        }
+
+        /* ================= CONTABILIDAD FORMAL ================= */
+        // Inicializa plan de cuentas predeterminado si no existe
+        function initPlanCuentas() {
+            if (!db.contabilidad) {
+                db.contabilidad = { planCuentas: [], asientos: [] };
+            }
+            if (!db.contabilidad.planCuentas || db.contabilidad.planCuentas.length === 0) {
+                db.contabilidad.planCuentas = [
+                    { id: '1100', nombre: 'Caja', tipo: 'Activo' },
+                    { id: '1110', nombre: 'Banco Estado', tipo: 'Activo' },
+                    { id: '1120', nombre: 'Banco Chile', tipo: 'Activo' },
+                    { id: '1130', nombre: 'Mercado Pago', tipo: 'Activo' },
+                    { id: '1200', nombre: 'Inventarios', tipo: 'Activo' },
+                    { id: '1300', nombre: 'Clientes', tipo: 'Activo' },
+                    { id: '2100', nombre: 'Proveedores', tipo: 'Pasivo' },
+                    { id: '2200', nombre: 'IVA por Pagar', tipo: 'Pasivo' },
+                    { id: '2300', nombre: 'Retenciones por Pagar', tipo: 'Pasivo' },
+                    { id: '3100', nombre: 'Capital', tipo: 'Patrimonio' },
+                    { id: '4100', nombre: 'Ingresos por Ventas', tipo: 'Ingreso' },
+                    { id: '4200', nombre: 'IVA Débito', tipo: 'Pasivo' },
+                    { id: '4300', nombre: 'IVA Crédito', tipo: 'Activo' },
+                    { id: '5100', nombre: 'Costo de Mercaderia', tipo: 'Gasto' },
+                    { id: '6100', nombre: 'Gastos Operativos', tipo: 'Gasto' }
+                ];
+            }
+        }
+
+        // Mapear identificador de cuenta (usado en flujo caja) a código de plan de cuentas
+        function mapCuentaToPlan(cuentaId) {
+            switch (cuentaId) {
+                case 'banco': return '1110';
+                case 'banchile': return '1120';
+                case 'mp': return '1130';
+                case 'caja': return '1100';
+                default: return '1100';
+            }
+        }
+
+        // Registrar un asiento contable (una línea de debito y una de crédito)
+        function registrarAsiento(fecha, debeCuentaId, debeMonto, haberCuentaId, haberMonto) {
+            if (!db.contabilidad) initPlanCuentas();
+            db.contabilidad.asientos.push({
+                fecha: fecha,
+                debeCuentaId: debeCuentaId,
+                debeMonto: debeMonto,
+                haberCuentaId: haberCuentaId,
+                haberMonto: haberMonto
+            });
+        }
+
+        // Obtener la cuenta asociada a un movimiento buscando en el flujo de caja
+        function getCuentaIdForMov(movId) {
+            const flow = db.flujoCaja.find(f => f.refId == movId);
+            return flow ? flow.cuentaId : null;
+        }
+
+        // Reconstruir asientos contables a partir de los movimientos y flujos existentes
+        function rebuildAsientos() {
+            initPlanCuentas();
+            if (!db.contabilidad) db.contabilidad = { planCuentas: [], asientos: [] };
+            db.contabilidad.asientos = [];
+            // Procesar movimientos
+            db.movimientos.forEach(m => {
+                const cuenta = getCuentaIdForMov(m.id);
+                const planCuenta = cuenta ? mapCuentaToPlan(cuenta) : null;
+                const fecha = m.fecha;
+                if (!planCuenta) return;
+                const neto = m.neto || 0;
+                const iva = m.iva || 0;
+                if (m.tipo === 'VENTA') {
+                    const bruto = m.total || (neto + iva);
+                    // Debe: cuenta bancaria, Haber: ventas
+                    registrarAsiento(fecha, planCuenta, bruto, '4100', neto);
+                    // IVA débito
+                    if (iva > 0) registrarAsiento(fecha, planCuenta, 0, '4200', iva);
+                    // Costo de ventas (CMV)
+                    const costo = m.costoMercaderia || 0;
+                    if (costo > 0) registrarAsiento(fecha, '5100', costo, '1200', costo);
+                } else if (m.tipo === 'IMPORTACION') {
+                    if (neto > 0) registrarAsiento(fecha, '1200', neto, planCuenta, neto);
+                    if (iva > 0) registrarAsiento(fecha, '4300', iva, planCuenta, iva);
+                } else if (m.tipo === 'GASTO_LOCAL') {
+                    if (neto > 0) registrarAsiento(fecha, '6100', neto, planCuenta, neto);
+                    if (iva > 0) registrarAsiento(fecha, '4300', iva, planCuenta, iva);
+                } else if (m.tipo === 'HONORARIOS') {
+                    const ret = m.retention || 0;
+                    if (neto > 0) registrarAsiento(fecha, '6100', neto, planCuenta, neto);
+                    if (ret > 0) registrarAsiento(fecha, '2300', ret, planCuenta, ret);
+                } else if (m.tipo === 'RETIRO') {
+                    const total = m.total || 0;
+                    if (total > 0) registrarAsiento(fecha, '3100', total, planCuenta, total);
+                }
+            });
+            // Aportes de capital registrados solo en flujo de caja
+            db.flujoCaja.forEach(f => {
+                if (f.refId && String(f.refId).startsWith('CAP-') && f.tipoMovimiento === 'INGRESO') {
+                    const cuentaPlan = mapCuentaToPlan(f.cuentaId);
+                    registrarAsiento(f.fecha, cuentaPlan, f.monto, '3100', f.monto);
+                }
+            });
+        }
+
+        // Renderizar tablas de contabilidad
+        function renderContabilidad() {
+            initPlanCuentas();
+            // Plan de cuentas
+            const planRows = db.contabilidad.planCuentas.map(pc => {
+                return `<tr><td class="px-4 py-2 font-mono">${pc.id}</td><td class="px-4 py-2 font-bold">${pc.nombre}</td><td class="px-4 py-2 text-slate-500">${pc.tipo}</td></tr>`;
+            }).join('');
+            safeSetHTML('table-plan-cuentas', planRows);
+            // Selección para libro mayor
+            const select = document.getElementById('mayor-cuenta-select');
+            if (select) {
+                select.innerHTML = db.contabilidad.planCuentas.map(pc => `<option value="${pc.id}">${pc.id} - ${pc.nombre}</option>`).join('');
+            }
+            // Libro Diario: filtrar asientos por el mes definido para el diario
+            const contabMonthDiario = db.config.contabMonthDiario;
+            const selectedYear = db.config.year;
+            const asientosDiario = db.contabilidad.asientos.filter(a => {
+                const d = new Date(a.fecha);
+                if (d.getFullYear() !== selectedYear) return false;
+                if (contabMonthDiario < 0) return true;
+                return d.getMonth() === contabMonthDiario;
+            });
+            const asientoRows = asientosDiario.map(a => {
+                const debeName = db.contabilidad.planCuentas.find(pc => pc.id === a.debeCuentaId)?.nombre || a.debeCuentaId;
+                const haberName = db.contabilidad.planCuentas.find(pc => pc.id === a.haberCuentaId)?.nombre || a.haberCuentaId;
+                return `<tr><td class="px-4 py-2">${new Date(a.fecha).toLocaleDateString('es-CL')}</td><td class="px-4 py-2">${a.debeCuentaId} - ${debeName}</td><td class="px-4 py-2 text-right">$ ${a.debeMonto.toLocaleString('es-CL')}</td><td class="px-4 py-2">${a.haberCuentaId} - ${haberName}</td><td class="px-4 py-2 text-right">$ ${a.haberMonto.toLocaleString('es-CL')}</td></tr>`;
+            }).join('');
+            safeSetHTML('table-asientos', asientoRows);
+            // Render libro mayor y balance (utilizarán sus propios filtros)
+            renderLibroMayor();
+            renderBalance();
+            safeCreateIcons();
+        }
+
+        // Libro mayor para una cuenta seleccionada
+        function renderLibroMayor() {
+            const select = document.getElementById('mayor-cuenta-select');
+            if (!select) return;
+            const accountId = select.value;
+            let saldo = 0;
+            let rows = '';
+            const contabMonth = db.config.contabMonthMayor;
+            const selectedYear = db.config.year;
+            const asientosFiltrados = db.contabilidad.asientos.filter(a => {
+                const d = new Date(a.fecha);
+                if (d.getFullYear() !== selectedYear) return false;
+                if (contabMonth < 0) return true;
+                return d.getMonth() === contabMonth;
+            });
+            asientosFiltrados.forEach(a => {
+                let debe = 0, haber = 0;
+                if (a.debeCuentaId === accountId) {
+                    debe = a.debeMonto;
+                    saldo += a.debeMonto;
+                }
+                if (a.haberCuentaId === accountId) {
+                    haber = a.haberMonto;
+                    saldo -= a.haberMonto;
+                }
+                if (debe || haber) {
+                    rows += `<tr><td class="px-4 py-2">${new Date(a.fecha).toLocaleDateString('es-CL')}</td><td class="px-4 py-2 text-right">$ ${debe.toLocaleString('es-CL')}</td><td class="px-4 py-2 text-right">$ ${haber.toLocaleString('es-CL')}</td><td class="px-4 py-2 text-right">$ ${saldo.toLocaleString('es-CL')}</td></tr>`;
+                }
+            });
+            safeSetHTML('table-libro-mayor', rows);
+        }
+
+        // Balance general simple: sumar saldo de cada cuenta
+        function renderBalance() {
+            const saldos = {};
+            const contabMonth = db.config.contabMonthBalance;
+            const selectedYear = db.config.year;
+            const asientosFiltrados = db.contabilidad.asientos.filter(a => {
+                const d = new Date(a.fecha);
+                if (d.getFullYear() !== selectedYear) return false;
+                if (contabMonth < 0) return true;
+                return d.getMonth() === contabMonth;
+            });
+            asientosFiltrados.forEach(a => {
+                saldos[a.debeCuentaId] = (saldos[a.debeCuentaId] || 0) + a.debeMonto;
+                saldos[a.haberCuentaId] = (saldos[a.haberCuentaId] || 0) - a.haberMonto;
+            });
+            const rows = db.contabilidad.planCuentas.map(ac => {
+                const s = saldos[ac.id] || 0;
+                return `<tr><td class="px-4 py-2">${ac.id} - ${ac.nombre}</td><td class="px-4 py-2 text-right">$ ${s.toLocaleString('es-CL')}</td></tr>`;
+            }).join('');
+            safeSetHTML('table-balance', rows);
+        }
+
+    </script>
+</body>
+</html>
