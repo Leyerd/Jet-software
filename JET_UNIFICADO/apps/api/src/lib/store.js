@@ -14,11 +14,18 @@ const defaultState = {
   terceros: [],
   flujoCaja: [],
   periodos: [],
-  auditLog: []
+  auditLog: [],
+  // Fuentes externas para conciliación Sprint 5
+  cartolaMovimientos: [],
+  rcvVentas: [],
+  marketplaceOrders: []
 };
 
 function ensureArrays(state) {
-  const keys = ['usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog'];
+  const keys = [
+    'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
+    'cartolaMovimientos', 'rcvVentas', 'marketplaceOrders'
+  ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
   }

@@ -9,7 +9,12 @@ const { coherenceCheck } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview } = require('./modules/inventory');
-const { getReconciliationSummary } = require('./modules/reconciliation');
+const {
+  getReconciliationSummary,
+  importCartola,
+  importRCVVentas,
+  importMarketplaceOrders
+} = require('./modules/reconciliation');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -23,7 +28,8 @@ const modulesList = [
   'postgres-runtime-ready-3.1',
   'finance-projections-sprint4',
   'inventory-overview-sprint5',
-  'reconciliation-summary-sprint5'
+  'reconciliation-summary-sprint5',
+  'reconciliation-imports-cartola-rcv-marketplace'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -47,6 +53,9 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+  if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
+  if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
+  if (path === '/reconciliation/import/marketplace') return req.method === 'POST' ? handle(importMarketplaceOrders(req, res), res) : methodNotAllowed(res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);

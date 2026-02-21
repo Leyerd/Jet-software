@@ -50,11 +50,26 @@ function req(method, path, body, token) {
   const proj = await req('GET', '/finance/projection', null, token);
   if (!proj.data.ok || !proj.data.projection?.scenarios?.base) throw new Error('Projection falló');
 
+  const importCartola = await req('POST', '/reconciliation/import/cartola', {
+    rows: [{ fecha: '2026-02-10', tipoMovimiento: 'INGRESO', monto: 100000 }]
+  }, token);
+  if (!importCartola.data.ok) throw new Error('Import cartola falló');
+
+  const importRcv = await req('POST', '/reconciliation/import/rcv-ventas', {
+    rows: [{ fecha: '2026-02-10', total: 100000 }]
+  }, token);
+  if (!importRcv.data.ok) throw new Error('Import RCV ventas falló');
+
+  const importMkt = await req('POST', '/reconciliation/import/marketplace', {
+    rows: [{ fecha: '2026-02-10', total: 120000, comision: 20000, netoLiquidado: 100000 }]
+  }, token);
+  if (!importMkt.data.ok) throw new Error('Import marketplace falló');
+
   const inv = await req('GET', '/inventory/overview', null, token);
   if (!inv.data.ok || !inv.data.overview) throw new Error('Inventory overview falló');
 
   const rec = await req('GET', '/reconciliation/summary', null, token);
-  if (!rec.data.ok || !rec.data.totals) throw new Error('Reconciliation summary falló');
+  if (!rec.data.ok || !rec.data.totals || !Array.isArray(rec.data.summary)) throw new Error('Reconciliation summary falló');
 
   const coh = await req('GET', '/system/coherence-check');
   if (!coh.data.ok) throw new Error('Coherence check falló');

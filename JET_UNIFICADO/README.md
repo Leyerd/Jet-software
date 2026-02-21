@@ -19,6 +19,7 @@ Documentos de avance:
 - `docs/SPRINT_3_1.md`
 - `docs/SPRINT_4.md`
 - `docs/SPRINT_5.md`
+- `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
