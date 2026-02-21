@@ -11,6 +11,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 3.1 iniciado (runtime PostgreSQL opcional + health DB real)
 - ✅ Sprint 4 ejecutado (proyecciones financieras + QA smoke)
 - ✅ Sprint 5 ejecutado (inventario + conciliación + QA runner estable)
+- ✅ Sprint 6 ejecutado (motor tributario versionado, default 14D8 transparente)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -19,6 +20,7 @@ Documentos de avance:
 - `docs/SPRINT_3_1.md`
 - `docs/SPRINT_4.md`
 - `docs/SPRINT_5.md`
+- `docs/SPRINT_6.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
@@ -158,3 +160,13 @@ QA recomendado (más estable):
 cd apps/api
 npm run qa:run
 ```
+
+
+## Sprint 6: tributario (EIRL)
+
+Endpoints:
+- `GET /tax/config`
+- `POST /tax/config`
+- `GET /tax/summary`
+
+Por defecto el sistema inicia en régimen transparente (`14D8`).

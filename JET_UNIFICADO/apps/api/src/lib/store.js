@@ -15,6 +15,13 @@ const defaultState = {
   flujoCaja: [],
   periodos: [],
   auditLog: [],
+  taxConfig: {
+    regime: '14D8',
+    year: new Date().getFullYear(),
+    ppmRate: 0.2,
+    ivaRate: 0.19,
+    retentionRate: 14.5
+  },
   // Fuentes externas para conciliación Sprint 5
   cartolaMovimientos: [],
   rcvVentas: [],
@@ -31,6 +38,9 @@ function ensureArrays(state) {
   }
   if (state.migratedAt === undefined) state.migratedAt = null;
   if (state.source === undefined) state.source = null;
+  if (!state.taxConfig || typeof state.taxConfig !== 'object') {
+    state.taxConfig = { regime: '14D8', year: new Date().getFullYear(), ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
+  }
   return state;
 }
 

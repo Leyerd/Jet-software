@@ -47,6 +47,15 @@ function req(method, path, body, token) {
   if (!login.data.ok || !login.data.token) throw new Error('Login falló');
   const token = login.data.token;
 
+  const taxCfgSet = await req('POST', '/tax/config', { regime: '14D8', ppmRate: 0.2 }, token);
+  if (!taxCfgSet.data.ok) throw new Error('No se pudo fijar 14D8 para QA');
+
+  const taxCfg = await req('GET', '/tax/config', null, token);
+  if (!taxCfg.data.ok || taxCfg.data.taxConfig.regime !== '14D8') throw new Error('Tax config no quedó en 14D8');
+
+  const taxSummary = await req('GET', '/tax/summary', null, token);
+  if (!taxSummary.data.ok || !taxSummary.data.f29 || !taxSummary.data.f22) throw new Error('Tax summary falló');
+
   const proj = await req('GET', '/finance/projection', null, token);
   if (!proj.data.ok || !proj.data.projection?.scenarios?.base) throw new Error('Projection falló');
 

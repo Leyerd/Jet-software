@@ -15,6 +15,7 @@ const {
   importRCVVentas,
   importMarketplaceOrders
 } = require('./modules/reconciliation');
+const { getTaxConfig, updateTaxConfig, getTaxSummary } = require('./modules/tax');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -29,7 +30,8 @@ const modulesList = [
   'finance-projections-sprint4',
   'inventory-overview-sprint5',
   'reconciliation-summary-sprint5',
-  'reconciliation-imports-cartola-rcv-marketplace'
+  'reconciliation-imports-cartola-rcv-marketplace',
+  'tax-engine-sprint6-default-14d8'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -41,7 +43,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '5', version: 'v1.5-sprint5' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '6', version: 'v1.6-sprint6' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -53,9 +55,17 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/marketplace') return req.method === 'POST' ? handle(importMarketplaceOrders(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/tax/config') {
+    if (req.method === 'GET') return handle(getTaxConfig(req, res), res);
+    if (req.method === 'POST') return handle(updateTaxConfig(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/tax/summary' && req.method === 'GET') return handle(getTaxSummary(req, res), res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);
