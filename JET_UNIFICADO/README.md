@@ -15,6 +15,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 7 ejecutado (kardex FIFO + costeo trazable por lotes)
 - ✅ Sprint 8 ejecutado (conectores externos Alibaba, Mercado Libre y SII)
 - ✅ Sprint 9 ejecutado (auth reforzada + políticas de respaldo y restore auditado)
+- ✅ Sprint 10 ejecutado (pipeline de calidad y despliegue continuo)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -27,6 +28,7 @@ Documentos de avance:
 - `docs/SPRINT_7.md`
 - `docs/SPRINT_8.md`
 - `docs/SPRINT_9.md`
+- `docs/SPRINT_10.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
@@ -211,3 +213,19 @@ Endpoints nuevos:
 - `POST /backup/restore`
 
 Incluye política de contraseña robusta, expiración de sesión y gestión auditada de respaldos.
+
+
+## Sprint 10: CI/CD y calidad
+
+Nuevos artefactos:
+- `.github/workflows/ci.yml`
+- `.github/workflows/cd.yml`
+- `apps/api/scripts/ci-check.js`
+
+Comando local de calidad:
+```bash
+cd apps/api
+npm run ci:check
+```
+
+En GitHub Actions se ejecuta CI automáticamente y CD queda listo para deploy con secrets de SSH.

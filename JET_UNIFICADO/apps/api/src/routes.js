@@ -48,7 +48,8 @@ const modulesList = [
   'tax-engine-sprint6-default-14d8',
   'inventory-kardex-fifo-sprint7',
   'external-connectors-sprint8',
-  'auth-roles-backup-policies-sprint9'
+  'auth-roles-backup-policies-sprint9',
+  'quality-ci-cd-sprint10'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -60,7 +61,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '9', version: 'v1.9-sprint9' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '10', version: 'v1.10-sprint10' });
   }
 
   if (req.method === 'GET' && path === '/modules') {

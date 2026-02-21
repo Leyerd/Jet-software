@@ -1,0 +1,51 @@
+name: CD Build and Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy to remote host after build'
+        required: false
+        default: 'false'
+  push:
+    branches:
+      - main
+    paths:
+      - 'JET_UNIFICADO/**'
+      - '.github/workflows/cd.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image
+        run: docker build -t jet-unificado-api:latest JET_UNIFICADO/apps/api
+
+      - name: Build Web image
+        run: docker build -t jet-unificado-web:latest JET_UNIFICADO/apps/web
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != '' && secrets.DEPLOY_SSH_KEY != '' && secrets.DEPLOY_PATH != '' && ((github.event_name == 'workflow_dispatch' && inputs.deploy == 'true') || github.ref == 'refs/heads/main') }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy with Docker Compose over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull
+            docker compose -f JET_UNIFICADO/docker-compose.yml down
+            docker compose -f JET_UNIFICADO/docker-compose.yml up -d --build
