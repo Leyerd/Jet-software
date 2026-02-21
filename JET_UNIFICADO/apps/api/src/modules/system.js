@@ -28,7 +28,7 @@ async function coherenceCheck(_req, res) {
 
   return sendJson(res, 200, {
     ok: missing.length === 0,
-    sprint: 6,
+    sprint: 7,
     message: missing.length === 0 ? 'Coherencia básica OK' : 'Faltan archivos críticos',
     checks,
     missing

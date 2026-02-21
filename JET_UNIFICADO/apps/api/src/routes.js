@@ -8,7 +8,7 @@ const { createProduct, listProducts } = require('./modules/products');
 const { coherenceCheck } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
-const { getInventoryOverview } = require('./modules/inventory');
+const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
 const {
   getReconciliationSummary,
   importCartola,
@@ -31,7 +31,8 @@ const modulesList = [
   'inventory-overview-sprint5',
   'reconciliation-summary-sprint5',
   'reconciliation-imports-cartola-rcv-marketplace',
-  'tax-engine-sprint6-default-14d8'
+  'tax-engine-sprint6-default-14d8',
+  'inventory-kardex-fifo-sprint7'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -43,7 +44,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '6', version: 'v1.6-sprint6' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '7', version: 'v1.7-sprint7' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -54,8 +55,11 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);
-  if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+  if (req.method === 'GET' && path === '/inventory/kardex') return handle(getKardex(req, res), res);
+  if (path === '/inventory/import-lot') return req.method === 'POST' ? handle(importLot(req, res), res) : methodNotAllowed(res);
+  if (path === '/inventory/consume') return req.method === 'POST' ? handle(consumeStock(req, res), res) : methodNotAllowed(res);
 
+  if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/marketplace') return req.method === 'POST' ? handle(importMarketplaceOrders(req, res), res) : methodNotAllowed(res);

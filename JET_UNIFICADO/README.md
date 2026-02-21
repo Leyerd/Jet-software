@@ -12,6 +12,7 @@ Este proyecto junta en **un solo software** todos los objetivos: contabilidad, t
 - ✅ Sprint 4 ejecutado (proyecciones financieras + QA smoke)
 - ✅ Sprint 5 ejecutado (inventario + conciliación + QA runner estable)
 - ✅ Sprint 6 ejecutado (motor tributario versionado, default 14D8 transparente)
+- ✅ Sprint 7 ejecutado (kardex FIFO + costeo trazable por lotes)
 
 Documentos de avance:
 - `docs/SPRINT_1.md`
@@ -21,6 +22,7 @@ Documentos de avance:
 - `docs/SPRINT_4.md`
 - `docs/SPRINT_5.md`
 - `docs/SPRINT_6.md`
+- `docs/SPRINT_7.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
 ## Regla de trabajo acordada (importante)
@@ -170,3 +172,13 @@ Endpoints:
 - `GET /tax/summary`
 
 Por defecto el sistema inicia en régimen transparente (`14D8`).
+
+
+## Sprint 7: inventario profesional
+
+Endpoints nuevos:
+- `POST /inventory/import-lot`
+- `POST /inventory/consume`
+- `GET /inventory/kardex`
+
+Estos endpoints implementan trazabilidad por lote y costeo FIFO.
