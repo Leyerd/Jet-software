@@ -39,6 +39,7 @@ const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modu
 const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
 const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
+const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -70,7 +71,8 @@ const modulesList = [
   'frontend-backend-first-api-client-unified',
   'auditable-exportable-reporting-reproducible-hash',
   'observability-logs-metrics-alerts-dashboard',
-  'compliance-calendar-semaphore-evidence-escalation'
+  'compliance-calendar-semaphore-evidence-escalation',
+  'governance-chart-rules-consistency-dual-approval'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -82,7 +84,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '13', version: 'v1.13-sprint13' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '14', version: 'v1.14-sprint14' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -165,6 +167,20 @@ function route(req, res) {
   if (path === '/accounting/entries/reverse') return req.method === 'POST' ? handle(reverseEntry(req, res), res) : methodNotAllowed(res);
 
   if (path === '/observability/dashboard' && req.method === 'GET') return handle(getDashboard(req, res), res);
+
+  if (path === '/accounting/chart') {
+    if (req.method === 'GET') return handle(getChart(req, res), res);
+    if (req.method === 'POST') return handle(updateChart(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/rules') {
+    if (req.method === 'GET') return handle(getRules(req, res), res);
+    if (req.method === 'POST') return handle(updateRules(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/consistency-check' && req.method === 'GET') return handle(runConsistencyCheck(req, res), res);
+  if (path === '/accounting/approval/request' && req.method === 'POST') return handle(createApprovalRequest(req, res), res);
+  if (path === '/accounting/approval/approve' && req.method === 'POST') return handle(approveRequest(req, res), res);
 
   if (path === '/compliance/calendar' && req.method === 'GET') return handle(getCalendar(req, res), res);
   if (path === '/compliance/semaphore' && req.method === 'GET') return handle(getSemaphore(req, res), res);

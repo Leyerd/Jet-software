@@ -134,6 +134,9 @@
             <button onclick="switchTab('cumplimiento')" id="btn-cumplimiento" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-fuchsia-400">
                 <i data-lucide="calendar-check-2" class="w-4 h-4"></i> Cumplimiento
             </button>
+            <button onclick="switchTab('gobernanza')" id="btn-gobernanza" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-indigo-400">
+                <i data-lucide="shield-ellipsis" class="w-4 h-4"></i> Gobernanza
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -187,11 +190,6 @@
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span></p>
                     </div>
-                        <!-- Selector de año rápido en el header para mejorar la accesibilidad -->
-                        <div class="flex items-center gap-2 text-right mt-1">
-                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Año</span>
-                            <input type="number" id="config-year-header" onchange="updateYear(this.value)" class="w-16 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-black rounded px-2 py-1 outline-none text-center" />
-                        </div>
                         <!-- Se eliminan indicadores UF, UTM e IPC ya que no se usan en los cálculos -->
                 </div>
                 <div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -852,6 +850,37 @@
                 </div>
             </div>
 
+            <!-- Gobernanza contable (Meta 14) -->
+            <div id="tab-gobernanza" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Gobernanza Contable</h2>
+                            <p class="text-xs text-slate-500 mt-2">Plan de cuentas, validaciones cruzadas y doble aprobación para acciones críticas.</p>
+                        </div>
+                        <button onclick="runGovernanceConsistency()" class="btn-jet bg-indigo-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Validar</button>
+                    </div>
+                </div>
+                <div id="gov-consistency" class="card p-6 text-xs text-slate-600 dark:text-slate-300">Sin validaciones aún.</div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Solicitud de aprobación crítica</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <select id="gov-action" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                            <option value="period.close">period.close</option>
+                            <option value="period.reopen">period.reopen</option>
+                            <option value="tax.rectification">tax.rectification</option>
+                        </select>
+                        <input id="gov-reason" type="text" placeholder="Motivo (mín 10)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="createApprovalRequestUI()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Solicitar</button>
+                        <input id="gov-request-id" type="text" placeholder="Request ID" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <button onclick="approveRequestUI()" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Aprobar</button>
+                        <div id="gov-approval-result" class="text-xs text-slate-500"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Observabilidad y cumplimiento (Meta 12) -->
             <div id="tab-observabilidad" class="tab-content hidden space-y-6">
                 <div class="card p-8">
@@ -1307,9 +1336,6 @@
             const balanceSel = document.getElementById('filter-month-balance'); if (balanceSel) balanceSel.value = db.config.contabMonthBalance;
             // Reflejar el año en los elementos que lo muestran (por ejemplo F22)
             document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
-            // Asignar valor inicial al selector de año en el header, si existe
-            const yearInpHeader = document.getElementById('config-year-header');
-            if (yearInpHeader) yearInpHeader.value = db.config.year;
             // Inicializar contabilidad y reconstruir asientos desde los movimientos guardados
             initPlanCuentas();
             rebuildAsientos();
@@ -1404,8 +1430,6 @@
                 // Sincronizar los campos de selección de año en la interfaz
                 const yearSidebar = document.getElementById('config-year');
                 if (yearSidebar) yearSidebar.value = db.config.year;
-                const yearHeader = document.getElementById('config-year-header');
-                if (yearHeader) yearHeader.value = db.config.year;
                 updateRetRate();
                 // Actualizar textos que muestran el año actual (por ejemplo en F22)
                 document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
@@ -1486,6 +1510,7 @@
             if (t === 'reporteria') loadAuditableReports();
             if (t === 'observabilidad') loadObservabilityDashboard();
             if (t === 'cumplimiento') loadComplianceStatus();
+            if (t === 'gobernanza') runGovernanceConsistency();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
@@ -1608,6 +1633,40 @@
                 await loadComplianceStatus();
             } catch (err) {
                 safeSetHTML('comp-evidence-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+
+        async function runGovernanceConsistency() {
+            try {
+                const payload = await apiClient.get('/accounting/consistency-check');
+                const r = payload.result || {};
+                safeSetHTML('gov-consistency', `<div class="text-xs"><span class="font-black">Resultado:</span> ${r.passed ? '<span class="text-emerald-600">OK</span>' : '<span class="text-red-600">Con observaciones</span>'}</div><pre class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-3 text-[11px] overflow-auto max-h-64">${JSON.stringify(r, null, 2)}</pre>`);
+            } catch (err) {
+                safeSetHTML('gov-consistency', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function createApprovalRequestUI() {
+            try {
+                const actionType = (document.getElementById('gov-action')?.value || '').trim();
+                const reason = (document.getElementById('gov-reason')?.value || '').trim();
+                const payload = await apiClient.post('/accounting/approval/request', { actionType, reason });
+                const id = payload.request?.id || '';
+                const input = document.getElementById('gov-request-id'); if (input) input.value = id;
+                safeSetHTML('gov-approval-result', `<span class="text-blue-600 font-bold">Solicitud creada: ${id}</span>`);
+            } catch (err) {
+                safeSetHTML('gov-approval-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function approveRequestUI() {
+            try {
+                const requestId = (document.getElementById('gov-request-id')?.value || '').trim();
+                const payload = await apiClient.post('/accounting/approval/approve', { requestId });
+                safeSetHTML('gov-approval-result', `<span class="text-emerald-600 font-bold">Aprobada: ${payload.request?.id || '-'}</span>`);
+            } catch (err) {
+                safeSetHTML('gov-approval-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
             }
         }
 

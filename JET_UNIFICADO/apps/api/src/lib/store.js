@@ -42,6 +42,10 @@ const defaultState = {
     alerts: { emailEnabled: false, webhookEnabled: false, emailTo: '', webhookUrl: '' },
     escalationDaysBefore: [7, 3, 1]
   },
+  chartOfAccounts: [],
+  accountingRules: [],
+  costCenters: [],
+  approvalRequests: [],
   backups: [],
   backupPolicy: {
     retentionMaxFiles: 20,
@@ -75,6 +79,10 @@ const POSTGRES_FRAGMENT_KEYS = [
   'complianceObligations',
   'complianceEvidence',
   'complianceConfig',
+  'chartOfAccounts',
+  'accountingRules',
+  'costCenters',
+  'approvalRequests',
   'backups',
   'backupPolicy'
 ];
@@ -82,7 +90,7 @@ const POSTGRES_FRAGMENT_KEYS = [
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'backups'
+    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'chartOfAccounts', 'accountingRules', 'costCenters', 'approvalRequests', 'backups'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -108,6 +116,11 @@ function ensureArrays(state) {
       escalationDaysBefore: [7, 3, 1]
     };
   }
+
+  if (!Array.isArray(state.chartOfAccounts)) state.chartOfAccounts = [];
+  if (!Array.isArray(state.accountingRules)) state.accountingRules = [];
+  if (!Array.isArray(state.costCenters)) state.costCenters = [];
+  if (!Array.isArray(state.approvalRequests)) state.approvalRequests = [];
 
   if (!state.backupPolicy || typeof state.backupPolicy !== 'object') {
     state.backupPolicy = {

@@ -3,6 +3,7 @@ const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
+const { assertApprovedRequest } = require('./accountingGovernance');
 
 function key(anio, mes) {
   return `${anio}-${String(mes).padStart(2, '0')}`;
@@ -127,7 +128,9 @@ async function closePeriod(req, res) {
   const body = await parseBody(req);
   const anio = Number(body.anio);
   const mes = Number(body.mes);
+  const approvalRequestId = String(body.approvalRequestId || '').trim();
   assertAnioMes(anio, mes);
+  await assertApprovedRequest('period.close', approvalRequestId);
 
   if (isPostgresMode()) {
     const period = await withPgClient(async (client) => {
@@ -189,11 +192,13 @@ async function reopenPeriod(req, res) {
   const body = await parseBody(req);
   const anio = Number(body.anio);
   const mes = Number(body.mes);
+  const approvalRequestId = String(body.approvalRequestId || '').trim();
   const motivo = String(body.motivo || '').trim();
   const aprobadoPor = String(body.aprobadoPor || '').trim().toLowerCase();
   assertAnioMes(anio, mes);
 
   if (!motivo || motivo.length < 10) return sendJson(res, 400, { ok: false, message: 'motivo de reapertura es requerido (mín 10 chars)' });
+  await assertApprovedRequest('period.reopen', approvalRequestId);
   if (!aprobadoPor) return sendJson(res, 400, { ok: false, message: 'aprobadoPor es requerido (workflow de aprobación)' });
 
   if (isPostgresMode()) {
