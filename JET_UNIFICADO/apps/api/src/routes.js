@@ -15,7 +15,7 @@ const {
   importRCVVentas,
   importMarketplaceOrders
 } = require('./modules/reconciliation');
-const { getTaxConfig, updateTaxConfig, getTaxSummary } = require('./modules/tax');
+const { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog } = require('./modules/tax');
 const {
   updateIntegrationConfig,
   getIntegrationsStatus,
@@ -53,7 +53,8 @@ const modulesList = [
   'quality-ci-cd-sprint10',
   'meta1-postgres-normalized-runtime-auth-products-movements-periods-tax',
   'journal-double-entry-publish-validation',
-  'journal-auto-posting-reverse'
+  'journal-auto-posting-reverse',
+  'tax-engine-versioned-f29-f22-rli-traceability'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -90,6 +91,7 @@ function route(req, res) {
     if (req.method === 'POST') return handle(updateTaxConfig(req, res), res);
     return methodNotAllowed(res);
   }
+  if (path === '/tax/catalog' && req.method === 'GET') return handle(getTaxCatalog(req, res), res);
   if (path === '/tax/summary' && req.method === 'GET') return handle(getTaxSummary(req, res), res);
 
 
