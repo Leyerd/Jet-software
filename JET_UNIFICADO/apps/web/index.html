@@ -125,6 +125,12 @@
             <button onclick="switchTab('contabilidad')" id="btn-contabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-yellow-400">
                 <i data-lucide="book-open" class="w-4 h-4"></i> Contabilidad
             </button>
+            <button onclick="switchTab('reporteria')" id="btn-reporteria" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-cyan-400">
+                <i data-lucide="files" class="w-4 h-4"></i> Reportería
+            </button>
+            <button onclick="switchTab('observabilidad')" id="btn-observabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-lime-400">
+                <i data-lucide="siren" class="w-4 h-4"></i> Observabilidad
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -763,6 +769,69 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Reportería auditable (Meta 11) -->
+            <div id="tab-reporteria" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Reportería Auditable</h2>
+                            <p class="text-xs text-slate-500 mt-2">Genera Libro Diario, Mayor, Balance, Estado de Resultados e IVA con hash reproducible y exportación CSV/XLSX/PDF.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
+                            <input id="report-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="report-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="">Acumulado anual</option>
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadAuditableReports()" class="btn-jet bg-cyan-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Consultar</button>
+                        </div>
+                    </div>
+                    <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input id="api-token" type="text" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Token de sesión (opcional, requerido por endpoints protegidos)">
+                        <div class="flex gap-2">
+                            <button onclick="saveApiToken()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Guardar token</button>
+                            <button onclick="clearApiToken()" class="btn-jet bg-slate-200 dark:bg-slate-700 dark:text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Limpiar</button>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex flex-wrap gap-2">
+                        <button onclick="exportAuditableReport('diario','csv')" class="btn-jet bg-blue-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Diario CSV</button>
+                        <button onclick="exportAuditableReport('mayor','xlsx')" class="btn-jet bg-purple-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Mayor XLSX</button>
+                        <button onclick="exportAuditableReport('balance','pdf')" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Balance PDF</button>
+                    </div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Resumen de generación</h3>
+                    <div id="reports-meta" class="text-xs text-slate-500">Sin consultas aún.</div>
+                    <pre id="reports-preview" class="mt-4 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-80">{}</pre>
+                </div>
+            </div>
+
+            <!-- Observabilidad y cumplimiento (Meta 12) -->
+            <div id="tab-observabilidad" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Observabilidad Operativa</h2>
+                            <p class="text-xs text-slate-500 mt-2">Monitorea errores, latencia, rechazos de validación y alertas activas del backend.</p>
+                        </div>
+                        <button onclick="loadObservabilityDashboard()" class="btn-jet bg-lime-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                    </div>
+                </div>
+                <div id="obs-metrics" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Alertas activas</h3>
+                        <div id="obs-alerts" class="space-y-2 text-xs">Sin datos.</div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Últimos eventos app</h3>
+                        <pre id="obs-logs" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre>
+                    </div>
+                </div>
+            </div>
         </section>
     </main>
 
@@ -1100,7 +1169,8 @@
                 // Giro principal (SII): código de actividad económica
                 giro: '479100',
                 // Domicilio principal de la empresa (para fines de importaciones y fiscalización)
-                address: ''
+                address: '',
+                apiToken: ''
             }
         };
 
@@ -1109,8 +1179,9 @@
 
         const apiClient = {
             async request(path, options = {}) {
+                const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
                 const response = await fetch(path, {
-                    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+                    headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
                     ...options
                 });
                 let payload = null;
@@ -1176,6 +1247,9 @@
             await bootstrapFromBackend();
             safeSetText('current-date', new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             const yearInp = document.getElementById('config-year'); if (yearInp) yearInp.value = db.config.year;
+            const reportYearInp = document.getElementById('report-year'); if (reportYearInp) reportYearInp.value = db.config.year;
+            const reportMonthInp = document.getElementById('report-month'); if (reportMonthInp) reportMonthInp.value = String((db.config.selectedMonth || 0) + 1);
+            const tokenInp = document.getElementById('api-token'); if (tokenInp) tokenInp.value = db.config.apiToken || '';
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             // Establecer valores por defecto en los campos de régimen, giro y domicilio
             const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
@@ -1364,12 +1438,93 @@
             if (t === 'kpi') renderKPI();
             if (t === 'contabilidad') renderContabilidad();
             if (t === 'auditoria') renderAuditoria();
+            if (t === 'reporteria') loadAuditableReports();
+            if (t === 'observabilidad') loadObservabilityDashboard();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
             if (navBtn) navBtn.classList.add('active');
             // Actualizar iconos
             safeCreateIcons();
+        }
+
+
+        function saveApiToken() {
+            const token = (document.getElementById('api-token')?.value || '').trim();
+            db.config.apiToken = token;
+            save();
+            alert(token ? 'Token guardado para consumo de API protegida.' : 'Token vacío.');
+        }
+
+        function clearApiToken() {
+            db.config.apiToken = '';
+            const tokenInp = document.getElementById('api-token');
+            if (tokenInp) tokenInp.value = '';
+            save();
+        }
+
+        function reportFilters() {
+            const year = Number(document.getElementById('report-year')?.value || db.config.year || new Date().getFullYear());
+            const monthRaw = document.getElementById('report-month')?.value || '';
+            const month = monthRaw ? Number(monthRaw) : null;
+            return { year, month };
+        }
+
+        async function loadAuditableReports() {
+            try {
+                const { year, month } = reportFilters();
+                const q = new URLSearchParams({ year: String(year) });
+                if (month) q.set('month', String(month));
+                const payload = await apiClient.get(`/reports?${q.toString()}`);
+                safeSetHTML('reports-meta', `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="text-xs"><span class="font-black">Período:</span> ${payload.metadata?.period || '-'} </div>
+                        <div class="text-xs"><span class="font-black">Usuario:</span> ${payload.metadata?.generatedBy || '-'} </div>
+                        <div class="text-xs"><span class="font-black">Generado:</span> ${payload.metadata?.generatedAt || '-'} </div>
+                        <div class="text-xs break-all"><span class="font-black">Hash:</span> ${payload.metadata?.hash || '-'} </div>
+                    </div>`);
+                safeSetText('reports-preview', JSON.stringify(payload.reports || {}, null, 2));
+            } catch (err) {
+                safeSetHTML('reports-meta', `<span class="text-red-500 font-bold">${err.message}</span>`);
+                safeSetText('reports-preview', '{}');
+            }
+        }
+
+        function exportAuditableReport(reportName, format) {
+            const { year, month } = reportFilters();
+            const q = new URLSearchParams({ report: reportName, format, year: String(year) });
+            if (month) q.set('month', String(month));
+            window.open(`/reports/export?${q.toString()}`, '_blank');
+        }
+
+        function obsMetricCard(label, value, tone = 'text-slate-900 dark:text-white') {
+            return `<div class="card p-5"><p class="text-[10px] uppercase font-black tracking-widest text-slate-400">${label}</p><p class="text-2xl font-black ${tone}">${value}</p></div>`;
+        }
+
+        async function loadObservabilityDashboard() {
+            try {
+                const payload = await apiClient.get('/observability/dashboard');
+                const rt = payload.dashboard?.runtime || {};
+                safeSetHTML('obs-metrics', [
+                    obsMetricCard('Requests', Number(rt.requests || 0).toLocaleString('es-CL')),
+                    obsMetricCard('Errores 5xx', Number(rt.errors || 0).toLocaleString('es-CL'), 'text-red-500'),
+                    obsMetricCard('Rechazos 4xx', Number(rt.validationRejects || 0).toLocaleString('es-CL'), 'text-amber-500'),
+                    obsMetricCard('Latencia p95 (ms)', Number(rt.p95Ms || 0).toLocaleString('es-CL'), 'text-blue-500')
+                ].join(''));
+
+                const alerts = payload.dashboard?.alerts || [];
+                if (!alerts.length) {
+                    safeSetHTML('obs-alerts', '<div class="text-emerald-600 font-bold">Sin alertas activas.</div>');
+                } else {
+                    safeSetHTML('obs-alerts', alerts.map(a => `<div class="rounded-xl px-3 py-2 ${a.severity === 'critical' ? 'bg-red-100 text-red-700' : a.severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'}"><span class="font-black uppercase">${a.key}</span>: ${a.message} (valor: ${a.value})</div>`).join(''));
+                }
+
+                safeSetText('obs-logs', JSON.stringify(payload.dashboard?.appLogsTail || [], null, 2));
+            } catch (err) {
+                safeSetHTML('obs-metrics', obsMetricCard('Estado', 'No disponible', 'text-red-500'));
+                safeSetHTML('obs-alerts', `<div class="text-red-500 font-bold">${err.message}</div>`);
+                safeSetText('obs-logs', '[]');
+            }
         }
 
         // Modal utils (basic)
