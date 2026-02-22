@@ -23,7 +23,9 @@ const {
   getIntegrationsStatus,
   importAlibabaCatalog,
   importMercadoLibre,
-  importSii
+  importSii,
+  runScheduledSync,
+  listDeadLetter
 } = require('./modules/integrations');
 const {
   getBackupPolicy,
@@ -60,7 +62,8 @@ const modulesList = [
   'tax-engine-versioned-f29-f22-rli-traceability',
   'reconciliation-immutable-incremental-batches-status',
   'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation',
-  'encrypted-backups-dr-validation-rpo-rto'
+  'encrypted-backups-dr-validation-rpo-rto',
+  'secure-connectors-scheduler-retry-deadletter-status'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -108,6 +111,8 @@ function route(req, res) {
   if (path === '/integrations/alibaba/import-products') return req.method === 'POST' ? handle(importAlibabaCatalog(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/mercadolibre/import-orders') return req.method === 'POST' ? handle(importMercadoLibre(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/sii/import-rcv') return req.method === 'POST' ? handle(importSii(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/sync/run') return req.method === 'POST' ? handle(runScheduledSync(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/dead-letter' && req.method === 'GET') return handle(listDeadLetter(req, res), res);
 
 
   if (path === '/backup/policy') {

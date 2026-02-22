@@ -2171,26 +2171,23 @@ calculateReports(yearMovs);
             }
         }
 
-        // Sincronización Mercado Libre vía backend (sin exponer token en frontend)
+        // Sincronización Mercado Libre backend-first (sin token/manual prompt en UI)
         async function syncMercadoLibre() {
             try {
-                const raw = prompt('Pega aquí el JSON de órdenes exportadas desde Mercado Libre para importación segura por backend');
-                if (!raw) return;
-                const parsed = JSON.parse(raw);
-                const rows = Array.isArray(parsed) ? parsed : (parsed.results || parsed.rows || []);
-                if (!rows.length) throw new Error('No se encontraron órdenes en el JSON');
-
-                const response = await fetch('/integrations/mercadolibre/import-orders', {
+                const response = await fetch('/integrations/sync/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rows })
+                    body: JSON.stringify({ provider: 'mercadolibre', maxAttempts: 3 })
                 });
 
-                if (!response.ok) throw new Error('No se pudo importar en backend');
-                alert('Órdenes enviadas al backend. Revisa conciliación para validar resultados.');
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok || payload.ok === false) {
+                    throw new Error(payload.error || payload.message || 'No se pudo ejecutar sync de Mercado Libre');
+                }
+                alert('Sincronización de Mercado Libre enviada al backend. Revisa Integraciones/Conciliación para el resultado.');
             } catch (err) {
                 console.error(err);
-                alert('Error de importación. Verifica que el JSON sea válido y que el backend esté activo.');
+                alert('Error de sincronización backend. Revisa la configuración de credenciales del conector en el servidor.');
             }
         }
         function deleteMov(id) {
