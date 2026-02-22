@@ -5,11 +5,17 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 const apiDir = path.join(root, 'apps', 'api');
-const webDir = path.join(root, 'apps', 'web');
+
+function bin(name) {
+  if (process.platform !== 'win32') return name;
+  if (name === 'npm') return 'npm.cmd';
+  if (name === 'node') return 'node.exe';
+  return name;
+}
 
 function run(cmd, args, cwd, inherit = true) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { cwd, stdio: inherit ? 'inherit' : 'pipe', shell: process.platform === 'win32' });
+    const child = spawn(bin(cmd), args, { cwd, stdio: inherit ? 'inherit' : 'pipe', shell: false });
     child.on('exit', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`${cmd} ${args.join(' ')} failed with code ${code}`));
@@ -19,10 +25,10 @@ function run(cmd, args, cwd, inherit = true) {
 }
 
 function startProcess(cmd, args, cwd, name, env = {}) {
-  const child = spawn(cmd, args, {
+  const child = spawn(bin(cmd), args, {
     cwd,
     stdio: 'inherit',
-    shell: process.platform === 'win32',
+    shell: false,
     env: { ...process.env, ...env }
   });
   child.on('exit', (code) => {
@@ -44,6 +50,17 @@ async function ensureApiDependencies() {
   await run('npm', ['install'], apiDir);
 }
 
+function openBrowser(url) {
+  if (process.env.JET_NO_BROWSER === '1') return;
+  if (process.platform === 'win32') {
+    spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore', shell: false }).unref();
+  } else if (process.platform === 'darwin') {
+    spawn('open', [url], { detached: true, stdio: 'ignore', shell: false }).unref();
+  } else {
+    spawn('xdg-open', [url], { detached: true, stdio: 'ignore', shell: false }).unref();
+  }
+}
+
 async function main() {
   console.log('[JET] Iniciador local: instalación automática + arranque de servicios');
   await ensureApiDependencies();
@@ -55,34 +72,12 @@ async function main() {
   const api = startProcess('node', ['server.js'], apiDir, 'API', { PORT: String(apiPort) });
 
   console.log(`[JET] Iniciando WEB en puerto ${webPort}...`);
-  const webServerScript = [
-    "const http=require('http');",
-    "const fs=require('fs');",
-    "const path=require('path');",
-    `const root=${JSON.stringify(webDir)};`,
-    "const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.ico':'image/x-icon'};",
-    "const server=http.createServer((req,res)=>{",
-    "let p=req.url.split('?')[0];if(p==='/'||!p)p='/index.html';",
-    "const f=path.join(root,p.replace(/^\\/+/,''));",
-    "if(!f.startsWith(root)){res.statusCode=403;return res.end('forbidden');}",
-    "fs.readFile(f,(err,data)=>{if(err){res.statusCode=404;return res.end('not found');}",
-    "res.setHeader('Content-Type',mime[path.extname(f)]||'text/plain');res.end(data);});});",
-    `server.listen(${webPort},()=>console.log('[JET] Web listo en http://localhost:${webPort}'));`
-  ].join('');
-
-  const web = startProcess('node', ['-e', webServerScript], root, 'WEB');
+  const web = startProcess('node', [path.join(root, 'scripts', 'web-static-server.js')], root, 'WEB', { JET_WEB_PORT: String(webPort) });
 
   await wait(1200);
   const url = `http://localhost:${webPort}`;
   console.log(`[JET] Abriendo navegador en ${url}`);
-
-  if (process.platform === 'win32') {
-    spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-  } else if (process.platform === 'darwin') {
-    spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-  } else {
-    spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-  }
+  openBrowser(url);
 
   const shutdown = () => {
     console.log('\n[JET] Cerrando servicios...');
@@ -94,6 +89,9 @@ async function main() {
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+
+  const autoExitMs = Number(process.env.JET_TEST_EXIT_AFTER_MS || 0);
+  if (autoExitMs > 0) setTimeout(shutdown, autoExitMs);
 
   console.log('[JET] Sistema listo. Presiona Ctrl+C en esta ventana para detener API y WEB.');
 }

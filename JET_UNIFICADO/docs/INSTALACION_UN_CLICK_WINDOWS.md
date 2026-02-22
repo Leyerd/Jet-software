@@ -26,3 +26,7 @@ Permitir que JET UNIFICADO se instale/inicie con doble clic, sin abrir terminal 
 - Windows 10/11.
 - Permisos para ejecutar PowerShell con `ExecutionPolicy Bypass` (ya aplicado por `.cmd`).
 - `winget` disponible para instalación automática de Node.js (si no existe, instalar Node LTS manualmente).
+
+## Nota importante sobre Docker
+- Este launcher **no levanta Docker**: ejecuta API y Web en modo local con Node.js para simplificar el doble clic.
+- Si quieres modo Docker, usa `docker compose up -d --build` desde la carpeta `JET_UNIFICADO`.
