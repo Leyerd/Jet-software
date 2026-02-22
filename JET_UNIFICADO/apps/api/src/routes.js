@@ -40,6 +40,7 @@ const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
 const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
+const { getAuditPackage, getRiskSimulation, getExecutiveDashboard } = require('./modules/eirlExecutive');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -72,7 +73,8 @@ const modulesList = [
   'auditable-exportable-reporting-reproducible-hash',
   'observability-logs-metrics-alerts-dashboard',
   'compliance-calendar-semaphore-evidence-escalation',
-  'governance-chart-rules-consistency-dual-approval'
+  'governance-chart-rules-consistency-dual-approval',
+  'meta15-audit-package-risk-simulator-executive-dashboard'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -84,7 +86,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '14', version: 'v1.14-sprint14' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '15', version: 'v1.15-sprint15' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -186,6 +188,10 @@ function route(req, res) {
   if (path === '/compliance/semaphore' && req.method === 'GET') return handle(getSemaphore(req, res), res);
   if (path === '/compliance/evidence') return req.method === 'POST' ? handle(registerEvidence(req, res), res) : methodNotAllowed(res);
   if (path === '/compliance/config') return req.method === 'POST' ? handle(updateComplianceConfig(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/executive/audit-package' && req.method === 'GET') return handle(getAuditPackage(req, res), res);
+  if (path === '/executive/risk-simulation' && req.method === 'GET') return handle(getRiskSimulation(req, res), res);
+  if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
 
   if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
   if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);

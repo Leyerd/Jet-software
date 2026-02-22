@@ -137,6 +137,9 @@
             <button onclick="switchTab('gobernanza')" id="btn-gobernanza" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-indigo-400">
                 <i data-lucide="shield-ellipsis" class="w-4 h-4"></i> Gobernanza
             </button>
+            <button onclick="switchTab('ejecutivo')" id="btn-ejecutivo" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-teal-400">
+                <i data-lucide="briefcase-business" class="w-4 h-4"></i> Ejecutivo EIRL
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -881,6 +884,39 @@
                 </div>
             </div>
 
+            <!-- Meta 15: Panel ejecutivo + riesgo + paquete fiscalizador -->
+            <div id="tab-ejecutivo" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Panel Ejecutivo EIRL</h2>
+                            <p class="text-xs text-slate-500 mt-2">Riesgo esperado, cumplimiento y paquete fiscalizador exportable por período.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 w-full lg:w-auto">
+                            <input id="exec-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="exec-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadExecutivePanel()" class="btn-jet bg-teal-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="exec-cards" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Riesgo esperado</h3>
+                        <pre id="exec-risk" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Paquete fiscalizador (hash chain)</h3>
+                        <button onclick="loadAuditPackage()" class="btn-jet bg-slate-900 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest mb-3">Generar</button>
+                        <pre id="exec-pack" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                    </div>
+                </div>
+            </div>
+
             <!-- Observabilidad y cumplimiento (Meta 12) -->
             <div id="tab-observabilidad" class="tab-content hidden space-y-6">
                 <div class="card p-8">
@@ -1324,6 +1360,8 @@
             const tokenInp = document.getElementById('api-token'); if (tokenInp) tokenInp.value = db.config.apiToken || '';
             const compYear = document.getElementById('comp-year'); if (compYear) compYear.value = db.config.year;
             const compMonth = document.getElementById('comp-month'); if (compMonth) compMonth.value = String((db.config.selectedMonth || 0) + 1);
+            const execYear = document.getElementById('exec-year'); if (execYear) execYear.value = db.config.year;
+            const execMonth = document.getElementById('exec-month'); if (execMonth) execMonth.value = String((db.config.selectedMonth || 0) + 1);
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             // Establecer valores por defecto en los campos de régimen, giro y domicilio
             const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
@@ -1511,6 +1549,7 @@
             if (t === 'observabilidad') loadObservabilityDashboard();
             if (t === 'cumplimiento') loadComplianceStatus();
             if (t === 'gobernanza') runGovernanceConsistency();
+            if (t === 'ejecutivo') loadExecutivePanel();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
@@ -1667,6 +1706,38 @@
                 safeSetHTML('gov-approval-result', `<span class="text-emerald-600 font-bold">Aprobada: ${payload.request?.id || '-'}</span>`);
             } catch (err) {
                 safeSetHTML('gov-approval-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+
+        async function loadExecutivePanel() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('exec-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/executive/dashboard?year=${year}&month=${month}`);
+                const d = payload.dashboard || {};
+                const risk = payload.risk || {};
+                safeSetHTML('exec-cards', [
+                    obsMetricCard('Caja', `$ ${Number(d.financial?.cash || 0).toLocaleString('es-CL')}`),
+                    obsMetricCard('Margen', `$ ${Number(d.financial?.margin || 0).toLocaleString('es-CL')}`, 'text-emerald-500'),
+                    obsMetricCard('Cumplimiento', `${Number(d.compliance?.score || 0)}%`, 'text-blue-500'),
+                    obsMetricCard('Riesgo Esperado', `$ ${Number(risk.totalExpectedRisk || 0).toLocaleString('es-CL')}`, 'text-red-500')
+                ].join(''));
+                safeSetText('exec-risk', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetHTML('exec-cards', obsMetricCard('Ejecutivo', 'No disponible', 'text-red-500'));
+                safeSetText('exec-risk', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+        async function loadAuditPackage() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('exec-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/executive/audit-package?year=${year}&month=${month}`);
+                safeSetText('exec-pack', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetText('exec-pack', JSON.stringify({ error: err.message }, null, 2));
             }
         }
 
