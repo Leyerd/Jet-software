@@ -35,6 +35,16 @@ Documentos de avance:
 ## Instalación guiada (recomendada para no programadores)
 Si quieres una explicación paso a paso, abre: `docs/GUIA_INSTALACION_PARA_PRINCIPIANTES.md`.
 
+## Inicio en 1 clic (Windows, .cmd/.ps1)
+Si quieres abrir el sistema como un programa (sin terminal manual):
+
+1. Doble clic en `desktop/JET_Lanzar.cmd`.
+2. El launcher instala dependencias automáticamente (y Node.js vía winget si falta).
+3. Levanta API + Web y abre el navegador en `http://localhost:3000`.
+4. Crea acceso directo `JET UNIFICADO` en el escritorio.
+
+Detalle técnico: `docs/INSTALACION_UN_CLICK_WINDOWS.md`.
+
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
 Endpoints de apoyo:
@@ -248,3 +258,7 @@ Nota: el runtime operativo ya migró fuera de `app_state` monolítico y la UI qu
 
 ## Meta 2: migración segura y trazable
 Guía y comandos en: `docs/META2_MIGRACION_SEGURA_TRAZABLE.md`.
+
+## Auditoría integral EIRL (estado actual)
+Se agregó un informe técnico de capacidad real del software para tus objetivos de negocio:
+- `docs/AUDITORIA_SOFTWARE_ACTUAL_EIRL.md`
