@@ -262,3 +262,7 @@ Guía y comandos en: `docs/META2_MIGRACION_SEGURA_TRAZABLE.md`.
 ## Auditoría integral EIRL (estado actual)
 Se agregó un informe técnico de capacidad real del software para tus objetivos de negocio:
 - `docs/AUDITORIA_SOFTWARE_ACTUAL_EIRL.md`
+
+## Plan de metas para reemplazo operativo del contador
+Se agregó roadmap de cierre de brechas (Meta 17-22):
+- `docs/PLAN_METAS_REEMPLAZO_CONTADOR_EIRL.md`

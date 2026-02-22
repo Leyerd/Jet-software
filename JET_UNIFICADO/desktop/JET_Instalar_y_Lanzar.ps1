@@ -1,8 +1,14 @@
 param(
-  [string]$ProjectRoot = "$(Split-Path -Parent $PSScriptRoot)"
+  [string]$ProjectRoot = (Join-Path (Split-Path -Parent $PSScriptRoot) ".")
 )
 
 $ErrorActionPreference = 'Stop'
+
+$ProjectRoot = $ProjectRoot.Trim().Trim('"')
+if ($ProjectRoot.EndsWith('\')) {
+  $ProjectRoot = $ProjectRoot.TrimEnd('\')
+}
+$ProjectRoot = [System.IO.Path]::GetFullPath($ProjectRoot)
 
 function Ensure-Command {
   param([string]$Name)
