@@ -2,6 +2,7 @@ const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
+const { assertPeriodOpenForDate } = require('./accountingClose');
 
 function ensureInventoryStructures(state) {
   if (!Array.isArray(state.inventoryLots)) state.inventoryLots = [];
@@ -36,6 +37,8 @@ async function importLot(req, res) {
   if (!productId || qty <= 0 || unitCost <= 0) {
     return sendJson(res, 400, { ok: false, message: 'productId, qty y unitCost (>0) son requeridos' });
   }
+
+  await assertPeriodOpenForDate(fechaIngreso, 'ingreso de lote de inventario');
 
   if (isPostgresMode()) {
     const result = await withPgClient(async (client) => {
@@ -117,6 +120,8 @@ async function consumeStock(req, res) {
   const fecha = body.fecha || new Date().toISOString().slice(0, 10);
   const reference = body.reference || 'venta';
   if (!productId || qty <= 0) return sendJson(res, 400, { ok: false, message: 'productId y qty (>0) son requeridos' });
+
+  await assertPeriodOpenForDate(fecha, 'consumo de inventario');
 
   if (isPostgresMode()) {
     const out = await withPgClient(async (client) => {

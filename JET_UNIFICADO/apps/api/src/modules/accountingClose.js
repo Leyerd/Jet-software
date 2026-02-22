@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
@@ -13,38 +14,110 @@ function assertAnioMes(anio, mes) {
   }
 }
 
+function hashSnapshot(snapshot) {
+  return crypto.createHash('sha256').update(JSON.stringify(snapshot)).digest('hex');
+}
+
 function ensurePeriodExists(state, anio, mes) {
   const existing = state.periodos.find(p => p.key === key(anio, mes));
   if (existing) return existing;
   const period = {
     key: key(anio, mes), anio, mes, estado: 'abierto',
-    cerradoPor: null, cerradoEn: null, reabiertoPor: null, reabiertoEn: null, motivoReapertura: null
+    cerradoPor: null, cerradoEn: null, reabiertoPor: null, reabiertoEn: null, motivoReapertura: null,
+    cierreHash: null, cierreSnapshot: null, reaperturaAprobadaPor: null, reaperturaAprobadaEn: null
   };
   state.periodos.push(period);
   return period;
 }
 
-function isPeriodClosed(state, isoDate) {
+function periodFromDate(isoDate) {
   const d = new Date(isoDate);
-  if (Number.isNaN(d.getTime())) return false;
-  const anio = d.getFullYear();
-  const mes = d.getMonth() + 1;
-  const period = state.periodos.find(p => p.key === key(anio, mes));
+  if (Number.isNaN(d.getTime())) return null;
+  return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
+}
+
+function isPeriodClosed(state, isoDate) {
+  const p = periodFromDate(isoDate);
+  if (!p) return false;
+  const period = state.periodos.find(x => x.key === key(p.anio, p.mes));
   return period ? period.estado === 'cerrado' : false;
 }
 
 async function isPeriodClosedInDb(isoDate) {
-  const d = new Date(isoDate);
-  if (Number.isNaN(d.getTime())) return false;
-  const anio = d.getFullYear();
-  const mes = d.getMonth() + 1;
+  const p = periodFromDate(isoDate);
+  if (!p) return false;
   return withPgClient(async (client) => {
-    const rs = await client.query(
-      'SELECT estado FROM periodos_contables WHERE anio = $1 AND mes = $2 LIMIT 1',
-      [anio, mes]
-    );
+    const rs = await client.query('SELECT estado FROM periodos_contables WHERE anio = $1 AND mes = $2 LIMIT 1', [p.anio, p.mes]);
     return rs.rows.length ? rs.rows[0].estado === 'cerrado' : false;
   });
+}
+
+async function assertPeriodOpenForDate(isoDate, operationLabel = 'mutación') {
+  if (!isoDate) return;
+  const p = periodFromDate(isoDate);
+  if (!p) return;
+
+  if (isPostgresMode()) {
+    const closed = await isPeriodClosedInDb(isoDate);
+    if (closed) throw new Error(`No se permite ${operationLabel}: período ${key(p.anio, p.mes)} está cerrado`);
+    return;
+  }
+
+  const state = await readStore();
+  if (isPeriodClosed(state, isoDate)) throw new Error(`No se permite ${operationLabel}: período ${key(p.anio, p.mes)} está cerrado`);
+}
+
+async function buildCloseSnapshotInDb(client, anio, mes) {
+  const mov = await client.query(
+    `SELECT COALESCE(SUM(total),0)::numeric AS total, COALESCE(SUM(neto),0)::numeric AS neto, COALESCE(SUM(iva),0)::numeric AS iva, COUNT(*)::int AS count
+     FROM movimientos
+     WHERE EXTRACT(YEAR FROM fecha) = $1 AND EXTRACT(MONTH FROM fecha) = $2`,
+    [anio, mes]
+  );
+  const ast = await client.query(
+    `SELECT COALESCE(SUM(l.debe),0)::numeric AS debe, COALESCE(SUM(l.haber),0)::numeric AS haber, COUNT(DISTINCT a.id)::int AS entries
+     FROM asientos_contables a
+     LEFT JOIN asiento_lineas l ON l.asiento_id = a.id
+     WHERE EXTRACT(YEAR FROM a.fecha) = $1 AND EXTRACT(MONTH FROM a.fecha) = $2`,
+    [anio, mes]
+  );
+  const tax = await client.query('SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate" FROM tax_config WHERE anio = $1 ORDER BY id DESC LIMIT 1', [anio]);
+  return {
+    period: key(anio, mes),
+    movements: mov.rows[0],
+    journal: ast.rows[0],
+    taxConfig: tax.rows[0] || null,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function buildCloseSnapshotInFile(state, anio, mes) {
+  const movs = (state.movimientos || []).filter(m => {
+    const d = new Date(m.fecha);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === anio && (d.getMonth() + 1) === mes;
+  });
+  const entries = (state.asientos || []).filter(a => {
+    const d = new Date(a.fecha);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === anio && (d.getMonth() + 1) === mes;
+  });
+  const entryIds = new Set(entries.map(e => e.id));
+  const lines = (state.asientoLineas || []).filter(l => entryIds.has(l.asientoId));
+  return {
+    period: key(anio, mes),
+    movements: {
+      total: movs.reduce((s, m) => s + Number(m.total || 0), 0),
+      neto: movs.reduce((s, m) => s + Number(m.neto || 0), 0),
+      iva: movs.reduce((s, m) => s + Number(m.iva || 0), 0),
+      count: movs.length
+    },
+    journal: {
+      debe: lines.reduce((s, l) => s + Number(l.debe || 0), 0),
+      haber: lines.reduce((s, l) => s + Number(l.haber || 0), 0),
+      entries: entries.length
+    },
+    taxConfig: state.taxConfig || null,
+    generatedAt: new Date().toISOString()
+  };
 }
 
 async function closePeriod(req, res) {
@@ -58,6 +131,11 @@ async function closePeriod(req, res) {
 
   if (isPostgresMode()) {
     const period = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS cierre_hash TEXT');
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS cierre_snapshot JSONB');
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS reapertura_aprobada_por TEXT');
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS reapertura_aprobada_en TIMESTAMP');
+
       await client.query(
         `INSERT INTO periodos_contables (anio, mes, estado)
          VALUES ($1, $2, 'abierto')
@@ -65,35 +143,43 @@ async function closePeriod(req, res) {
         [anio, mes]
       );
       const current = await client.query(
-        'SELECT anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura" FROM periodos_contables WHERE anio = $1 AND mes = $2',
+        `SELECT anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura", cierre_hash AS "cierreHash"
+         FROM periodos_contables WHERE anio = $1 AND mes = $2`,
         [anio, mes]
       );
       if (current.rows[0].estado === 'cerrado') return { conflict: true, period: current.rows[0] };
+
+      const snapshot = await buildCloseSnapshotInDb(client, anio, mes);
+      const cierreHash = hashSnapshot(snapshot);
+
       const updated = await client.query(
         `UPDATE periodos_contables
-         SET estado = 'cerrado', cerrado_por = $3, cerrado_en = NOW()
+         SET estado = 'cerrado', cerrado_por = $3, cerrado_en = NOW(), cierre_hash = $4, cierre_snapshot = $5::jsonb
          WHERE anio = $1 AND mes = $2
-         RETURNING anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura"`,
-        [anio, mes, auth.user.email]
+         RETURNING anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura", cierre_hash AS "cierreHash"`,
+        [anio, mes, auth.user.email, cierreHash, JSON.stringify(snapshot)]
       );
-      return { conflict: false, period: updated.rows[0] };
+      return { conflict: false, period: updated.rows[0], snapshot, cierreHash };
     });
 
     if (period.conflict) return sendJson(res, 409, { ok: false, message: 'El período ya está cerrado', period: period.period });
-    await appendAuditLog('period.close', { anio, mes }, auth.user.email);
-    return sendJson(res, 200, { ok: true, period: period.period });
+    await appendAuditLog('period.close', { anio, mes, cierreHash: period.cierreHash }, auth.user.email);
+    return sendJson(res, 200, { ok: true, period: period.period, cierreHash: period.cierreHash });
   }
 
   const state = await readStore();
   const period = ensurePeriodExists(state, anio, mes);
   if (period.estado === 'cerrado') return sendJson(res, 409, { ok: false, message: 'El período ya está cerrado', period });
 
+  const snapshot = buildCloseSnapshotInFile(state, anio, mes);
   period.estado = 'cerrado';
   period.cerradoPor = auth.user.email;
   period.cerradoEn = new Date().toISOString();
+  period.cierreSnapshot = snapshot;
+  period.cierreHash = hashSnapshot(snapshot);
   await writeStore(state);
-  await appendAudit('period.close', { anio, mes }, auth.user.email);
-  return sendJson(res, 200, { ok: true, period });
+  await appendAudit('period.close', { anio, mes, cierreHash: period.cierreHash }, auth.user.email);
+  return sendJson(res, 200, { ok: true, period, cierreHash: period.cierreHash });
 }
 
 async function reopenPeriod(req, res) {
@@ -103,38 +189,47 @@ async function reopenPeriod(req, res) {
   const body = await parseBody(req);
   const anio = Number(body.anio);
   const mes = Number(body.mes);
-  const motivo = body.motivo || 'sin motivo';
+  const motivo = String(body.motivo || '').trim();
+  const aprobadoPor = String(body.aprobadoPor || '').trim().toLowerCase();
   assertAnioMes(anio, mes);
+
+  if (!motivo || motivo.length < 10) return sendJson(res, 400, { ok: false, message: 'motivo de reapertura es requerido (mín 10 chars)' });
+  if (!aprobadoPor) return sendJson(res, 400, { ok: false, message: 'aprobadoPor es requerido (workflow de aprobación)' });
 
   if (isPostgresMode()) {
     const period = await withPgClient(async (client) => {
+      const approver = await client.query('SELECT email, rol FROM usuarios WHERE LOWER(email)=LOWER($1) LIMIT 1', [aprobadoPor]);
+      if (!approver.rows.length || approver.rows[0].rol !== 'dueno') return { error: 'aprobadoPor debe ser usuario con rol dueno' };
+
       await client.query(
         `INSERT INTO periodos_contables (anio, mes, estado)
          VALUES ($1, $2, 'abierto')
          ON CONFLICT (anio, mes) DO NOTHING`,
         [anio, mes]
       );
-      const current = await client.query(
-        'SELECT estado FROM periodos_contables WHERE anio = $1 AND mes = $2',
-        [anio, mes]
-      );
-      if (!current.rows.length || current.rows[0].estado !== 'cerrado') return null;
+      const current = await client.query('SELECT estado FROM periodos_contables WHERE anio = $1 AND mes = $2', [anio, mes]);
+      if (!current.rows.length || current.rows[0].estado !== 'cerrado') return { error: 'Solo se puede reabrir un período cerrado' };
+
       const updated = await client.query(
         `UPDATE periodos_contables
-         SET estado = 'reabierto', reabierto_por = $3, reabierto_en = NOW(), motivo_reapertura = $4
+         SET estado = 'reabierto', reabierto_por = $3, reabierto_en = NOW(), motivo_reapertura = $4,
+             reapertura_aprobada_por = $5, reapertura_aprobada_en = NOW()
          WHERE anio = $1 AND mes = $2
-         RETURNING anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura"`,
-        [anio, mes, auth.user.email, motivo]
+         RETURNING anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura", reapertura_aprobada_por AS "reaperturaAprobadaPor", cierre_hash AS "cierreHash"`,
+        [anio, mes, auth.user.email, motivo, aprobadoPor]
       );
-      return updated.rows[0];
+      return { period: updated.rows[0] };
     });
 
-    if (!period) return sendJson(res, 409, { ok: false, message: 'Solo se puede reabrir un período cerrado' });
-    await appendAuditLog('period.reopen', { anio, mes, motivo }, auth.user.email);
-    return sendJson(res, 200, { ok: true, period });
+    if (period.error) return sendJson(res, 409, { ok: false, message: period.error });
+    await appendAuditLog('period.reopen', { anio, mes, motivo, aprobadoPor }, auth.user.email);
+    return sendJson(res, 200, { ok: true, period: period.period });
   }
 
   const state = await readStore();
+  const approver = (state.usuarios || []).find(u => String(u.email || '').toLowerCase() === aprobadoPor && u.rol === 'dueno');
+  if (!approver) return sendJson(res, 409, { ok: false, message: 'aprobadoPor debe ser usuario con rol dueno' });
+
   const period = ensurePeriodExists(state, anio, mes);
   if (period.estado !== 'cerrado') return sendJson(res, 409, { ok: false, message: 'Solo se puede reabrir un período cerrado', period });
 
@@ -142,8 +237,10 @@ async function reopenPeriod(req, res) {
   period.reabiertoPor = auth.user.email;
   period.reabiertoEn = new Date().toISOString();
   period.motivoReapertura = motivo;
+  period.reaperturaAprobadaPor = aprobadoPor;
+  period.reaperturaAprobadaEn = new Date().toISOString();
   await writeStore(state);
-  await appendAudit('period.reopen', { anio, mes, motivo }, auth.user.email);
+  await appendAudit('period.reopen', { anio, mes, motivo, aprobadoPor }, auth.user.email);
   return sendJson(res, 200, { ok: true, period });
 }
 
@@ -153,8 +250,10 @@ async function listPeriods(req, res) {
 
   if (isPostgresMode()) {
     const periods = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS cierre_hash TEXT');
+      await client.query('ALTER TABLE periodos_contables ADD COLUMN IF NOT EXISTS reapertura_aprobada_por TEXT');
       const rs = await client.query(
-        `SELECT anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura"
+        `SELECT anio, mes, estado, cerrado_por AS "cerradoPor", cerrado_en AS "cerradoEn", reabierto_por AS "reabiertoPor", reabierto_en AS "reabiertoEn", motivo_reapertura AS "motivoReapertura", cierre_hash AS "cierreHash", reapertura_aprobada_por AS "reaperturaAprobadaPor"
          FROM periodos_contables
          ORDER BY anio DESC, mes DESC`
       );
@@ -167,4 +266,4 @@ async function listPeriods(req, res) {
   return sendJson(res, 200, { ok: true, periods: state.periodos });
 }
 
-module.exports = { closePeriod, reopenPeriod, listPeriods, isPeriodClosed, isPeriodClosedInDb };
+module.exports = { closePeriod, reopenPeriod, listPeriods, isPeriodClosed, isPeriodClosedInDb, assertPeriodOpenForDate };

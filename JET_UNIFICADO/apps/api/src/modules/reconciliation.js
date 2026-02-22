@@ -2,6 +2,7 @@ const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
+const { assertPeriodOpenForDate } = require('./accountingClose');
 
 function toMonthKey(dateLike) {
   const d = new Date(dateLike);
@@ -30,6 +31,8 @@ async function importCartola(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
   const body = await parseBody(req);
   const rows = parseImportRows(body).map((r, i) => ({ id: r.id || `CART-${Date.now()}-${i}`, fecha: r.fecha, tipoMovimiento: r.tipoMovimiento || 'INGRESO', monto: Number(r.monto || 0), descripcion: r.descripcion || '' }));
+
+  for (const r of rows) await assertPeriodOpenForDate(r.fecha, 'importación cartola');
 
   if (isPostgresMode()) {
     const imported = await withPgClient(async (client) => {
@@ -64,6 +67,8 @@ async function importRCVVentas(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
   const body = await parseBody(req);
   const rows = parseImportRows(body).map((r, i) => ({ id: r.id || `RCV-${Date.now()}-${i}`, fecha: r.fecha, neto: Number(r.neto || 0), iva: Number(r.iva || 0), total: Number(r.total || 0), folio: r.folio || null }));
+
+  for (const r of rows) await assertPeriodOpenForDate(r.fecha, 'importación RCV ventas');
 
   if (isPostgresMode()) {
     const imported = await withPgClient(async (client) => {
@@ -101,6 +106,8 @@ async function importMarketplaceOrders(req, res) {
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
   const body = await parseBody(req);
   const rows = parseImportRows(body).map((r, i) => ({ id: r.id || `MKT-${Date.now()}-${i}`, fecha: r.fecha, total: Number(r.total || 0), comision: Number(r.comision || 0), netoLiquidado: Number(r.netoLiquidado || (Number(r.total || 0) - Number(r.comision || 0))) }));
+
+  for (const r of rows) await assertPeriodOpenForDate(r.fecha, 'importación marketplace');
 
   if (isPostgresMode()) {
     const imported = await withPgClient(async (client) => {

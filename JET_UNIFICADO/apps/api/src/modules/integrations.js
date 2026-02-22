@@ -2,6 +2,7 @@ const { parseBody, sendJson } = require('../lib/http');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
+const { assertPeriodOpenForDate } = require('./accountingClose');
 
 function ensureIntegrationStructures(state) {
   if (!state.integrationConfigs || typeof state.integrationConfigs !== 'object') {
@@ -112,6 +113,8 @@ async function importAlibabaCatalog(req, res) {
   const body = await parseBody(req);
   const rows = Array.isArray(body.rows) ? body.rows : [];
   if (!rows.length) return sendJson(res, 400, { ok: false, message: 'rows es requerido (array no vacío)' });
+
+  for (const r of rows) await assertPeriodOpenForDate(r.fecha, 'importación Mercado Libre');
 
   if (isPostgresMode()) {
     const result = { created: 0, updated: 0 };
@@ -230,6 +233,8 @@ async function importSii(req, res) {
   const rows = Array.isArray(body.rows) ? body.rows : [];
   const kind = body.kind === 'compras' ? 'compras' : 'ventas';
   if (!rows.length) return sendJson(res, 400, { ok: false, message: 'rows es requerido (array no vacío)' });
+
+  for (const r of rows) await assertPeriodOpenForDate(r.fecha, 'importación SII RCV');
 
   if (isPostgresMode()) {
     let imported = 0; let skipped = 0;

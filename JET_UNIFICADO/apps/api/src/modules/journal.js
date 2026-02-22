@@ -2,6 +2,7 @@ const { parseBody, sendJson } = require('../lib/http');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
 const { readStore, writeStore, appendAudit } = require('../lib/store');
+const { assertPeriodOpenForDate } = require('./accountingClose');
 
 const DEFAULT_ACCOUNTS = {
   caja: { codigo: '1101', nombre: 'Caja y Bancos', tipo: 'activo' },
@@ -60,6 +61,8 @@ async function createEntryInternal({ fecha, glosa, origen, lines, userEmail, ini
     const balance = validateBalanced(normalized);
     if (!balance.ok) throw new Error(balance.message);
   }
+
+  await assertPeriodOpenForDate(fecha, 'publicación/creación de asiento');
 
   if (isPostgresMode()) {
     return withPgClient(async (client) => {
@@ -286,6 +289,7 @@ async function reverseEntry(req, res) {
       const e = await client.query('SELECT id, fecha, glosa, origen, estado FROM asientos_contables WHERE id = $1', [Number(entryId)]);
       if (!e.rows.length) return { status: 404, payload: { ok: false, message: 'Asiento no encontrado' } };
       if (e.rows[0].estado !== 'publicado') return { status: 409, payload: { ok: false, message: 'Solo se revierte un asiento publicado' } };
+      await assertPeriodOpenForDate(e.rows[0].fecha, 'reversa de asiento');
       const linesRs = await client.query('SELECT cuenta_id AS "cuentaId", debe, haber, descripcion FROM asiento_lineas WHERE asiento_id = $1', [Number(entryId)]);
       const reverseLines = linesRs.rows.map(l => ({ cuentaId: l.cuentaId, debe: Number(l.haber || 0), haber: Number(l.debe || 0), descripcion: `Reverso: ${l.descripcion || ''}` }));
       const created = await createEntryInternal({ fecha: new Date().toISOString().slice(0, 10), glosa: `Reverso asiento ${entryId}: ${motivo}`, origen: `reverso:${entryId}`, lines: reverseLines, userEmail: auth.user.email, initialStatus: 'publicado' });
@@ -300,6 +304,7 @@ async function reverseEntry(req, res) {
   const entry = state.asientos.find(a => a.id === entryId);
   if (!entry) return sendJson(res, 404, { ok: false, message: 'Asiento no encontrado' });
   if (entry.estado !== 'publicado') return sendJson(res, 409, { ok: false, message: 'Solo se revierte un asiento publicado' });
+  await assertPeriodOpenForDate(entry.fecha, 'reversa de asiento');
   const lines = state.asientoLineas.filter(l => l.asientoId === entryId);
   const reverseLines = lines.map(l => ({ cuentaId: l.cuentaId, debe: Number(l.haber || 0), haber: Number(l.debe || 0), descripcion: `Reverso: ${l.descripcion || ''}` }));
   const created = await createEntryInternal({ fecha: new Date().toISOString().slice(0, 10), glosa: `Reverso asiento ${entryId}: ${motivo}`, origen: `reverso:${entryId}`, lines: reverseLines, userEmail: auth.user.email, initialStatus: 'publicado' });
