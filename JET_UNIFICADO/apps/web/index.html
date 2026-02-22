@@ -38,6 +38,11 @@
             color: #60a5fa;
             border-right: 3px solid #60a5fa;
         }
+
+        .sidebar-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: #334155 #020617; }
+        .sidebar-scroll::-webkit-scrollbar { width: 10px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: #020617; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; border: 2px solid #020617; }
         .card {
             background-color: var(--bg-card);
             border-radius: 20px;
@@ -83,7 +88,7 @@
             </h1>
             <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2">ERP Chile v3.0</p>
         </div>
-        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav class="flex-1 p-4 space-y-1 sidebar-scroll">
             <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operativa</div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
                 <i data-lucide="layout-grid" class="w-4 h-4"></i> Dashboard
@@ -188,6 +193,7 @@
         <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-20 shadow-sm transition-colors">
             <div class="flex items-center gap-4">
                 <span id="tab-title" class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.25em]">Dashboard</span>
+                <button onclick="openTabHelp()" id="btn-tab-help" class="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-black" title="Ayuda del módulo">?</button>
             </div>
             <div class="flex items-center gap-8">
                     <div class="hidden lg:flex flex-col items-end text-right">
@@ -1274,6 +1280,17 @@
     </div>
 </div>
 
+
+<div id="modal-tab-help" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="help-title" class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-wider">Ayuda</h3>
+            <button onclick="closeModal('modal-tab-help')" class="text-slate-500 hover:text-red-500 text-xl font-black">×</button>
+        </div>
+        <div id="help-content" class="text-sm text-slate-700 dark:text-slate-200 space-y-2 max-h-[60vh] overflow-y-auto"></div>
+    </div>
+</div>
+
     
 
     <!-- Scripts -->
@@ -1563,8 +1580,39 @@
             safeCreateIcons(); if (performanceChart) renderAnnualSummary();
         }
 
+
+        let currentTab = 'dashboard';
+        const TAB_HELP = {
+            dashboard: { title: 'Dashboard', text: 'Resumen general de caja, ventas y alertas. Úsalo para revisar estado diario.' },
+            tesoreria: { title: 'Caja & Bancos', text: 'Registra capital inicial y transferencias. Verifica saldos y flujo antes de cerrar el día.' },
+            movimientos: { title: 'Libro Diario', text: 'Registra ventas, importaciones y gastos. Completa fecha, documento y montos coherentes.' },
+            inventario: { title: 'Bodega / Stock', text: 'Administra productos y stock. Revisa costo promedio y quiebres de inventario.' },
+            terceros: { title: 'Directorio RUTs', text: 'Mantén clientes/proveedores con RUT correcto para documentos tributarios.' },
+            proyecciones: { title: 'Proyecciones', text: 'Usa escenarios para estimar flujo futuro y necesidades de caja.' },
+            f29: { title: 'F29 Mensual', text: 'Revisa débito/crédito IVA y prepara propuesta antes del envío oficial.' },
+            ddjj: { title: 'DDJJ Juradas', text: 'Controla declaraciones juradas y evidencia por período.' },
+            f22: { title: 'Renta F22', text: 'Visualiza base anual y consistencias previas a operación renta.' },
+            kpi: { title: 'Indicadores', text: 'Monitorea margen, rotación y salud del negocio.' },
+            auditoria: { title: 'Auditoría', text: 'Consulta bitácora y trazabilidad de cambios críticos.' },
+            contabilidad: { title: 'Contabilidad', text: 'Gestiona asientos, publicación y reversas con validación.' },
+            reporteria: { title: 'Reportería', text: 'Genera reportes auditables y exportaciones CSV/XLSX/PDF con hash.' },
+            observabilidad: { title: 'Observabilidad', text: 'Monitorea errores, latencia y alertas operativas del backend.' },
+            cumplimiento: { title: 'Cumplimiento', text: 'Gestiona calendario legal, semáforo y evidencias para evitar multas.' },
+            gobernanza: { title: 'Gobernanza', text: 'Configura plan de cuentas, reglas y aprobaciones duales.' },
+            ejecutivo: { title: 'Ejecutivo EIRL', text: 'Revisa riesgo esperado, paquete fiscalizador y panel ejecutivo.' },
+            normativa: { title: 'Normativa', text: 'Registra cambios regulatorios y ejecuta regresión normativa anual.' }
+        };
+
+        function openTabHelp() {
+            const info = TAB_HELP[currentTab] || { title: currentTab.toUpperCase(), text: 'Sin guía registrada para este módulo.' };
+            safeSetText('help-title', `Ayuda · ${info.title}`);
+            safeSetHTML('help-content', `<p>${info.text}</p><p class="text-xs text-slate-500 mt-3">Tip: completa primero configuración de año, régimen y PPM en el panel izquierdo para mantener consistencia entre módulos.</p>`);
+            openModal('modal-tab-help');
+        }
+
         // Tab switcher
         function switchTab(t) {
+            currentTab = t;
             // Ocultar todos los contenidos
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             // Mostrar el contenido solicitado

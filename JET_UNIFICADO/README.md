@@ -266,3 +266,8 @@ Se agregó un informe técnico de capacidad real del software para tus objetivos
 ## Plan de metas para reemplazo operativo del contador
 Se agregó roadmap de cierre de brechas (Meta 17-22):
 - `docs/PLAN_METAS_REEMPLAZO_CONTADOR_EIRL.md`
+
+## Base demo multianual para pruebas
+Puedes cargar una base ficticia 2024-2026 con:
+- `node JET_UNIFICADO/scripts/seed_demo_multiyear.js`
+- Detalle: `docs/BASE_DEMO_MULTIANIO.md`
