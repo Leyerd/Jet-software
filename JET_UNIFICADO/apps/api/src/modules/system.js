@@ -21,6 +21,7 @@ async function coherenceCheck(_req, res) {
     'src/modules/integrations.js',
     'src/modules/backup.js',
     'src/modules/journal.js',
+    'src/modules/reports.js',
     'src/lib/http.js',
     'src/lib/store.js',
     'src/lib/postgresRepo.js',

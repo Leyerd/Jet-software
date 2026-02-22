@@ -36,6 +36,7 @@ const {
   validateRestore
 } = require('./modules/backup');
 const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
+const { getReports, exportReport } = require('./modules/reports');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -64,7 +65,8 @@ const modulesList = [
   'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation',
   'encrypted-backups-dr-validation-rpo-rto',
   'secure-connectors-scheduler-retry-deadletter-status',
-  'frontend-backend-first-api-client-unified'
+  'frontend-backend-first-api-client-unified',
+  'auditable-exportable-reporting-reproducible-hash'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -157,6 +159,9 @@ function route(req, res) {
   }
   if (path === '/accounting/entries/publish') return req.method === 'POST' ? handle(publishEntry(req, res), res) : methodNotAllowed(res);
   if (path === '/accounting/entries/reverse') return req.method === 'POST' ? handle(reverseEntry(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
+  if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);
 
   if (path === '/products') {
     if (req.method === 'GET') return handle(listProducts(req, res), res);
