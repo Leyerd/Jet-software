@@ -1,6 +1,6 @@
 const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
-const { register, login, me, logout } = require('./modules/auth');
+const { register, login, me, logout, revokeSession, mfaSetup, mfaEnable, mfaDisable } = require('./modules/auth');
 const { importJson, getSummary } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
@@ -57,7 +57,8 @@ const modulesList = [
   'journal-double-entry-publish-validation',
   'journal-auto-posting-reverse',
   'tax-engine-versioned-f29-f22-rli-traceability',
-  'reconciliation-immutable-incremental-batches-status'
+  'reconciliation-immutable-incremental-batches-status',
+  'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -120,6 +121,11 @@ function route(req, res) {
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/me') return req.method === 'GET' ? handle(me(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/logout') return req.method === 'POST' ? handle(logout(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/auth/revoke-session') return req.method === 'POST' ? handle(revokeSession(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/setup') return req.method === 'POST' ? handle(mfaSetup(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/enable') return req.method === 'POST' ? handle(mfaEnable(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/disable') return req.method === 'POST' ? handle(mfaDisable(req, res), res) : methodNotAllowed(res);
 
   if (path === '/migration/import-json') return req.method === 'POST' ? handle(importJson(req, res), res, 500) : methodNotAllowed(res);
   if (path === '/migration/summary') return req.method === 'GET' ? handle(getSummary(req, res), res) : methodNotAllowed(res);
