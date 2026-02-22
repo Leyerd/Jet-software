@@ -3,6 +3,7 @@ const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { isPeriodClosed, isPeriodClosedInDb } = require('./accountingClose');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
+const { createAutoEntryForMovement } = require('./journal');
 
 async function createMovement(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador']);
@@ -12,6 +13,10 @@ async function createMovement(req, res) {
   const fecha = body.fecha;
   const tipo = body.tipo;
   const total = Number(body.total || 0);
+  const neto = Number(body.neto || 0);
+  const iva = Number(body.iva || 0);
+  const retention = Number(body.retention || 0);
+  const comision = Number(body.comision || 0);
   const desc = body.descripcion || '';
 
   if (!fecha || !tipo) return sendJson(res, 400, { ok: false, message: 'fecha y tipo son requeridos' });
@@ -23,27 +28,29 @@ async function createMovement(req, res) {
 
     const movement = await withPgClient(async (client) => {
       const rs = await client.query(
-        `INSERT INTO movimientos (fecha, tipo, descripcion, total, creado_en)
-         VALUES ($1::date, $2, $3, $4, NOW())
-         RETURNING id, fecha, tipo, descripcion, total`,
-        [fecha, tipo, desc, total]
+        `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, creado_en)
+         VALUES ($1::date, $2, $3, $4, $5, $6, NOW())
+         RETURNING id, fecha, tipo, descripcion, total, neto, iva`,
+        [fecha, tipo, desc, total, neto, iva]
       );
-      return rs.rows[0];
+      return { ...rs.rows[0], retention, comision };
     });
 
     await appendAuditLog('movement.create', movement, auth.user.email);
-    return sendJson(res, 201, { ok: true, movement });
+    const autoJournal = await createAutoEntryForMovement(movement, auth.user.email);
+    return sendJson(res, 201, { ok: true, movement, autoJournal });
   }
 
   const state = await readStore();
   if (isPeriodClosed(state, fecha)) return sendJson(res, 409, { ok: false, message: 'No se puede registrar: período contable cerrado' });
 
-  const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total };
+  const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total, neto, iva, retention, comision };
   state.movimientos.push(movement);
   await writeStore(state);
   await appendAudit('movement.create', movement, auth.user.email);
+  const autoJournal = await createAutoEntryForMovement(movement, auth.user.email);
 
-  return sendJson(res, 201, { ok: true, movement });
+  return sendJson(res, 201, { ok: true, movement, autoJournal });
 }
 
 async function listMovements(req, res) {
