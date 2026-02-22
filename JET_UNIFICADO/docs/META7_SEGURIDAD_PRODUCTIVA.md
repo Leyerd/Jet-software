@@ -6,8 +6,8 @@ Implementada en autenticación con controles de credenciales, sesiones, lockout/
 ## Entregables cubiertos
 
 - **Hash de credenciales robusto**
-  - Hashing de password con `scrypt` + salt aleatorio + comparación timing-safe.
-  - Eliminado uso de `sha256` para password auth runtime.
+  - Hashing de password con **bcrypt** en PostgreSQL (`pgcrypto` + `crypt/gen_salt('bf')`) y comparación segura en verificación de credenciales.
+  - Eliminado uso de `sha256` para password auth runtime en producción.
 
 - **Bloqueo progresivo + rate limiting**
   - Rate limiting por IP/usuario sobre intentos de login por minuto.

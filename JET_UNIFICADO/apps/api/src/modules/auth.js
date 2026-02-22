@@ -7,6 +7,7 @@ const SCRYPT_N = Number(process.env.SCRYPT_N || 16384);
 const SCRYPT_R = Number(process.env.SCRYPT_R || 8);
 const SCRYPT_P = Number(process.env.SCRYPT_P || 1);
 const KEY_LEN = 64;
+const BCRYPT_COST = Number(process.env.BCRYPT_COST || 12);
 const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS || 12);
 const MFA_ISSUER = process.env.MFA_ISSUER || 'JET';
 
@@ -103,6 +104,7 @@ function getClientIp(req) {
 }
 
 async function ensurePgAuthSecurityTables(client) {
+  await client.query('CREATE EXTENSION IF NOT EXISTS pgcrypto');
   await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE');
   await client.query('ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS mfa_secret TEXT');
   await client.query('ALTER TABLE sesiones ADD COLUMN IF NOT EXISTS revocada BOOLEAN DEFAULT FALSE');
@@ -304,16 +306,15 @@ async function register(req, res) {
   if (!validRoles.includes(rol)) return sendJson(res, 400, { ok: false, message: 'rol inválido' });
 
   if (isPostgresMode()) {
-    const passwordHash = hashPassword(password);
     const user = await withPgClient(async (client) => {
       await ensurePgAuthSecurityTables(client);
       const existing = await client.query('SELECT id FROM usuarios WHERE email = $1 LIMIT 1', [email]);
       if (existing.rows.length) return null;
       const created = await client.query(
         `INSERT INTO usuarios (email, nombre, rol, password_hash, creado_en, mfa_enabled)
-         VALUES ($1, $2, $3, $4, NOW(), FALSE)
+         VALUES ($1, $2, $3, crypt($4, gen_salt('bf', $5)), NOW(), FALSE)
          RETURNING id, nombre, email, rol`,
-        [email, nombre, rol, passwordHash]
+        [email, nombre, rol, password, BCRYPT_COST]
       );
       return created.rows[0];
     });
@@ -369,8 +370,12 @@ async function login(req, res) {
       }
 
       const userRs = await client.query(
-        'SELECT id, nombre, email, rol, password_hash, mfa_enabled, mfa_secret FROM usuarios WHERE email = $1 LIMIT 1',
-        [email]
+        `SELECT id, nombre, email, rol, password_hash, mfa_enabled, mfa_secret,
+                (password_hash = crypt($2, password_hash)) AS password_ok
+         FROM usuarios
+         WHERE email = $1
+         LIMIT 1`,
+        [email, password]
       );
       if (!userRs.rows.length) {
         await writeLockoutFailureInDb(client, 'email', email);
@@ -380,7 +385,7 @@ async function login(req, res) {
       }
 
       const user = userRs.rows[0];
-      if (!verifyPassword(password, user.password_hash || '')) {
+      if (!user.password_ok) {
         await writeLockoutFailureInDb(client, 'email', email);
         await writeLockoutFailureInDb(client, 'ip', ip);
         await client.query('INSERT INTO auth_login_events (email, ip, success, reason, created_at) VALUES ($1, $2, FALSE, $3, NOW())', [email, ip, 'invalid-password']);

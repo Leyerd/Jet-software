@@ -30,7 +30,8 @@ const {
   updateBackupPolicy,
   createBackup,
   listBackups,
-  restoreBackup
+  restoreBackup,
+  validateRestore
 } = require('./modules/backup');
 const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
 
@@ -58,7 +59,8 @@ const modulesList = [
   'journal-auto-posting-reverse',
   'tax-engine-versioned-f29-f22-rli-traceability',
   'reconciliation-immutable-incremental-batches-status',
-  'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation'
+  'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation',
+  'encrypted-backups-dr-validation-rpo-rto'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -116,6 +118,7 @@ function route(req, res) {
   if (path === '/backup/create') return req.method === 'POST' ? handle(createBackup(req, res), res) : methodNotAllowed(res);
   if (path === '/backup/list' && req.method === 'GET') return handle(listBackups(req, res), res);
   if (path === '/backup/restore') return req.method === 'POST' ? handle(restoreBackup(req, res), res) : methodNotAllowed(res);
+  if (path === '/backup/validate-restore') return req.method === 'POST' ? handle(validateRestore(req, res), res) : methodNotAllowed(res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);
