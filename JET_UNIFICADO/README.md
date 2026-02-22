@@ -39,9 +39,9 @@ Si quieres una explicación paso a paso, abre: `docs/GUIA_INSTALACION_PARA_PRINC
 Si quieres abrir el sistema como un programa (sin terminal manual):
 
 1. Doble clic en `desktop/JET_Lanzar.cmd`.
-2. El launcher instala dependencias automáticamente (y Node.js vía winget si falta).
-3. Levanta API + Web y abre el navegador en `http://localhost:3000`.
-4. Crea acceso directo `JET UNIFICADO` en el escritorio.
+2. El launcher intenta primero levantar **Docker Compose** automáticamente (`docker compose up -d --build`).
+3. Verifica Web/API y abre el navegador en `http://localhost:3000`.
+4. Si Docker no está disponible, usa fallback local con Node.js.
 
 Detalle técnico: `docs/INSTALACION_UN_CLICK_WINDOWS.md`.
 
