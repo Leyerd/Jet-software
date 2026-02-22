@@ -5,7 +5,7 @@ const { importJson, getSummary } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
-const { coherenceCheck } = require('./modules/system');
+const { coherenceCheck, getFrontendState } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
@@ -63,7 +63,8 @@ const modulesList = [
   'reconciliation-immutable-incremental-batches-status',
   'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation',
   'encrypted-backups-dr-validation-rpo-rto',
-  'secure-connectors-scheduler-retry-deadletter-status'
+  'secure-connectors-scheduler-retry-deadletter-status',
+  'frontend-backend-first-api-client-unified'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -83,6 +84,7 @@ function route(req, res) {
   }
 
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
+  if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);

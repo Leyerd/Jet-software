@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const { sendJson } = require('../lib/http');
+const { readStore } = require('../lib/store');
+const { isPostgresMode, withPgClient } = require('../lib/postgresRepo');
+const { ensureTaxConfig, getCatalog } = require('./tax');
 
 async function coherenceCheck(_req, res) {
   const requiredFiles = [
@@ -40,4 +43,52 @@ async function coherenceCheck(_req, res) {
   });
 }
 
-module.exports = { coherenceCheck };
+async function getFrontendState(_req, res) {
+  if (isPostgresMode()) {
+    const state = await withPgClient(async (client) => {
+      const [productsRs, movementsRs, taxRs] = await Promise.all([
+        client.query('SELECT id, sku, nombre, categoria, costo_promedio AS "costoPromedio", stock FROM productos ORDER BY id ASC LIMIT 5000'),
+        client.query('SELECT id, fecha, tipo, descripcion, total, neto, iva FROM movimientos ORDER BY fecha ASC, id ASC LIMIT 10000'),
+        client.query('SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate" FROM tax_config ORDER BY id DESC LIMIT 1')
+      ]);
+      const taxConfig = taxRs.rows[0] || { year: new Date().getFullYear(), regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
+      const catalog = getCatalog(taxConfig.year, taxConfig.regime);
+      return {
+        backendFirst: true,
+        products: productsRs.rows,
+        movements: movementsRs.rows,
+        taxConfig,
+        defaults: {
+          regime: '14D8',
+          year: taxConfig.year,
+          ppmRate: taxConfig.ppmRate,
+          retentionRate: taxConfig.retentionRate
+        },
+        taxCatalog: { version: catalog.version, source: catalog.source }
+      };
+    });
+    return sendJson(res, 200, { ok: true, state });
+  }
+
+  const store = await readStore();
+  const taxConfig = ensureTaxConfig(store);
+  const catalog = getCatalog(taxConfig.year, taxConfig.regime);
+  return sendJson(res, 200, {
+    ok: true,
+    state: {
+      backendFirst: true,
+      products: store.productos || [],
+      movements: store.movimientos || [],
+      taxConfig,
+      defaults: {
+        regime: '14D8',
+        year: taxConfig.year,
+        ppmRate: taxConfig.ppmRate,
+        retentionRate: taxConfig.retentionRate
+      },
+      taxCatalog: { version: catalog.version, source: catalog.source }
+    }
+  });
+}
+
+module.exports = { coherenceCheck, getFrontendState };

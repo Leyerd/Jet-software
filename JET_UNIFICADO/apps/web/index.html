@@ -1106,12 +1106,48 @@
 
         let performanceChart = null;
 
+
+        const apiClient = {
+            async request(path, options = {}) {
+                const response = await fetch(path, {
+                    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+                    ...options
+                });
+                let payload = null;
+                try { payload = await response.json(); } catch (e) { payload = null; }
+                if (!response.ok || (payload && payload.ok === false)) {
+                    const msg = (payload && (payload.message || payload.error)) || `HTTP ${response.status}`;
+                    throw new Error(msg);
+                }
+                return payload;
+            },
+            get(path) { return this.request(path, { method: 'GET' }); },
+            post(path, body) { return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); }
+        };
+
+        async function bootstrapFromBackend() {
+            try {
+                const data = await apiClient.get('/system/frontend-state');
+                const state = data && data.state ? data.state : null;
+                if (!state) return;
+                db.productos = Array.isArray(state.products) ? state.products : db.productos;
+                db.movimientos = Array.isArray(state.movements) ? state.movimientos : db.movimientos;
+                if (!db.config) db.config = {};
+                db.config.regimen = (state.defaults && state.defaults.regime) || '14D8';
+                db.config.year = (state.defaults && state.defaults.year) || db.config.year;
+                if (state.defaults && state.defaults.ppmRate !== undefined) db.config.ppmRate = state.defaults.ppmRate;
+                if (state.defaults && state.defaults.retentionRate !== undefined) db.config.retRate = state.defaults.retentionRate;
+            } catch (err) {
+                console.warn('No se pudo cargar estado backend inicial, continuando en modo local de UX.', err.message);
+            }
+        }
+
         // Safe helpers
         function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
         function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
         function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             // En modo backend-first, no se usa localStorage como fuente principal de datos.
             // Initialize or migrate previous versions if any
             if (!db.cuentas || db.cuentas.length === 0) {
@@ -1137,6 +1173,7 @@
             // Asegurar que existan los registros de RCV, incluso si no fueron guardados previamente
             if (!db.rcvCompras) db.rcvCompras = [];
             if (!db.rcvVentas) db.rcvVentas = [];
+            await bootstrapFromBackend();
             safeSetText('current-date', new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             const yearInp = document.getElementById('config-year'); if (yearInp) yearInp.value = db.config.year;
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
@@ -2174,16 +2211,7 @@ calculateReports(yearMovs);
         // Sincronización Mercado Libre backend-first (sin token/manual prompt en UI)
         async function syncMercadoLibre() {
             try {
-                const response = await fetch('/integrations/sync/run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ provider: 'mercadolibre', maxAttempts: 3 })
-                });
-
-                const payload = await response.json().catch(() => ({}));
-                if (!response.ok || payload.ok === false) {
-                    throw new Error(payload.error || payload.message || 'No se pudo ejecutar sync de Mercado Libre');
-                }
+                const payload = await apiClient.post('/integrations/sync/run', { provider: 'mercadolibre', maxAttempts: 3 });
                 alert('Sincronización de Mercado Libre enviada al backend. Revisa Integraciones/Conciliación para el resultado.');
             } catch (err) {
                 console.error(err);
