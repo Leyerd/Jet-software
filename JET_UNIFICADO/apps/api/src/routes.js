@@ -38,6 +38,7 @@ const {
 const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
 const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
+const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -68,7 +69,8 @@ const modulesList = [
   'secure-connectors-scheduler-retry-deadletter-status',
   'frontend-backend-first-api-client-unified',
   'auditable-exportable-reporting-reproducible-hash',
-  'observability-logs-metrics-alerts-dashboard'
+  'observability-logs-metrics-alerts-dashboard',
+  'compliance-calendar-semaphore-evidence-escalation'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -80,7 +82,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '12', version: 'v1.12-sprint12' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '13', version: 'v1.13-sprint13' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -163,6 +165,11 @@ function route(req, res) {
   if (path === '/accounting/entries/reverse') return req.method === 'POST' ? handle(reverseEntry(req, res), res) : methodNotAllowed(res);
 
   if (path === '/observability/dashboard' && req.method === 'GET') return handle(getDashboard(req, res), res);
+
+  if (path === '/compliance/calendar' && req.method === 'GET') return handle(getCalendar(req, res), res);
+  if (path === '/compliance/semaphore' && req.method === 'GET') return handle(getSemaphore(req, res), res);
+  if (path === '/compliance/evidence') return req.method === 'POST' ? handle(registerEvidence(req, res), res) : methodNotAllowed(res);
+  if (path === '/compliance/config') return req.method === 'POST' ? handle(updateComplianceConfig(req, res), res) : methodNotAllowed(res);
 
   if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
   if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);

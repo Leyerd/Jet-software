@@ -35,6 +35,13 @@ const defaultState = {
     sii: { enabled: false, lastSyncAt: null }
   },
   integrationSyncLog: [],
+  complianceObligations: [],
+  complianceEvidence: [],
+  complianceConfig: {
+    taxpayerType: 'EIRL',
+    alerts: { emailEnabled: false, webhookEnabled: false, emailTo: '', webhookUrl: '' },
+    escalationDaysBefore: [7, 3, 1]
+  },
   backups: [],
   backupPolicy: {
     retentionMaxFiles: 20,
@@ -65,6 +72,9 @@ const POSTGRES_FRAGMENT_KEYS = [
   'rcvCompras',
   'integrationConfigs',
   'integrationSyncLog',
+  'complianceObligations',
+  'complianceEvidence',
+  'complianceConfig',
   'backups',
   'backupPolicy'
 ];
@@ -72,7 +82,7 @@ const POSTGRES_FRAGMENT_KEYS = [
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'backups'
+    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'backups'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -88,6 +98,14 @@ function ensureArrays(state) {
       alibaba: { enabled: false, lastSyncAt: null },
       mercadolibre: { enabled: false, lastSyncAt: null },
       sii: { enabled: false, lastSyncAt: null }
+    };
+  }
+
+  if (!state.complianceConfig || typeof state.complianceConfig !== 'object') {
+    state.complianceConfig = {
+      taxpayerType: 'EIRL',
+      alerts: { emailEnabled: false, webhookEnabled: false, emailTo: '', webhookUrl: '' },
+      escalationDaysBefore: [7, 3, 1]
     };
   }
 

@@ -131,6 +131,9 @@
             <button onclick="switchTab('observabilidad')" id="btn-observabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-lime-400">
                 <i data-lucide="siren" class="w-4 h-4"></i> Observabilidad
             </button>
+            <button onclick="switchTab('cumplimiento')" id="btn-cumplimiento" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-fuchsia-400">
+                <i data-lucide="calendar-check-2" class="w-4 h-4"></i> Cumplimiento
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -809,6 +812,46 @@
                 </div>
             </div>
 
+
+            <!-- Cumplimiento tributario operativo (Meta 13) -->
+            <div id="tab-cumplimiento" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Calendario & Semáforo Tributario</h2>
+                            <p class="text-xs text-slate-500 mt-2">Control diario de obligaciones: F29, F22, DDJJ y evidencias con acuse/hash.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
+                            <input id="comp-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="comp-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadComplianceStatus()" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="comp-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Obligaciones del período</h3>
+                    <div id="comp-obligations" class="space-y-2 text-xs">Sin datos.</div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Registrar evidencia</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <input id="comp-obligation-key" type="text" placeholder="Obligation key" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <select id="comp-lifecycle" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                            <option value="preparado">preparado</option><option value="validado">validado</option><option value="enviado">enviado</option><option value="acuse">acuse</option>
+                        </select>
+                        <input id="comp-ack" type="text" placeholder="Acuse/Folio" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="comp-source" type="text" placeholder="Fuente (SII/API)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="registerComplianceEvidence()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Guardar evidencia</button>
+                    </div>
+                    <div id="comp-evidence-result" class="text-xs mt-3 text-slate-500"></div>
+                </div>
+            </div>
+
             <!-- Observabilidad y cumplimiento (Meta 12) -->
             <div id="tab-observabilidad" class="tab-content hidden space-y-6">
                 <div class="card p-8">
@@ -1250,6 +1293,8 @@
             const reportYearInp = document.getElementById('report-year'); if (reportYearInp) reportYearInp.value = db.config.year;
             const reportMonthInp = document.getElementById('report-month'); if (reportMonthInp) reportMonthInp.value = String((db.config.selectedMonth || 0) + 1);
             const tokenInp = document.getElementById('api-token'); if (tokenInp) tokenInp.value = db.config.apiToken || '';
+            const compYear = document.getElementById('comp-year'); if (compYear) compYear.value = db.config.year;
+            const compMonth = document.getElementById('comp-month'); if (compMonth) compMonth.value = String((db.config.selectedMonth || 0) + 1);
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             // Establecer valores por defecto en los campos de régimen, giro y domicilio
             const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
@@ -1440,6 +1485,7 @@
             if (t === 'auditoria') renderAuditoria();
             if (t === 'reporteria') loadAuditableReports();
             if (t === 'observabilidad') loadObservabilityDashboard();
+            if (t === 'cumplimiento') loadComplianceStatus();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
@@ -1524,6 +1570,44 @@
                 safeSetHTML('obs-metrics', obsMetricCard('Estado', 'No disponible', 'text-red-500'));
                 safeSetHTML('obs-alerts', `<div class="text-red-500 font-bold">${err.message}</div>`);
                 safeSetText('obs-logs', '[]');
+            }
+        }
+
+
+        async function loadComplianceStatus() {
+            try {
+                const year = Number(document.getElementById('comp-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('comp-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/compliance/semaphore?year=${year}&month=${month}`);
+                const summary = payload.summary || { verde: 0, amarillo: 0, rojo: 0 };
+                safeSetHTML('comp-summary', [
+                    obsMetricCard('Verde', String(summary.verde || 0), 'text-emerald-500'),
+                    obsMetricCard('Amarillo', String(summary.amarillo || 0), 'text-amber-500'),
+                    obsMetricCard('Rojo', String(summary.rojo || 0), 'text-red-500')
+                ].join(''));
+
+                const rows = (payload.semaforo || []).map(ob => {
+                    const tone = ob.risk?.color === 'rojo' ? 'bg-red-100 text-red-700' : ob.risk?.color === 'amarillo' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+                    return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><span class="font-black">${ob.code}</span> · ${ob.name}<br><span class="text-slate-500">Vence: ${ob.dueDate} · Estado: ${ob.lifecycleStatus}</span><br><span class="text-[10px] text-slate-400">Key: ${ob.key}</span></div><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${ob.risk?.color || 'verde'}</span></div>`;
+                });
+                safeSetHTML('comp-obligations', rows.length ? rows.join('') : 'Sin obligaciones para el período.');
+            } catch (err) {
+                safeSetHTML('comp-summary', obsMetricCard('Cumplimiento', 'No disponible', 'text-red-500'));
+                safeSetHTML('comp-obligations', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function registerComplianceEvidence() {
+            try {
+                const obligationKey = (document.getElementById('comp-obligation-key')?.value || '').trim();
+                const lifecycleStatus = (document.getElementById('comp-lifecycle')?.value || '').trim();
+                const ackNumber = (document.getElementById('comp-ack')?.value || '').trim();
+                const source = (document.getElementById('comp-source')?.value || '').trim();
+                const payload = await apiClient.post('/compliance/evidence', { obligationKey, lifecycleStatus, ackNumber, source });
+                safeSetHTML('comp-evidence-result', `<span class="text-emerald-600 font-bold">Evidencia registrada: ${payload.evidence?.id || '-'}</span>`);
+                await loadComplianceStatus();
+            } catch (err) {
+                safeSetHTML('comp-evidence-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
             }
         }
 
