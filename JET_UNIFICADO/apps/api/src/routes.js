@@ -41,6 +41,7 @@ const { getDashboard } = require('./modules/observability');
 const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
 const { getAuditPackage, getRiskSimulation, getExecutiveDashboard } = require('./modules/eirlExecutive');
+const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -74,7 +75,8 @@ const modulesList = [
   'observability-logs-metrics-alerts-dashboard',
   'compliance-calendar-semaphore-evidence-escalation',
   'governance-chart-rules-consistency-dual-approval',
-  'meta15-audit-package-risk-simulator-executive-dashboard'
+  'meta15-audit-package-risk-simulator-executive-dashboard',
+  'meta16-normative-governance-regression'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -86,7 +88,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '15', version: 'v1.15-sprint15' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '16', version: 'v1.16-sprint16' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -192,6 +194,13 @@ function route(req, res) {
   if (path === '/executive/audit-package' && req.method === 'GET') return handle(getAuditPackage(req, res), res);
   if (path === '/executive/risk-simulation' && req.method === 'GET') return handle(getRiskSimulation(req, res), res);
   if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
+
+  if (path === '/normative/changes') {
+    if (req.method === 'GET') return handle(listChanges(req, res), res);
+    if (req.method === 'POST') return handle(registerChange(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/normative/regression/run' && req.method === 'POST') return handle(runRegression(req, res), res);
 
   if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
   if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);

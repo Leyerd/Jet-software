@@ -26,7 +26,9 @@ async function coherenceCheck(_req, res) {
     'src/modules/compliance.js',
     'src/modules/accountingGovernance.js',
     'src/modules/eirlExecutive.js',
+    'src/modules/normativeGovernance.js',
     'src/modules/eirlExecutive.js',
+    'src/modules/normativeGovernance.js',
     'src/lib/http.js',
     'src/lib/store.js',
     'src/lib/postgresRepo.js',
@@ -43,7 +45,7 @@ async function coherenceCheck(_req, res) {
 
   return sendJson(res, 200, {
     ok: missing.length === 0,
-    sprint: 15,
+    sprint: 16,
     message: missing.length === 0 ? 'Coherencia básica OK' : 'Faltan archivos críticos',
     checks,
     missing

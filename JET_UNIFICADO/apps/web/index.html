@@ -140,6 +140,9 @@
             <button onclick="switchTab('ejecutivo')" id="btn-ejecutivo" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-teal-400">
                 <i data-lucide="briefcase-business" class="w-4 h-4"></i> Ejecutivo EIRL
             </button>
+            <button onclick="switchTab('normativa')" id="btn-normativa" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-violet-400">
+                <i data-lucide="scale" class="w-4 h-4"></i> Normativa
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -917,6 +920,37 @@
                 </div>
             </div>
 
+            <!-- Meta 16: Gobierno normativo continuo -->
+            <div id="tab-normativa" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Gobierno Normativo</h2>
+                            <p class="text-xs text-slate-500 mt-2">Registro de cambios regulatorios y corrida de regresión normativa por año.</p>
+                        </div>
+                        <button onclick="loadNormativeChanges()" class="btn-jet bg-violet-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                    </div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Registrar cambio normativo</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <input id="norm-title" type="text" placeholder="Título cambio" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="norm-source" type="text" placeholder="Fuente (SII/LIR)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="norm-effective" type="date" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="registerNormativeChange()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Registrar</button>
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <input id="norm-reg-year" type="number" placeholder="Año regresión" class="border-2 border-slate-100 dark:border-slate-800 p-2 rounded-xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="runNormativeRegression()" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Correr regresión</button>
+                    </div>
+                    <div id="norm-result" class="text-xs mt-3 text-slate-500"></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Cambios normativos</h3><pre id="norm-changes" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
+                    <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Corridas de regresión</h3><pre id="norm-runs" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
+                </div>
+            </div>
+
             <!-- Observabilidad y cumplimiento (Meta 12) -->
             <div id="tab-observabilidad" class="tab-content hidden space-y-6">
                 <div class="card p-8">
@@ -1550,6 +1584,7 @@
             if (t === 'cumplimiento') loadComplianceStatus();
             if (t === 'gobernanza') runGovernanceConsistency();
             if (t === 'ejecutivo') loadExecutivePanel();
+            if (t === 'normativa') loadNormativeChanges();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
@@ -1738,6 +1773,42 @@
                 safeSetText('exec-pack', JSON.stringify(payload, null, 2));
             } catch (err) {
                 safeSetText('exec-pack', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+
+        async function loadNormativeChanges() {
+            try {
+                const payload = await apiClient.get('/normative/changes');
+                safeSetText('norm-changes', JSON.stringify(payload.changes || [], null, 2));
+                safeSetText('norm-runs', JSON.stringify(payload.runs || [], null, 2));
+            } catch (err) {
+                safeSetText('norm-changes', JSON.stringify({ error: err.message }, null, 2));
+                safeSetText('norm-runs', '[]');
+            }
+        }
+
+        async function registerNormativeChange() {
+            try {
+                const title = (document.getElementById('norm-title')?.value || '').trim();
+                const source = (document.getElementById('norm-source')?.value || '').trim();
+                const effectiveDate = (document.getElementById('norm-effective')?.value || '').trim();
+                const payload = await apiClient.post('/normative/changes', { title, source, effectiveDate, impactedAreas: ['tax', 'reports'] });
+                safeSetHTML('norm-result', `<span class="text-emerald-600 font-bold">Cambio registrado: ${payload.change?.id || '-'}</span>`);
+                await loadNormativeChanges();
+            } catch (err) {
+                safeSetHTML('norm-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function runNormativeRegression() {
+            try {
+                const targetYear = Number(document.getElementById('norm-reg-year')?.value || db.config.year || new Date().getFullYear());
+                const payload = await apiClient.post('/normative/regression/run', { targetYear });
+                safeSetHTML('norm-result', `<span class="text-blue-600 font-bold">Regresión ejecutada: ${payload.run?.id || '-'}</span>`);
+                await loadNormativeChanges();
+            } catch (err) {
+                safeSetHTML('norm-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
             }
         }
 

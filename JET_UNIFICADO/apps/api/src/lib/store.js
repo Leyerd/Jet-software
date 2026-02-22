@@ -46,6 +46,9 @@ const defaultState = {
   accountingRules: [],
   costCenters: [],
   approvalRequests: [],
+  normativeChanges: [],
+  normativeRegressionRuns: [],
+  normativePolicy: { monthlyReviewEnabled: true, ownerRole: 'contador_admin', hotfixWindowHours: 24, lastReviewedAt: null },
   backups: [],
   backupPolicy: {
     retentionMaxFiles: 20,
@@ -83,6 +86,9 @@ const POSTGRES_FRAGMENT_KEYS = [
   'accountingRules',
   'costCenters',
   'approvalRequests',
+  'normativeChanges',
+  'normativeRegressionRuns',
+  'normativePolicy',
   'backups',
   'backupPolicy'
 ];
@@ -90,7 +96,7 @@ const POSTGRES_FRAGMENT_KEYS = [
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'chartOfAccounts', 'accountingRules', 'costCenters', 'approvalRequests', 'backups'
+    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'chartOfAccounts', 'accountingRules', 'costCenters', 'approvalRequests', 'normativeChanges', 'normativeRegressionRuns', 'backups'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -121,6 +127,12 @@ function ensureArrays(state) {
   if (!Array.isArray(state.accountingRules)) state.accountingRules = [];
   if (!Array.isArray(state.costCenters)) state.costCenters = [];
   if (!Array.isArray(state.approvalRequests)) state.approvalRequests = [];
+
+  if (!Array.isArray(state.normativeChanges)) state.normativeChanges = [];
+  if (!Array.isArray(state.normativeRegressionRuns)) state.normativeRegressionRuns = [];
+  if (!state.normativePolicy || typeof state.normativePolicy !== 'object') {
+    state.normativePolicy = { monthlyReviewEnabled: true, ownerRole: 'contador_admin', hotfixWindowHours: 24, lastReviewedAt: null };
+  }
 
   if (!state.backupPolicy || typeof state.backupPolicy !== 'object') {
     state.backupPolicy = {
