@@ -13,7 +13,9 @@ const {
   getReconciliationSummary,
   importCartola,
   importRCVVentas,
-  importMarketplaceOrders
+  importMarketplaceOrders,
+  listReconciliationDocuments,
+  updateReconciliationStatus
 } = require('./modules/reconciliation');
 const { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog } = require('./modules/tax');
 const {
@@ -54,7 +56,8 @@ const modulesList = [
   'meta1-postgres-normalized-runtime-auth-products-movements-periods-tax',
   'journal-double-entry-publish-validation',
   'journal-auto-posting-reverse',
-  'tax-engine-versioned-f29-f22-rli-traceability'
+  'tax-engine-versioned-f29-f22-rli-traceability',
+  'reconciliation-immutable-incremental-batches-status'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -82,9 +85,11 @@ function route(req, res) {
   if (path === '/inventory/consume') return req.method === 'POST' ? handle(consumeStock(req, res), res) : methodNotAllowed(res);
 
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+  if (req.method === 'GET' && path === '/reconciliation/documents') return handle(listReconciliationDocuments(req, res), res);
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/marketplace') return req.method === 'POST' ? handle(importMarketplaceOrders(req, res), res) : methodNotAllowed(res);
+  if (path === '/reconciliation/documents/status') return req.method === 'POST' ? handle(updateReconciliationStatus(req, res), res) : methodNotAllowed(res);
 
   if (path === '/tax/config') {
     if (req.method === 'GET') return handle(getTaxConfig(req, res), res);
