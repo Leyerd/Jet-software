@@ -1,4 +1,5 @@
 const { mode } = require('./store');
+const { getRequestContext } = require('./requestContext');
 
 function isPostgresMode() {
   return mode() === 'postgres';
@@ -23,7 +24,7 @@ async function appendAuditLog(action, detail, user = 'system') {
     await client.query(
       `INSERT INTO audit_log (entidad, entidad_id, accion, detalle, usuario, fecha)
        VALUES ($1, $2, $3, $4::jsonb, $5, NOW())`,
-      ['system', null, action, JSON.stringify(detail || {}), user]
+      ['system', null, action, JSON.stringify({ ...(detail || {}), requestId: getRequestContext().requestId || null, path: getRequestContext().path || null }), user]
     );
   });
   return true;

@@ -37,6 +37,7 @@ const {
 } = require('./modules/backup');
 const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
 const { getReports, exportReport } = require('./modules/reports');
+const { getDashboard } = require('./modules/observability');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -66,7 +67,8 @@ const modulesList = [
   'encrypted-backups-dr-validation-rpo-rto',
   'secure-connectors-scheduler-retry-deadletter-status',
   'frontend-backend-first-api-client-unified',
-  'auditable-exportable-reporting-reproducible-hash'
+  'auditable-exportable-reporting-reproducible-hash',
+  'observability-logs-metrics-alerts-dashboard'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -78,7 +80,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '10', version: 'v1.10-sprint10' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '12', version: 'v1.12-sprint12' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -159,6 +161,8 @@ function route(req, res) {
   }
   if (path === '/accounting/entries/publish') return req.method === 'POST' ? handle(publishEntry(req, res), res) : methodNotAllowed(res);
   if (path === '/accounting/entries/reverse') return req.method === 'POST' ? handle(reverseEntry(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/observability/dashboard' && req.method === 'GET') return handle(getDashboard(req, res), res);
 
   if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
   if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);

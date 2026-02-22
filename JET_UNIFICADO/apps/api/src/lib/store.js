@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getRequestContext } = require('./requestContext');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'store.json');
 
@@ -199,11 +200,14 @@ async function writeStore(next) {
 
 async function appendAudit(action, detail, user = 'system') {
   const state = await readStore();
+  const ctx = getRequestContext();
   state.auditLog.push({
     id: `AUD-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
     action,
     detail,
     user,
+    requestId: ctx.requestId || null,
+    path: ctx.path || null,
     createdAt: new Date().toISOString()
   });
   await writeStore(state);
