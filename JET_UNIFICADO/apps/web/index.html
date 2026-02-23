@@ -39,13 +39,19 @@
             border-right: 3px solid #60a5fa;
         }
 
-        .sidebar-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; scrollbar-width: auto; scrollbar-color: #38bdf8 #020617; }
-        .sidebar-scroll::-webkit-scrollbar { width: 12px !important; }
-        .sidebar-scroll::-webkit-scrollbar-track { background: #020617 !important; }
-        .sidebar-scroll::-webkit-scrollbar-thumb { background: #38bdf8 !important; border-radius: 999px; border: 2px solid #020617; }
-        .sidebar-scroll-wrap { position: relative; flex: 1; min-height: 0; }
-        .sidebar-custom-scroll { position: absolute; right: 2px; top: 10px; bottom: 10px; width: 10px; background: #0b1220; border-radius: 999px; border: 1px solid #1e293b; }
-        .sidebar-custom-thumb { position: absolute; left: 1px; width: 6px; min-height: 28px; background: #38bdf8; border-radius: 999px; cursor: pointer; }
+        .sidebar-scroll-wrap { flex: 1; min-height: 0; }
+        .sidebar-scroll {
+            height: 100%;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            scrollbar-gutter: stable;
+            scrollbar-width: auto;
+            scrollbar-color: #38bdf8 #020617;
+            padding-right: 2px;
+        }
+        .sidebar-scroll::-webkit-scrollbar { width: 12px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: #020617; border-radius: 10px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 999px; border: 2px solid #020617; min-height: 24px; }
         .card {
             background-color: var(--bg-card);
             border-radius: 20px;
@@ -160,9 +166,6 @@
                 <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup
             </button>
         </nav>
-        <div id="sidebar-custom-scroll" class="sidebar-custom-scroll">
-            <div id="sidebar-custom-thumb" class="sidebar-custom-thumb"></div>
-        </div>
         </div>
         <div class="p-4 bg-slate-900/50 m-4 rounded-2xl border border-slate-800/50">
             <div class="flex items-center justify-between mb-2">
@@ -1379,8 +1382,9 @@
                 db.productos = Array.isArray(state.products) ? state.products : db.productos;
                 db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
                 if (!db.config) db.config = {};
-                db.config.regimen = (state.defaults && state.defaults.regime) || '14D8';
-                db.config.year = (state.defaults && state.defaults.year) || db.config.year;
+                db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
+                db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
+                if (state.demoAuthToken) db.config.apiToken = state.demoAuthToken;
                 if (state.defaults && state.defaults.ppmRate !== undefined) db.config.ppmRate = state.defaults.ppmRate;
                 if (state.defaults && state.defaults.retentionRate !== undefined) db.config.retRate = state.defaults.retentionRate;
             } catch (err) {
@@ -1389,60 +1393,6 @@
         }
 
         // Safe helpers
-
-        function initSidebarCustomScrollbar() {
-            const nav = document.getElementById('sidebar-nav');
-            const rail = document.getElementById('sidebar-custom-scroll');
-            const thumb = document.getElementById('sidebar-custom-thumb');
-            if (!nav || !rail || !thumb) return;
-
-            let dragging = false;
-            let startY = 0;
-            let startTop = 0;
-
-            const refresh = () => {
-                const maxScroll = Math.max(1, nav.scrollHeight - nav.clientHeight);
-                const railH = rail.clientHeight;
-                const thumbH = Math.max(28, (nav.clientHeight / Math.max(nav.scrollHeight, 1)) * railH);
-                const maxTop = Math.max(0, railH - thumbH);
-                const top = (nav.scrollTop / maxScroll) * maxTop;
-                thumb.style.height = `${thumbH}px`;
-                thumb.style.top = `${top}px`;
-                rail.style.opacity = maxScroll > 1 ? '1' : '0.35';
-            };
-
-            nav.addEventListener('scroll', refresh);
-            window.addEventListener('resize', refresh);
-
-            rail.addEventListener('click', (e) => {
-                if (e.target === thumb) return;
-                const rect = rail.getBoundingClientRect();
-                const pct = (e.clientY - rect.top) / Math.max(1, rect.height);
-                const maxScroll = Math.max(0, nav.scrollHeight - nav.clientHeight);
-                nav.scrollTop = Math.max(0, Math.min(maxScroll, pct * maxScroll));
-            });
-
-            thumb.addEventListener('mousedown', (e) => {
-                dragging = true;
-                startY = e.clientY;
-                startTop = parseFloat(thumb.style.top || '0');
-                e.preventDefault();
-            });
-
-            document.addEventListener('mousemove', (e) => {
-                if (!dragging) return;
-                const railH = rail.clientHeight;
-                const thumbH = thumb.clientHeight;
-                const maxTop = Math.max(0, railH - thumbH);
-                const nextTop = Math.max(0, Math.min(maxTop, startTop + (e.clientY - startY)));
-                thumb.style.top = `${nextTop}px`;
-                const maxScroll = Math.max(0, nav.scrollHeight - nav.clientHeight);
-                nav.scrollTop = maxTop > 0 ? (nextTop / maxTop) * maxScroll : 0;
-            });
-
-            document.addEventListener('mouseup', () => { dragging = false; });
-            setTimeout(refresh, 60);
-        }
 
         function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
         function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
@@ -1504,7 +1454,6 @@
             // Actualizar valor del dólar; UF/UTM/IPC se eliminan por no ser utilizados
             updateUSD();
             render();
-            initSidebarCustomScrollbar();
 
         });
 
@@ -1785,7 +1734,7 @@
             const { year, month } = reportFilters();
             const q = new URLSearchParams({ report: reportName, format, year: String(year) });
             if (month) q.set('month', String(month));
-            window.open(`/reports/export?${q.toString()}`, '_blank');
+            window.open(`${resolveApiBase()}/reports/export?${q.toString()}`, '_blank');
         }
 
         function obsMetricCard(label, value, tone = 'text-slate-900 dark:text-white') {
