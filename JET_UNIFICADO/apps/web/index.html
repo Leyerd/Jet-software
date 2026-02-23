@@ -1382,6 +1382,8 @@
                 if (!state) return;
                 db.productos = Array.isArray(state.products) ? state.products : db.productos;
                 db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
+                db.cuentas = Array.isArray(state.accounts) && state.accounts.length ? state.accounts : db.cuentas;
+                db.terceros = Array.isArray(state.thirdParties) && state.thirdParties.length ? state.thirdParties : db.terceros;
                 if (!db.config) db.config = {};
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
@@ -1535,7 +1537,7 @@
             }
             await bootstrapFromBackend();
             save();
-            alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'}`);
+            alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
         }
 
         function resetApp() {

@@ -138,6 +138,8 @@ async function getFrontendState(_req, res) {
         backendFirst: true,
         products: productsRs.rows,
         movements: movementsRs.rows,
+        accounts: (await client.query('SELECT id, codigo, nombre, tipo, saldo FROM cuentas ORDER BY id ASC LIMIT 1000')).rows.map((c) => ({ id: c.codigo || String(c.id), nombre: c.nombre, tipo: c.tipo, saldo: Number(c.saldo || 0) })),
+        thirdParties: (await client.query('SELECT id, rut, nombre, tipo FROM terceros ORDER BY id ASC LIMIT 2000')).rows.map((t) => ({ id: t.rut || String(t.id), rut: t.rut, nombre: t.nombre, tipo: t.tipo })),
         taxConfig,
         defaults: {
           regime: '14D8',
@@ -161,6 +163,8 @@ async function getFrontendState(_req, res) {
       backendFirst: true,
       products: store.productos || [],
       movements: store.movimientos || [],
+      accounts: store.cuentas || [],
+      thirdParties: store.terceros || [],
       taxConfig,
       defaults: {
         regime: '14D8',
@@ -190,7 +194,7 @@ async function loadDemoData(_req, res) {
     ok: true,
     message: 'Base demo 2024-2026 cargada correctamente',
     demoAuthToken,
-    summary: { totalsByYear: demo.totalsByYear, products: demo.products, movements: demo.movements }
+    summary: { totalsByYear: demo.totalsByYear, products: demo.products, movements: demo.movements, thirdParties: demo.thirdParties, accounts: demo.accounts }
   });
 }
 
