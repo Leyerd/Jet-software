@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 const { sendJson } = require('../lib/http');
-const { readStore } = require('../lib/store');
+const { readStore, writeStore } = require('../lib/store');
 const { isPostgresMode, withPgClient } = require('../lib/postgresRepo');
 const { ensureTaxConfig, getCatalog } = require('./tax');
+const { buildDemoState } = require('../lib/demoData');
 
 async function coherenceCheck(_req, res) {
   const requiredFiles = [
@@ -100,4 +101,14 @@ async function getFrontendState(_req, res) {
   });
 }
 
-module.exports = { coherenceCheck, getFrontendState };
+async function loadDemoData(_req, res) {
+  const demo = buildDemoState();
+  await writeStore(demo.state);
+  return sendJson(res, 200, {
+    ok: true,
+    message: 'Base demo 2024-2026 cargada correctamente',
+    summary: { totalsByYear: demo.totalsByYear, products: demo.products, movements: demo.movements }
+  });
+}
+
+module.exports = { coherenceCheck, getFrontendState, loadDemoData };

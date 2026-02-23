@@ -5,7 +5,7 @@ const { importJson, getSummary } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
-const { coherenceCheck, getFrontendState } = require('./modules/system');
+const { coherenceCheck, getFrontendState, loadDemoData } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
@@ -97,6 +97,7 @@ function route(req, res) {
 
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
   if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
+  if (req.method === 'POST' && path === '/system/load-demo-data') return handle(loadDemoData(req, res), res);
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);

@@ -20,3 +20,6 @@ Luego inicia JET (launcher o Docker) y revisa dashboard, libro diario, reportes 
 ## Nota
 - Es una base de pruebas para inspección funcional.
 - Puedes volver al estado limpio reemplazando `apps/api/data/store.json` por tu backup.
+
+## Botón directo en UI
+En `Backup` ahora existe el botón **Cargar Demo 2024-2026**, que llama al endpoint `POST /system/load-demo-data` y refresca la UI backend-first automáticamente.

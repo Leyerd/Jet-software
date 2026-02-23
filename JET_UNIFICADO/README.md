@@ -271,3 +271,5 @@ Se agregó roadmap de cierre de brechas (Meta 17-22):
 Puedes cargar una base ficticia 2024-2026 con:
 - `node JET_UNIFICADO/scripts/seed_demo_multiyear.js`
 - Detalle: `docs/BASE_DEMO_MULTIANIO.md`
+
+- En UI: menú `Backup` > botón `Cargar Demo 2024-2026`.
