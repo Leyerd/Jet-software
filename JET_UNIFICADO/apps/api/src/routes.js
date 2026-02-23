@@ -97,7 +97,14 @@ function route(req, res) {
 
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
   if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
-  if (req.method === 'POST' && path === '/system/load-demo-data') return handle(loadDemoData(req, res), res);
+  if (path === '/system/load-demo-data') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/system/demo/load') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
+    return methodNotAllowed(res);
+  }
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);

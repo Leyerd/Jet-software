@@ -23,3 +23,12 @@ Luego inicia JET (launcher o Docker) y revisa dashboard, libro diario, reportes 
 
 ## Botón directo en UI
 En `Backup` ahora existe el botón **Cargar Demo 2024-2026**, que llama al endpoint `POST /system/load-demo-data` y refresca la UI backend-first automáticamente.
+
+
+## Si aparece HTTP 404 al cargar demo
+Normalmente significa que el contenedor API aún está con imagen antigua. Ejecuta:
+
+```bash
+docker compose down
+docker compose up -d --build
+```
