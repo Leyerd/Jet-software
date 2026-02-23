@@ -1596,16 +1596,11 @@
         // Actualizar régimen tributario (14D3 o 14D8)
         function updateRegimen(v) {
             db.config.regimen = v;
-            // Ajustar tasa PPM por defecto cuando se elige régimen (si el usuario no la ha cambiado)
-            // 14D3: 0,25%; 14D8: 0,2%.
-            if (v === '14D3' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
-                db.config.ppmRate = 0.25;
-                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
-            }
-            if (v === '14D8' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
-                db.config.ppmRate = 0.2;
-                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
-            }
+            // Ajuste explícito por régimen para mantener consistencia en F29/F22
+            // 14D3 (general): PPM 0,25%
+            // 14D8 (transparente): PPM 0,20%
+            db.config.ppmRate = v === '14D3' ? 0.25 : 0.2;
+            const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             save();
         }
 
@@ -2266,14 +2261,16 @@ calculateReports(yearMovs);
             });
             safeSetHTML('table-f29', f29H);
             // F22
-            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            const cMV = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            // CMV solo desde ventas (evita duplicar importaciones en la RLI)
+            const cMV = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
             // Gastos Operativos aceptados (se descartan los no aceptados)
-            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + b.neto, 0);
+            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
             // Gastos no aceptados (para información)
-            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + b.neto, 0);
-            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + b.total, 0);
+            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + Number(b.neto || 0), 0);
+            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
             const utilidad = vN - cMV - gO; // RLI (Ingresos - Costos - Gastos)
+            const rliTributable = Math.max(0, utilidad);
             safeSetText('f22-ventas', `$ ${vN.toLocaleString('es-CL')}`);
             safeSetText('f22-costos', `$ ${cMV.toLocaleString('es-CL')}`);
             safeSetText('f22-gastos', `$ ${gO.toLocaleString('es-CL')}`);
@@ -2282,14 +2279,18 @@ calculateReports(yearMovs);
             safeSetText('f22-retenciones', `$ ${totalRet.toLocaleString('es-CL')}`);
             safeSetText('f22-utilidad', `$ ${utilidad.toLocaleString('es-CL')}`);
             safeSetText('f22-retiros', `$ ${retiros.toLocaleString('es-CL')}`);
-            // Impuesto de primera categoría (25%) para régimen 14D3
+            // Régimen 14D3: IDPC 25% sobre RLI positiva
+            // Régimen 14D8: transparente, no determina IDPC en la empresa
             let idpc = 0;
+            let idpcNet = 0;
             if (db.config.regimen === '14D3') {
-                idpc = Math.round(utilidad * 0.25);
+                idpc = Math.round(rliTributable * 0.25);
+                idpcNet = Math.max(0, idpc - totalPPM - totalRet);
+            } else {
+                idpc = 0;
+                idpcNet = 0;
             }
             safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
-            // Impuesto neto a pagar: impuesto menos PPM menos retenciones
-            const idpcNet = idpc - totalPPM - totalRet;
             safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
             // DJ tables
             renderDDJJTables(yearMovs, totalPPM, totalRet);

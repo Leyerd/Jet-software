@@ -54,7 +54,7 @@ function buildDemoMovements(products) {
       for (let i = 0; i < saleCount; i += 1) {
         const p = products[(month * 3 + i + year) % products.length];
         const cant = ((month + i) % 5) + 2;
-        const neto = Math.round(p.costoPromedio * cant * 2.15 * scale);
+        const neto = Math.round(p.costoPromedio * cant * 2.85 * scale);
         const iva = Math.round(neto * 0.19);
         movimientos.push(movement(
           ++id,
@@ -76,7 +76,7 @@ function buildDemoMovements(products) {
       }
 
       // gastos operacionales
-      const gastoNeto = Math.round((220000 + month * 35000) * scale);
+      const gastoNeto = Math.round((90000 + month * 15000) * scale);
       const gastoIva = Math.round(gastoNeto * 0.19);
       movimientos.push(movement(
         ++id,
@@ -92,7 +92,7 @@ function buildDemoMovements(products) {
 
       // honorarios en meses trimestrales
       if (month % 3 === 0) {
-        const bruto = Math.round((240000 + month * 9000) * scale);
+        const bruto = Math.round((110000 + month * 4500) * scale);
         const retention = Math.round(bruto * 0.145);
         movimientos.push(movement(
           ++id,
