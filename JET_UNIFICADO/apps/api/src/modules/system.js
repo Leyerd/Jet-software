@@ -19,7 +19,6 @@ async function ensureDemoSessionInPostgres() {
       email TEXT UNIQUE,
       rol TEXT,
       password_hash TEXT,
-      activo BOOLEAN DEFAULT TRUE,
       creado_en TIMESTAMP DEFAULT NOW()
     )`);
     await client.query(`CREATE TABLE IF NOT EXISTS sesiones (
@@ -39,8 +38,8 @@ async function ensureDemoSessionInPostgres() {
       userId = Number(existing.rows[0].id);
     } else {
       const created = await client.query(
-        `INSERT INTO usuarios (nombre, email, rol, password_hash, activo)
-         VALUES ($1, $2, $3, $4, TRUE)
+        `INSERT INTO usuarios (nombre, email, rol, password_hash, creado_en)
+         VALUES ($1, $2, $3, $4, NOW())
          RETURNING id`,
         ['Dueño Demo', 'dueno@demo.cl', 'dueno', '']
       );
@@ -125,7 +124,7 @@ async function coherenceCheck(_req, res) {
 async function getFrontendState(_req, res) {
   if (isPostgresMode()) {
     const state = await withPgClient(async (client) => {
-      await client.query("CREATE TABLE IF NOT EXISTS usuarios (id BIGSERIAL PRIMARY KEY, nombre TEXT, email TEXT UNIQUE, rol TEXT, password_hash TEXT, activo BOOLEAN DEFAULT TRUE, creado_en TIMESTAMP DEFAULT NOW())");
+      await client.query("CREATE TABLE IF NOT EXISTS usuarios (id BIGSERIAL PRIMARY KEY, nombre TEXT, email TEXT UNIQUE, rol TEXT, password_hash TEXT, creado_en TIMESTAMP DEFAULT NOW())");
       await client.query("CREATE TABLE IF NOT EXISTS sesiones (id BIGSERIAL PRIMARY KEY, usuario_id BIGINT, token TEXT UNIQUE, creado_en TIMESTAMP DEFAULT NOW(), expira_en TIMESTAMP, revocada BOOLEAN DEFAULT FALSE, revocada_en TIMESTAMP, revocada_por TEXT)");
       const [productsRs, movementsRs, taxRs, sessionRs] = await Promise.all([
         client.query('SELECT id, sku, nombre, categoria, costo_promedio AS "costoPromedio", stock FROM productos ORDER BY id ASC LIMIT 5000'),

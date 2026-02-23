@@ -44,10 +44,11 @@
             height: 100%;
             overflow-y: scroll;
             overflow-x: hidden;
-            scrollbar-gutter: stable;
+            scrollbar-gutter: stable both-edges;
             scrollbar-width: auto;
             scrollbar-color: #38bdf8 #020617;
             padding-right: 2px;
+            max-height: 100%;
         }
         .sidebar-scroll::-webkit-scrollbar { width: 12px; }
         .sidebar-scroll::-webkit-scrollbar-track { background: #020617; border-radius: 10px; }
@@ -90,7 +91,7 @@
 <body class="flex min-h-screen overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-slate-950 text-slate-400 flex-shrink-0 hidden md:flex flex-col border-r border-slate-800">
+    <aside class="w-64 h-screen overflow-hidden bg-slate-950 text-slate-400 flex-shrink-0 hidden md:flex flex-col border-r border-slate-800">
         <div class="p-8 border-b border-slate-800">
             <h1 class="text-2xl font-black text-white flex items-center gap-2 tracking-tighter">
                 <i data-lucide="rocket" class="text-blue-500 fill-blue-500/20"></i> JET PRO
