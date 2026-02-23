@@ -228,4 +228,11 @@ async function loadDemoData(_req, res) {
   });
 }
 
-module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData };
+async function shutdownSystem(_req, res) {
+  sendJson(res, 200, { ok: true, message: 'Apagado solicitado. Cerrando proceso JET...' });
+  setTimeout(() => {
+    try { process.kill(process.pid, 'SIGTERM'); } catch (_) { process.exit(0); }
+  }, 120);
+}
+
+module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem };

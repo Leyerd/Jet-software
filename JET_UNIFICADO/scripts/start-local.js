@@ -90,10 +90,19 @@ async function main() {
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
+  if (process.stdin && process.stdin.isTTY) {
+    process.stdin.setEncoding('utf8');
+    process.stdin.resume();
+    process.stdin.on('data', (chunk) => {
+      const txt = String(chunk || '').trim().toLowerCase();
+      if (txt === 'q' || txt === 'exit' || txt === 'salir') shutdown();
+    });
+  }
+
   const autoExitMs = Number(process.env.JET_TEST_EXIT_AFTER_MS || 0);
   if (autoExitMs > 0) setTimeout(shutdown, autoExitMs);
 
-  console.log('[JET] Sistema listo. Presiona Ctrl+C en esta ventana para detener API y WEB.');
+  console.log('[JET] Sistema listo. Presiona Ctrl+C o escribe Q + Enter para detener API y WEB.');
 }
 
 main().catch((err) => {

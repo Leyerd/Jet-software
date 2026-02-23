@@ -193,6 +193,9 @@
                         <!-- Se eliminan indicadores UF, UTM e IPC ya que no se usan en los cálculos -->
                 </div>
                 <div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
+                <button onclick="shutdownJet()" class="p-2 text-slate-300 hover:text-amber-500 transition-colors" title="Cerrar JET (API + WEB)">
+                    <i data-lucide="power" class="w-4 h-4"></i>
+                </button>
                 <button onclick="resetApp()" class="p-2 text-slate-300 hover:text-red-500 transition-colors" title="Limpiar Base de Datos">
                     <i data-lucide="refresh-cw" class="w-4 h-4"></i>
                 </button>
@@ -1671,6 +1674,16 @@
             await bootstrapFromBackend();
             save();
             alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
+        }
+
+        async function shutdownJet() {
+            if (!confirm('¿Cerrar JET ahora? Esto detendrá API y web local.')) return;
+            try {
+                await fetch(`${resolveApiBase()}/system/shutdown`, { method: 'POST' });
+                alert('JET se está cerrando. Puedes cerrar esta pestaña.');
+            } catch (_) {
+                alert('No se pudo cerrar automáticamente. Usa Ctrl+C (o Q + Enter en launcher).');
+            }
         }
 
         function resetApp() {
