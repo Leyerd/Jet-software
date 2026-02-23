@@ -7,6 +7,10 @@ const { recordRequest } = require('./src/modules/observability');
 const PORT = process.env.PORT || 4000;
 
 const server = http.createServer((req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Request-Id');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
   const requestId = req.headers['x-request-id'] || `req-${crypto.randomUUID()}`;
   const startedAt = Date.now();
   const path = (req.url || '').split('?')[0] || '/';

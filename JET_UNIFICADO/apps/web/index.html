@@ -39,13 +39,10 @@
             border-right: 3px solid #60a5fa;
         }
 
-        .sidebar-scroll { overflow-y: scroll; overflow-x: hidden; scrollbar-gutter: stable; scrollbar-width: auto; scrollbar-color: #38bdf8 #020617; }
+        .sidebar-scroll { overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; scrollbar-width: auto; scrollbar-color: #38bdf8 #020617; }
         .sidebar-scroll::-webkit-scrollbar { width: 12px !important; }
         .sidebar-scroll::-webkit-scrollbar-track { background: #020617 !important; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background: #38bdf8 !important; border-radius: 999px; border: 2px solid #020617; }
-        .sidebar-shell { position: relative; display: flex; flex: 1; min-height: 0; }
-        .sidebar-scroll-rail { width: 18px; display: flex; align-items: center; justify-content: center; background: #020617; border-left: 1px solid #1e293b; }
-        .sidebar-scroll-control { writing-mode: bt-lr; -webkit-appearance: slider-vertical; width: 12px; height: calc(100% - 20px); accent-color: #38bdf8; }
         .card {
             background-color: var(--bg-card);
             border-radius: 20px;
@@ -91,7 +88,6 @@
             </h1>
             <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2">ERP Chile v3.0</p>
         </div>
-        <div class="sidebar-shell">
         <nav id="sidebar-nav" class="flex-1 p-4 space-y-1 sidebar-scroll">
             <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operativa</div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
@@ -160,10 +156,6 @@
                 <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup
             </button>
         </nav>
-        <div class="sidebar-scroll-rail">
-            <input id="sidebar-scroll-control" class="sidebar-scroll-control" type="range" min="0" max="100" value="0" step="1" aria-label="Desplazar menú" />
-        </div>
-        </div>
         <div class="p-4 bg-slate-900/50 m-4 rounded-2xl border border-slate-800/50">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Año Fiscal</span>
@@ -1345,10 +1337,17 @@
         let performanceChart = null;
 
 
+        function resolveApiBase() {
+            if (db.config && db.config.apiBaseUrl) return String(db.config.apiBaseUrl).replace(/\/$/, '');
+            if (window.location.port === '3000') return `${window.location.protocol}//${window.location.hostname}:4000`;
+            return window.location.origin;
+        }
+
         const apiClient = {
             async request(path, options = {}) {
                 const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
-                const response = await fetch(path, {
+                const target = `${resolveApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+                const response = await fetch(target, {
                     headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
                     ...options
                 });
@@ -1442,7 +1441,7 @@
             // Actualizar valor del dólar; UF/UTM/IPC se eliminan por no ser utilizados
             updateUSD();
             render();
-            initSidebarScrollControl();
+
         });
 
         function updateUSD() {
@@ -1500,26 +1499,6 @@
             };
             reader.readAsText(file);
         }
-
-        function initSidebarScrollControl() {
-            const nav = document.getElementById('sidebar-nav');
-            const control = document.getElementById('sidebar-scroll-control');
-            if (!nav || !control) return;
-            const syncFromNav = () => {
-                const max = Math.max(0, nav.scrollHeight - nav.clientHeight);
-                control.max = String(max || 1);
-                control.value = String(Math.min(max, nav.scrollTop));
-                control.style.opacity = max > 0 ? '1' : '0.35';
-            };
-            const syncToNav = () => {
-                nav.scrollTop = Number(control.value || 0);
-            };
-            nav.addEventListener('scroll', syncFromNav);
-            control.addEventListener('input', syncToNav);
-            window.addEventListener('resize', syncFromNav);
-            setTimeout(syncFromNav, 60);
-        }
-
         async function loadDemoDataFromBackend() {
             const attempts = [
                 () => apiClient.post('/system/load-demo-data', {}),
