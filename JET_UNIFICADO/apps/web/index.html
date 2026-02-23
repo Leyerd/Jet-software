@@ -130,6 +130,9 @@
             <button onclick="switchTab('f22')" id="btn-f22" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
                 <i data-lucide="landmark" class="w-4 h-4"></i> Renta F22
             </button>
+            <button onclick="switchTab('dueno-sii')" id="btn-dueno-sii" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-sky-400">
+                <i data-lucide="user-round" class="w-4 h-4"></i> SII Dueño
+            </button>
             <button onclick="switchTab('kpi')" id="btn-kpi" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-pink-400">
                 <i data-lucide="trending-up" class="w-4 h-4"></i> Indicadores
             </button>
@@ -611,6 +614,36 @@
                             <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-withdrawals-label">Retiros Efectivos (Global Compl.)</span>
                             <span id="f22-retiros" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+            <!-- SII Dueño (Impuesto personal y guía de declaración) -->
+            <div id="tab-dueno-sii" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">SII Dueño · Impuesto Personal</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">¿Cuándo, dónde y cómo declarar?</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">Módulo profesional para estimar carga tributaria del dueño según régimen (<b id="owner-regime-chip">14D8</b>), consolidar créditos y preparar la declaración en SII.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-6 border-l-4 border-sky-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Base tributable dueño</p><h3 id="owner-tax-base" class="text-2xl font-black text-sky-600">$ 0</h3></div>
+                    <div class="card p-6 border-l-4 border-amber-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">IGC determinado</p><h3 id="owner-tax-gross" class="text-2xl font-black text-amber-600">$ 0</h3></div>
+                    <div class="card p-6 border-l-4 border-emerald-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Impuesto final dueño</p><h3 id="owner-tax-net" class="text-2xl font-black text-emerald-600">$ 0</h3></div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4">Detalle técnico de cálculo</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+                        <div class="flex justify-between"><span class="text-slate-500">Régimen</span><span id="owner-detail-regime" class="dark:text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Base en UTA</span><span id="owner-detail-uta" class="dark:text-white">0.00</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Crédito IDPC utilizable</span><span id="owner-detail-credit" class="dark:text-white">$ 0</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Tasa efectiva</span><span id="owner-detail-rate" class="dark:text-white">0.00%</span></div>
+                        <div class="flex justify-between md:col-span-2"><span class="text-slate-500">Dónde declarar</span><span id="owner-where" class="dark:text-white text-right">SII.cl → Servicios online → Declaración de Renta (F22)</span></div>
+                        <div class="flex justify-between md:col-span-2"><span class="text-slate-500">Cómo declarar</span><span id="owner-how" class="dark:text-white text-right">Con propuesta F22 + DDJJ régimen + respaldo libro contable</span></div>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800"><h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Tramos IGC usados por el simulador (UTA)</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs"><thead class="bg-slate-50 dark:bg-slate-800"><tr><th class="px-4 py-3 text-left">Desde UTA</th><th class="px-4 py-3 text-left">Hasta UTA</th><th class="px-4 py-3 text-left">Tasa marginal</th><th class="px-4 py-3 text-left">Rebaja fija (UTA)</th></tr></thead><tbody id="owner-tax-brackets" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody></table>
                     </div>
                 </div>
             </div>
@@ -1669,6 +1702,7 @@
             f29: { title: 'F29 Mensual', text: 'Revisa débito/crédito IVA y prepara propuesta antes del envío oficial.' },
             ddjj: { title: 'DDJJ Juradas', text: 'Controla declaraciones juradas y evidencia por período.' },
             f22: { title: 'Renta F22', text: 'Visualiza base anual y consistencias previas a operación renta.' },
+            'dueno-sii': { title: 'SII Dueño', text: 'Responde cuándo, dónde y cómo declara el dueño y estima impuesto personal anual según régimen (14D3/14D8), base, tramos IGC y créditos.' },
             kpi: { title: 'Indicadores', text: 'Monitorea margen, rotación y salud del negocio.' },
             auditoria: { title: 'Auditoría', text: 'Consulta bitácora y trazabilidad de cambios críticos.' },
             contabilidad: { title: 'Contabilidad', text: 'Gestiona asientos, publicación y reversas con validación.' },
@@ -1710,6 +1744,7 @@
             if (t === 'gobernanza') runGovernanceConsistency();
             if (t === 'ejecutivo') loadExecutivePanel();
             if (t === 'normativa') loadNormativeChanges();
+            if (t === 'dueno-sii') renderOwnerTaxModule();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
@@ -2201,9 +2236,72 @@ calculateReports(yearMovs);
             for (let m = 1; m <= 12; m++) {
                 dates.push({ name: `F29 ${m}/${db.config.year}`, date: new Date(db.config.year, m - 1, 20) });
             }
+            dates.push({ name: `DDJJ 1887 / 1947 (${db.config.year})`, date: new Date(db.config.year, 2, 31) });
             dates.push({ name: `F22 ${db.config.year}`, date: new Date(db.config.year, 3, 30) });
+            dates.push({ name: `Pago IGC dueño (${db.config.year})`, date: new Date(db.config.year, 3, 30) });
             dates.push({ name: 'Patente Comercial', date: new Date(db.config.year, 6, 31) });
             safeSetHTML('fiscal-calendar', dates.map(d => `<li>${d.name}: <span class="text-blue-500">${d.date.toLocaleDateString('es-CL')}</span></li>`).join(''));
+        }
+
+        function getOwnerTaxBracketsUTA() {
+            return [
+                { from: 0, to: 13.5, rate: 0, rebateUTA: 0 },
+                { from: 13.5, to: 30, rate: 0.04, rebateUTA: 0.54 },
+                { from: 30, to: 50, rate: 0.08, rebateUTA: 1.74 },
+                { from: 50, to: 70, rate: 0.135, rebateUTA: 4.49 },
+                { from: 70, to: 90, rate: 0.23, rebateUTA: 11.14 },
+                { from: 90, to: 120, rate: 0.304, rebateUTA: 17.80 },
+                { from: 120, to: 310, rate: 0.35, rebateUTA: 23.32 },
+                { from: 310, to: Infinity, rate: 0.40, rebateUTA: 38.82 }
+            ];
+        }
+
+        function computeOwnerAnnualTax(yearMovs) {
+            const isRegimenGeneral = db.config.regimen === '14D3';
+            const sales = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const cmv = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+            const gastos = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
+            const rli = Math.max(0, sales - cmv - gastos);
+            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
+            const baseOwner = isRegimenGeneral ? Math.max(0, retiros) : rli;
+            const utaValue = 8268728; // UTA referencial anual CLP (ajustable por normativa anual)
+            const baseUTA = utaValue > 0 ? (baseOwner / utaValue) : 0;
+            const brackets = getOwnerTaxBracketsUTA();
+            const tramo = brackets.find(b => baseUTA >= b.from && baseUTA <= b.to) || brackets[brackets.length - 1];
+            const igcBrutoUTA = Math.max(0, (baseUTA * tramo.rate) - tramo.rebateUTA);
+            const igcBruto = Math.round(igcBrutoUTA * utaValue);
+
+            const idpcEmpresa = isRegimenGeneral ? Math.round(rli * 0.25) : 0;
+            const ownerCredit = isRegimenGeneral ? Math.min(idpcEmpresa, igcBruto) : 0;
+            const netOwnerTax = Math.max(0, igcBruto - ownerCredit);
+
+            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue };
+        }
+
+        function renderOwnerTaxModule() {
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const data = computeOwnerAnnualTax(yearMovs);
+            safeSetText('owner-regime-chip', data.isRegimenGeneral ? 'ProPyme General (14D3)' : 'ProPyme Transparente (14D8)');
+            safeSetText('owner-tax-base', `$ ${Math.round(data.baseOwner).toLocaleString('es-CL')}`);
+            safeSetText('owner-tax-gross', `$ ${Math.round(data.igcBruto).toLocaleString('es-CL')}`);
+            safeSetText('owner-tax-net', `$ ${Math.round(data.netOwnerTax).toLocaleString('es-CL')}`);
+            safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros del dueño' : '14D8 · base atribuida anual');
+            safeSetText('owner-detail-uta', `${data.baseUTA.toFixed(2)} UTA`);
+            safeSetText('owner-detail-credit', `$ ${Math.round(data.ownerCredit).toLocaleString('es-CL')}`);
+            const effRate = data.baseOwner > 0 ? (data.netOwnerTax / data.baseOwner) * 100 : 0;
+            safeSetText('owner-detail-rate', `${effRate.toFixed(2)}%`);
+            safeSetText('owner-where', 'SII.cl → Servicios online → Declaración de Renta (F22)');
+            safeSetText('owner-how', data.isRegimenGeneral
+                ? 'Con retiros efectivos, registro empresarial 14D3, crédito IDPC y propuesta F22.'
+                : 'Con renta atribuida 14D8, respaldo de RLI/DDJJ 1947 y propuesta F22 del dueño.');
+            safeSetHTML('owner-tax-brackets', data.brackets.map(b => `
+                <tr>
+                    <td class="px-4 py-2">${b.from.toLocaleString('es-CL')}</td>
+                    <td class="px-4 py-2">${b.to === Infinity ? 'o más' : b.to.toLocaleString('es-CL')}</td>
+                    <td class="px-4 py-2">${(b.rate * 100).toFixed(1)}%</td>
+                    <td class="px-4 py-2">${b.rebateUTA.toFixed(2)}</td>
+                </tr>
+            `).join(''));
         }
 
         // Projections
