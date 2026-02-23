@@ -169,49 +169,10 @@
             <button onclick="openBackupModal()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup
             </button>
+            <button onclick="switchTab('configuracion')" id="btn-configuracion" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-slate-400">
+                <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Configuración
+            </button>
         </nav>
-        </div>
-        <div class="p-4 bg-slate-900/50 m-4 rounded-2xl border border-slate-800/50">
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Año Fiscal</span>
-                <input type="number" id="config-year" onchange="updateYear(this.value)" class="w-16 bg-slate-800 text-white text-xs font-black rounded px-2 py-1 outline-none text-center" value="2026">
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">PPM (%)</span>
-                <input type="number" id="config-ppm" onchange="updatePPM(this.value)" class="w-16 bg-slate-800 text-white text-xs font-black rounded px-2 py-1 outline-none text-center" value="1">
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Retención (Honor.)</span>
-                <span id="ret-rate" class="text-[10px] font-black text-white"></span>
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">UTM (CLP)</span>
-                <input type="number" id="config-utm" onchange="updateUTM(this.value)" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none text-center" value="0">
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">UTA (CLP)</span>
-                <input type="number" id="config-uta" onchange="updateUTA(this.value)" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none text-center" value="0">
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span id="tax-unit-updated" class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">UTM/UTA: Manual</span>
-                <button onclick="updateTaxUnits()" class="bg-slate-700 text-white text-[9px] font-black rounded px-2 py-1 uppercase tracking-widest">Actualizar</button>
-            </div>
-            <!-- Configuraciones adicionales de la empresa -->
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Régimen</span>
-                <select id="config-regimen" onchange="updateRegimen(this.value)" class="bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
-                    <option value="14D3">14 D3 (ProPyme General)</option>
-                    <option value="14D8">14 D8 (ProPyme Transparente)</option>
-                </select>
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Giro</span>
-                <input type="text" id="config-giro" onchange="updateGiro(this.value)" placeholder="479100" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
-            </div>
-            <div class="flex items-center justify-between mb-2">
-                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Domicilio</span>
-                <input type="text" id="config-address" onchange="updateAddress(this.value)" placeholder="Dirección" class="w-32 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none">
-            </div>
         </div>
     </aside>
 
@@ -227,7 +188,7 @@
                     <p id="current-date" class="text-[9px] text-slate-400 font-black uppercase tracking-[0.1em]"></p>
                     <div class="flex items-center gap-2 text-right">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span></p>
+                        <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span> · UTM: <span id="utm-val" class="text-emerald-600 font-black">$ 0</span></p>
                     </div>
                         <!-- Se eliminan indicadores UF, UTM e IPC ya que no se usan en los cálculos -->
                 </div>
@@ -1032,6 +993,26 @@
                 </div>
             </div>
 
+            <div id="tab-configuracion" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Configuración del Software</h2>
+                    <p class="text-xs text-slate-500 mt-2">Parámetros tributarios y generales de la empresa para cálculos y cumplimiento.</p>
+                </div>
+                <div class="card p-8 max-w-2xl">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">Año Fiscal</span><input type="number" id="config-year" onchange="updateYear(this.value)" class="w-24 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1 text-center"></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">PPM (%)</span><input type="number" id="config-ppm" onchange="updatePPM(this.value)" class="w-24 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1 text-center"></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">Retención (Honor.)</span><span id="ret-rate" class="text-[11px] font-black dark:text-white"></span></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">UTM (CLP)</span><input type="number" id="config-utm" onchange="updateUTM(this.value)" class="w-32 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1 text-center"></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">UTA (CLP)</span><input type="number" id="config-uta" onchange="updateUTA(this.value)" class="w-32 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1 text-center"></div>
+                        <div class="flex items-center justify-between"><span id="tax-unit-updated" class="text-[10px] font-black text-slate-500 uppercase tracking-wider">UTM/UTA: Manual</span><button onclick="updateTaxUnits()" class="btn-jet bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">Actualizar</button></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">Régimen</span><select id="config-regimen" onchange="updateRegimen(this.value)" class="border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1"><option value="14D3">14 D3 (ProPyme General)</option><option value="14D8">14 D8 (ProPyme Transparente)</option></select></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">Giro</span><input type="text" id="config-giro" onchange="updateGiro(this.value)" class="w-36 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1"></div>
+                        <div class="flex items-center justify-between"><span class="text-[11px] font-black text-slate-500 uppercase tracking-wider">Domicilio</span><input type="text" id="config-address" onchange="updateAddress(this.value)" class="w-56 border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-800 text-xs font-black rounded px-2 py-1"></div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Observabilidad y cumplimiento (Meta 12) -->
             <div id="tab-observabilidad" class="tab-content hidden space-y-6">
                 <div class="card p-8">
@@ -1421,8 +1402,30 @@
             return window.location.origin;
         }
 
+        let tokenBootstrapPromise = null;
+        async function ensureApiTokenFromBackend() {
+            if (db.config && db.config.apiToken) return true;
+            if (tokenBootstrapPromise) return tokenBootstrapPromise;
+            tokenBootstrapPromise = (async () => {
+                try {
+                    const response = await fetch(`${resolveApiBase()}/system/frontend-state`);
+                    const payload = await response.json();
+                    const token = payload?.state?.demoAuthToken || payload?.demoAuthToken || '';
+                    if (token) {
+                        db.config.apiToken = token;
+                        const tokenInp = document.getElementById('api-token'); if (tokenInp) tokenInp.value = token;
+                        return true;
+                    }
+                    return false;
+                } catch (_) { return false; }
+                finally { tokenBootstrapPromise = null; }
+            })();
+            return tokenBootstrapPromise;
+        }
+
         const apiClient = {
             async request(path, options = {}) {
+                if (!db.config?.apiToken) await ensureApiTokenFromBackend();
                 const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
                 const target = `${resolveApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
                 const response = await fetch(target, {
@@ -1514,6 +1517,7 @@
             const utmInp = document.getElementById('config-utm'); if (utmInp) utmInp.value = Math.round(db.config.utmValue || 0);
             const utaInp = document.getElementById('config-uta'); if (utaInp) utaInp.value = Math.round(db.config.utaValue || 0);
             safeSetText('tax-unit-updated', db.config.taxUnitUpdatedAt ? `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}` : 'UTM/UTA: Manual');
+            safeSetText('utm-val', `$ ${Math.round(db.config.utmValue || 0).toLocaleString('es-CL')}`);
             const monthSel = document.getElementById('filter-month'); if (monthSel) monthSel.value = db.config.selectedMonth;
             // Sincronizar selectores de mes en la sección de Contabilidad
             const diarioSel = document.getElementById('filter-month-diario'); if (diarioSel) diarioSel.value = db.config.contabMonthDiario;
@@ -1680,6 +1684,7 @@
             }
             db.config.taxUnitUpdatedAt = new Date().toISOString();
             safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+            safeSetText('utm-val', `$ ${db.config.utmValue.toLocaleString('es-CL')}`);
             save();
         }
         function updateUTA(v) {
@@ -1689,6 +1694,7 @@
             db.config.utaManual = true;
             db.config.taxUnitUpdatedAt = new Date().toISOString();
             safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+            safeSetText('utm-val', `$ ${db.config.utmValue.toLocaleString('es-CL')}`);
             save();
         }
         async function updateTaxUnits(silent = false) {
@@ -1703,6 +1709,7 @@
                 const utmInp = document.getElementById('config-utm'); if (utmInp) utmInp.value = db.config.utmValue;
                 const utaInp = document.getElementById('config-uta'); if (utaInp) utaInp.value = db.config.utaValue;
                 safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+                safeSetText('utm-val', `$ ${db.config.utmValue.toLocaleString('es-CL')}`);
                 save();
             } catch (err) {
                 if (!silent) alert('No se pudo actualizar UTM/UTA automáticamente. Puedes ingresarlas manualmente.');
@@ -1778,7 +1785,8 @@
             cumplimiento: { title: 'Cumplimiento', text: 'Gestiona calendario legal, semáforo y evidencias para evitar multas.' },
             gobernanza: { title: 'Gobernanza', text: 'Configura plan de cuentas, reglas y aprobaciones duales.' },
             ejecutivo: { title: 'Ejecutivo EIRL', text: 'Revisa riesgo esperado, paquete fiscalizador y panel ejecutivo.' },
-            normativa: { title: 'Normativa', text: 'Registra cambios regulatorios y ejecuta regresión normativa anual.' }
+            normativa: { title: 'Normativa', text: 'Registra cambios regulatorios y ejecuta regresión normativa anual.' },
+            configuracion: { title: 'Configuración', text: 'Ajusta año fiscal, régimen, PPM, UTM/UTA y parámetros base del software.' }
         };
 
         function openTabHelp() {
@@ -1811,6 +1819,7 @@
             if (t === 'gobernanza') runGovernanceConsistency();
             if (t === 'ejecutivo') loadExecutivePanel();
             if (t === 'normativa') loadNormativeChanges();
+            if (t === 'configuracion') updateRetRate();
             if (t === 'dueno-sii') renderOwnerTaxModule();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
