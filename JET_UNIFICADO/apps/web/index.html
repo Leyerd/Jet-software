@@ -556,7 +556,7 @@
                 <div class="help-box">
                     <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Renta Líquida Imponible (RLI)</h4>
                     <p class="text-[11px] text-slate-600 dark:text-slate-300">
-                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b>ProPyme General (14 D3)</b> optimizado con control de inventario (CMV). Incluye PPM pagados y Retenciones.
+                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados y retenciones según régimen.
                     </p>
                 </div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
@@ -627,8 +627,24 @@
                         <h3 id="kpi-mom" class="text-3xl font-black text-indigo-600">0.0%</h3>
                     </div>
                     <div class="card p-8 border-l-4 border-blue-500">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilidad Acumulada</p>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilidad Acumulada (Año seleccionado)</p>
                         <h3 id="kpi-profit" class="text-3xl font-black text-blue-600">$ 0</h3>
+                        <p id="kpi-profit-year" class="text-[10px] mt-2 text-slate-500 font-bold uppercase tracking-widest">Año -</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-6 border-l-4 border-slate-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Ventas 3 años</p>
+                        <h3 id="kpi-total-sales-general" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                    <div class="card p-6 border-l-4 border-slate-600">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Utilidad 3 años</p>
+                        <h3 id="kpi-profit-general" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                    <div class="card p-6 border-l-4 border-slate-700">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Margen 3 años</p>
+                        <h3 id="kpi-margin-general" class="text-2xl font-black text-slate-900 dark:text-white">0.0%</h3>
                     </div>
                 </div>
                 <!-- Marketing y Métricas de E-commerce -->
@@ -2292,6 +2308,10 @@ calculateReports(yearMovs);
             }
             safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
             safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+            const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
+            if (f22RegimeDisclaimer) {
+                f22RegimeDisclaimer.innerText = db.config.regimen === '14D3' ? 'ProPyme General (14 D3)' : 'ProPyme Transparente (14 D8)';
+            }
             // DJ tables
             renderDDJJTables(yearMovs, totalPPM, totalRet);
         }
@@ -2340,10 +2360,21 @@ calculateReports(yearMovs);
             safeSetText('kpi-mom', `${growth.toFixed(1)}%`);
             // Profit: ventas netas - sum costos mercaderia - gastos (neto)
             const totalSales = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            const totalCost = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const totalCost = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + (b.costoMercaderia || 0), 0);
             const totalGastos = yearMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + b.neto, 0);
             const profit = totalSales - totalCost - totalGastos;
             safeSetText('kpi-profit', `$ ${profit.toLocaleString('es-CL')}`);
+            safeSetText('kpi-profit-year', `Año ${db.config.year}`);
+
+            const allMovs = db.movimientos.filter(m => [2024, 2025, 2026].includes(new Date(m.fecha).getFullYear()));
+            const generalSales = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const generalCost = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+            const generalGastos = allMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const generalProfit = generalSales - generalCost - generalGastos;
+            const generalMargin = generalSales > 0 ? (generalProfit / generalSales) * 100 : 0;
+            safeSetText('kpi-total-sales-general', `$ ${Math.round(generalSales).toLocaleString('es-CL')}`);
+            safeSetText('kpi-profit-general', `$ ${Math.round(generalProfit).toLocaleString('es-CL')}`);
+            safeSetText('kpi-margin-general', `${generalMargin.toFixed(1)}%`);
             // Unit Economics table
             const ranking = db.productos.map(p => {
                 // Units sold
