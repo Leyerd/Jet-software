@@ -633,6 +633,8 @@
                     <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4">Detalle técnico de cálculo</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
                         <div class="flex justify-between"><span class="text-slate-500">Régimen</span><span id="owner-detail-regime" class="dark:text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">RLI empresa (referencial)</span><span id="owner-detail-rli" class="dark:text-white">$ 0</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Retiros informados</span><span id="owner-detail-retiros" class="dark:text-white">$ 0</span></div>
                         <div class="flex justify-between"><span class="text-slate-500">Base en UTA</span><span id="owner-detail-uta" class="dark:text-white">0.00</span></div>
                         <div class="flex justify-between"><span class="text-slate-500">Crédito IDPC utilizable</span><span id="owner-detail-credit" class="dark:text-white">$ 0</span></div>
                         <div class="flex justify-between"><span class="text-slate-500">Tasa efectiva</span><span id="owner-detail-rate" class="dark:text-white">0.00%</span></div>
@@ -1707,7 +1709,7 @@
             f29: { title: 'F29 Mensual', text: 'Revisa débito/crédito IVA y prepara propuesta antes del envío oficial.' },
             ddjj: { title: 'DDJJ Juradas', text: 'Controla declaraciones juradas y evidencia por período.' },
             f22: { title: 'Renta F22', text: 'Visualiza base anual y consistencias previas a operación renta.' },
-            'dueno-sii': { title: 'SII Dueño', text: 'Responde cuándo, dónde y cómo declara el dueño y estima impuesto personal anual según régimen (14D3/14D8), base, tramos IGC y créditos.' },
+            'dueno-sii': { title: 'SII Dueño', text: 'Responde cuándo, dónde y cómo declara el dueño y estima impuesto personal anual. En 14D3 calcula sobre retiros efectivos (no sobre utilidad retenida) y en 14D8 sobre renta atribuida anual.' },
             kpi: { title: 'Indicadores', text: 'Monitorea margen, rotación y salud del negocio.' },
             auditoria: { title: 'Auditoría', text: 'Consulta bitácora y trazabilidad de cambios críticos.' },
             contabilidad: { title: 'Contabilidad', text: 'Gestiona asientos, publicación y reversas con validación.' },
@@ -2268,8 +2270,8 @@ calculateReports(yearMovs);
             const cmv = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
             const gastos = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
             const rli = Math.max(0, sales - cmv - gastos);
-            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
-            const baseOwner = isRegimenGeneral ? Math.max(0, retiros) : rli;
+            const retiros = Math.max(0, yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0));
+            const baseOwner = isRegimenGeneral ? retiros : rli;
             const utaValue = 8268728; // UTA referencial anual CLP (ajustable por normativa anual)
             const baseUTA = utaValue > 0 ? (baseOwner / utaValue) : 0;
             const brackets = getOwnerTaxBracketsUTA();
@@ -2278,10 +2280,12 @@ calculateReports(yearMovs);
             const igcBruto = Math.round(igcBrutoUTA * utaValue);
 
             const idpcEmpresa = isRegimenGeneral ? Math.round(rli * 0.25) : 0;
-            const ownerCredit = isRegimenGeneral ? Math.min(idpcEmpresa, igcBruto) : 0;
+            const retiroSobreRli = isRegimenGeneral && rli > 0 ? Math.min(1, baseOwner / rli) : 0;
+            const creditoMaximoPorRetiros = Math.round(idpcEmpresa * retiroSobreRli);
+            const ownerCredit = isRegimenGeneral ? Math.min(creditoMaximoPorRetiros, igcBruto) : 0;
             const netOwnerTax = Math.max(0, igcBruto - ownerCredit);
 
-            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue };
+            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue, rli, retiros };
         }
 
         function renderOwnerTaxModule() {
@@ -2291,14 +2295,16 @@ calculateReports(yearMovs);
             safeSetText('owner-tax-base', `$ ${Math.round(data.baseOwner).toLocaleString('es-CL')}`);
             safeSetText('owner-tax-gross', `$ ${Math.round(data.igcBruto).toLocaleString('es-CL')}`);
             safeSetText('owner-tax-net', `$ ${Math.round(data.netOwnerTax).toLocaleString('es-CL')}`);
-            safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros del dueño' : '14D8 · base atribuida anual');
+            safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros efectivos del dueño' : '14D8 · base atribuida anual');
+            safeSetText('owner-detail-rli', `$ ${Math.round(data.rli || 0).toLocaleString('es-CL')}`);
+            safeSetText('owner-detail-retiros', `$ ${Math.round(data.retiros || 0).toLocaleString('es-CL')}`);
             safeSetText('owner-detail-uta', `${data.baseUTA.toFixed(2)} UTA`);
             safeSetText('owner-detail-credit', `$ ${Math.round(data.ownerCredit).toLocaleString('es-CL')}`);
             const effRate = data.baseOwner > 0 ? (data.netOwnerTax / data.baseOwner) * 100 : 0;
             safeSetText('owner-detail-rate', `${effRate.toFixed(2)}%`);
             safeSetText('owner-where', 'SII.cl → Servicios online → Declaración de Renta (F22)');
             safeSetText('owner-how', data.isRegimenGeneral
-                ? 'Con retiros efectivos, registro empresarial 14D3, crédito IDPC y propuesta F22.'
+                ? 'Con retiros efectivos, registro 14D3, control de crédito IDPC proporcional a retiros y propuesta F22 del dueño.'
                 : 'Con renta atribuida 14D8, respaldo de RLI/DDJJ 1947 y propuesta F22 del dueño.');
             safeSetHTML('owner-tax-brackets', data.brackets.map(b => `
                 <tr>
