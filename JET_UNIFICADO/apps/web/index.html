@@ -1956,8 +1956,11 @@
         }
 
         // Safe reversal for editing (no cambios)
+        function findProductById(prodId) {
+            return db.productos.find(p => String(p.id) === String(prodId));
+        }
         function revertMovement(m) {
-            const p = db.productos.find(x => x.id === m.prodId);
+            const p = findProductById(m.prodId);
             if (p && m.tipo === 'VENTA') p.stock += m.cant;
             if (p && m.tipo === 'IMPORTACION') p.stock -= m.cant;
         }
@@ -2573,7 +2576,7 @@ calculateReports(yearMovs);
             const cuenta = document.getElementById('venta-cuenta').value;
             const fechaRaw = document.getElementById('venta-fecha').value;
             const fecha = new Date(fechaRaw + 'T00:00:00');
-            const prod = db.productos.find(p => p.id === prodId);
+            const prod = findProductById(prodId);
             if (!prod || prod.stock < cant) { alert('Stock insuficiente'); return; }
             const neto = Math.round(bruto / 1.19);
             const iva = bruto - neto;
@@ -2621,7 +2624,11 @@ calculateReports(yearMovs);
             const baseImport = cif + adVal;
             const ivaImport = Math.round(baseImport * 0.19);
             const total = baseImport + ivaImport;
-            const prod = db.productos.find(p => p.id === prodId);
+            const prod = findProductById(prodId);
+            if (!prod) {
+                alert('Producto no encontrado. Selecciona un SKU válido.');
+                return;
+            }
             // Actualizar costo promedio de inventario con la base (costo + ad valorem) en CLP
             prod.costoPromedio = Math.round(((prod.stock * prod.costoPromedio) + baseImport) / (prod.stock + cant));
             prod.stock += cant;
