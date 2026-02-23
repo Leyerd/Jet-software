@@ -87,7 +87,7 @@ function buildDemoMovements(products) {
         `Gasto operacional ${year}-${String(month).padStart(2, '0')}`,
         gastoNeto,
         gastoIva,
-        { nDoc: `FAC-G-${year}${String(month).padStart(2, '0')}` }
+        { nDoc: `FAC-G-${year}${String(month).padStart(2, '0')}`, cuentaId: month % 2 === 0 ? 'banco' : 'caja' }
       ));
 
       // honorarios en meses trimestrales
@@ -103,7 +103,7 @@ function buildDemoMovements(products) {
           `Honorarios asesoría tributaria ${year}-${month}`,
           bruto,
           0,
-          { retention, nDoc: `HON-${year}${String(month).padStart(2, '0')}` }
+          { retention, nDoc: `HON-${year}${String(month).padStart(2, '0')}`, cuentaId: 'banco' }
         ));
       }
 
@@ -126,7 +126,8 @@ function buildDemoMovements(products) {
             cant,
             costoMercaderia: neto,
             nDoc: `IMP-${year}${String(month).padStart(2, '0')}`,
-            accepted: true
+            accepted: true,
+            cuentaId: 'banco'
           }
         ));
       }
@@ -134,6 +135,44 @@ function buildDemoMovements(products) {
   }
 
   return movimientos;
+}
+
+
+function buildCashFlow(movimientos, cuentas) {
+  const balances = Object.fromEntries(cuentas.map((c) => [c.id, Number(c.saldo || 0)]));
+  const ordered = [...movimientos].sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+  const flow = [];
+
+  for (const m of ordered) {
+    const cuentaId = m.cuentaId || 'banco';
+    if (!(cuentaId in balances)) balances[cuentaId] = 0;
+
+    let tipoMovimiento = null;
+    let monto = 0;
+    if (m.tipo === 'VENTA') {
+      tipoMovimiento = 'INGRESO';
+      monto = Number(m.total || 0);
+    } else if (['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'RETIRO'].includes(m.tipo)) {
+      tipoMovimiento = 'EGRESO';
+      monto = Number(m.total || 0);
+    }
+
+    if (!tipoMovimiento || monto <= 0) continue;
+    balances[cuentaId] += tipoMovimiento === 'INGRESO' ? monto : -monto;
+
+    flow.push({
+      id: `FLOW-${m.id}`,
+      fecha: m.fecha,
+      cuentaId,
+      tipoMovimiento,
+      monto,
+      concepto: m.desc || m.descripcion || m.tipo,
+      refId: m.id,
+      saldoParcial: Math.round(balances[cuentaId])
+    });
+  }
+
+  return flow;
 }
 
 function buildDemoState() {
@@ -164,7 +203,12 @@ function buildDemoState() {
       { id: '11.111.111-1', rut: '11.111.111-1', nombre: 'Javier Demo', tipo: 'SOCIO' },
       { id: '22.222.222-2', rut: '22.222.222-2', nombre: 'Ana Demo', tipo: 'SOCIO' }
     ],
-    flujoCaja: [],
+    flujoCaja: buildCashFlow(movimientos, [
+      { id: 'caja', saldo: 6850000 },
+      { id: 'banco', saldo: 19250000 },
+      { id: 'banchile', saldo: 6400000 },
+      { id: 'mp', saldo: 1840000 }
+    ]),
     periodos: [
       { id: '2024-12', year: 2024, month: 12, status: 'closed' },
       { id: '2025-12', year: 2025, month: 12, status: 'closed' },

@@ -2460,14 +2460,17 @@ calculateReports(yearMovs);
                     observations.push({ tipo: 'Margen Negativo', detalle: m.desc, valor: diff });
                 }
             });
-            // 2) Conciliación bancaria: diferencia entre ingresos registrados y ventas netas
-            const totalVentas = db.movimientos.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            // Suma de ingresos en cuentas bancarias y Mercado Pago
-            const totalIngresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'INGRESO').reduce((a, b) => a + b.monto, 0);
-            const totalEgresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'EGRESO').reduce((a, b) => a + b.monto, 0);
-            const conciliacionDiff = Math.abs(totalVentas - (totalIngresos - totalEgresos));
-            if (conciliacionDiff > 0.01) {
-                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Diferencia entre ventas y flujos de caja', valor: conciliacionDiff });
+            // 2) Conciliación bancaria: ventas cobradas (brutas) vs ingresos asociados a ventas
+            const totalVentas = db.movimientos.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + (b.total || 0), 0);
+            const ventaIds = new Set(db.movimientos.filter(m => m.tipo === 'VENTA').map(m => String(m.id)));
+            const ingresosPorVentas = db.flujoCaja
+                .filter(f => f.tipoMovimiento === 'INGRESO' && ventaIds.has(String(f.refId)))
+                .reduce((a, b) => a + b.monto, 0);
+            const conciliacionDiff = Math.abs(totalVentas - ingresosPorVentas);
+            if (db.flujoCaja.length === 0) {
+                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Sin flujos de caja registrados para conciliar', valor: 0 });
+            } else if (conciliacionDiff > 5000) {
+                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Diferencia entre ventas y cobros de ventas en caja/banco', valor: conciliacionDiff });
             }
             // 3) Gastos no aceptados: gastos marcados como no aceptados
             db.movimientos.forEach(m => {
@@ -2941,7 +2944,9 @@ calculateReports(yearMovs);
         // Obtener la cuenta asociada a un movimiento buscando en el flujo de caja
         function getCuentaIdForMov(movId) {
             const flow = db.flujoCaja.find(f => f.refId == movId);
-            return flow ? flow.cuentaId : null;
+            if (flow && flow.cuentaId) return flow.cuentaId;
+            const mov = db.movimientos.find(m => m.id == movId);
+            return mov && mov.cuentaId ? mov.cuentaId : null;
         }
 
         // Reconstruir asientos contables a partir de los movimientos y flujos existentes
