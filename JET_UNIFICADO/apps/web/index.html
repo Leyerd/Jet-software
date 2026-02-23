@@ -184,6 +184,18 @@
                 <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Retención (Honor.)</span>
                 <span id="ret-rate" class="text-[10px] font-black text-white"></span>
             </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">UTM (CLP)</span>
+                <input type="number" id="config-utm" onchange="updateUTM(this.value)" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none text-center" value="0">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">UTA (CLP)</span>
+                <input type="number" id="config-uta" onchange="updateUTA(this.value)" class="w-24 bg-slate-800 text-white text-[10px] font-black rounded px-2 py-1 outline-none text-center" value="0">
+            </div>
+            <div class="flex items-center justify-between mb-2">
+                <span id="tax-unit-updated" class="text-[9px] font-bold text-slate-500 uppercase tracking-wider">UTM/UTA: Manual</span>
+                <button onclick="updateTaxUnits()" class="bg-slate-700 text-white text-[9px] font-black rounded px-2 py-1 uppercase tracking-widest">Actualizar</button>
+            </div>
             <!-- Configuraciones adicionales de la empresa -->
             <div class="flex items-center justify-between mb-2">
                 <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Régimen</span>
@@ -1393,7 +1405,10 @@
                 giro: '479100',
                 // Domicilio principal de la empresa (para fines de importaciones y fiscalización)
                 address: '',
-                apiToken: ''
+                apiToken: '',
+                utmValue: 67000,
+                utaValue: 804000,
+                taxUnitUpdatedAt: null
             }
         };
 
@@ -1475,6 +1490,9 @@
             if (db.config.regimen === undefined) db.config.regimen = '14D8';
             if (db.config.giro === undefined) db.config.giro = '479100';
             if (db.config.address === undefined) db.config.address = '';
+            if (db.config.utmValue === undefined) db.config.utmValue = 67000;
+            if (db.config.utaValue === undefined) db.config.utaValue = db.config.utmValue * 12;
+            if (db.config.taxUnitUpdatedAt === undefined) db.config.taxUnitUpdatedAt = null;
             // Asegurar que existan los registros de RCV, incluso si no fueron guardados previamente
             if (!db.rcvCompras) db.rcvCompras = [];
             if (!db.rcvVentas) db.rcvVentas = [];
@@ -1493,6 +1511,9 @@
             const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
             const giroInp = document.getElementById('config-giro'); if (giroInp) giroInp.value = db.config.giro || '';
             const addrInp = document.getElementById('config-address'); if (addrInp) addrInp.value = db.config.address || '';
+            const utmInp = document.getElementById('config-utm'); if (utmInp) utmInp.value = Math.round(db.config.utmValue || 0);
+            const utaInp = document.getElementById('config-uta'); if (utaInp) utaInp.value = Math.round(db.config.utaValue || 0);
+            safeSetText('tax-unit-updated', db.config.taxUnitUpdatedAt ? `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}` : 'UTM/UTA: Manual');
             const monthSel = document.getElementById('filter-month'); if (monthSel) monthSel.value = db.config.selectedMonth;
             // Sincronizar selectores de mes en la sección de Contabilidad
             const diarioSel = document.getElementById('filter-month-diario'); if (diarioSel) diarioSel.value = db.config.contabMonthDiario;
@@ -1505,8 +1526,9 @@
             rebuildAsientos();
             updateRetRate();
             applyTheme();
-            // Actualizar valor del dólar; UF/UTM/IPC se eliminan por no ser utilizados
+            // Actualizar valor del dólar y unidades tributarias
             updateUSD();
+            updateTaxUnits(true);
             render();
 
         });
@@ -1648,6 +1670,44 @@
             }
         }
         function updatePPM(v) { db.config.ppmRate = parseFloat(v); save(); }
+        function updateUTM(v) {
+            const val = Number(v);
+            if (!Number.isFinite(val) || val <= 0) return;
+            db.config.utmValue = Math.round(val);
+            if (!db.config.utaManual) {
+                db.config.utaValue = Math.round(db.config.utmValue * 12);
+                const utaInp = document.getElementById('config-uta'); if (utaInp) utaInp.value = db.config.utaValue;
+            }
+            db.config.taxUnitUpdatedAt = new Date().toISOString();
+            safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+            save();
+        }
+        function updateUTA(v) {
+            const val = Number(v);
+            if (!Number.isFinite(val) || val <= 0) return;
+            db.config.utaValue = Math.round(val);
+            db.config.utaManual = true;
+            db.config.taxUnitUpdatedAt = new Date().toISOString();
+            safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+            save();
+        }
+        async function updateTaxUnits(silent = false) {
+            try {
+                const res = await fetch('https://mindicador.cl/api/utm');
+                const data = await res.json();
+                const utm = Number(data?.serie?.[0]?.valor || 0);
+                if (!Number.isFinite(utm) || utm <= 0) throw new Error('UTM inválida');
+                db.config.utmValue = Math.round(utm);
+                if (!db.config.utaManual) db.config.utaValue = Math.round(db.config.utmValue * 12);
+                db.config.taxUnitUpdatedAt = new Date().toISOString();
+                const utmInp = document.getElementById('config-utm'); if (utmInp) utmInp.value = db.config.utmValue;
+                const utaInp = document.getElementById('config-uta'); if (utaInp) utaInp.value = db.config.utaValue;
+                safeSetText('tax-unit-updated', `UTM/UTA: ${new Date(db.config.taxUnitUpdatedAt).toLocaleDateString('es-CL')}`);
+                save();
+            } catch (err) {
+                if (!silent) alert('No se pudo actualizar UTM/UTA automáticamente. Puedes ingresarlas manualmente.');
+            }
+        }
 
         // Actualizar régimen tributario (14D3 o 14D8)
         function updateRegimen(v) {
@@ -2272,7 +2332,7 @@ calculateReports(yearMovs);
             const rli = Math.max(0, sales - cmv - gastos);
             const retiros = Math.max(0, yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0));
             const baseOwner = isRegimenGeneral ? retiros : rli;
-            const utaValue = 8268728; // UTA referencial anual CLP (ajustable por normativa anual)
+            const utaValue = Number(db.config.utaValue || 0) > 0 ? Number(db.config.utaValue) : 8268728; // UTA anual
             const baseUTA = utaValue > 0 ? (baseOwner / utaValue) : 0;
             const brackets = getOwnerTaxBracketsUTA();
             const tramo = brackets.find(b => baseUTA >= b.from && baseUTA <= b.to) || brackets[brackets.length - 1];
@@ -2285,7 +2345,7 @@ calculateReports(yearMovs);
             const ownerCredit = isRegimenGeneral ? Math.min(creditoMaximoPorRetiros, igcBruto) : 0;
             const netOwnerTax = Math.max(0, igcBruto - ownerCredit);
 
-            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue, rli, retiros };
+            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue, rli, retiros, utmValue: Number(db.config.utmValue || 0) };
         }
 
         function renderOwnerTaxModule() {
