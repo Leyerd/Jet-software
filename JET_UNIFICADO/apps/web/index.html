@@ -599,16 +599,16 @@
                         </div>
                         <!-- Impuesto de Primera Categoría según régimen (25% para 14D3) -->
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto (25%)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-label">Impuesto (25%)</span>
                             <span id="f22-idpc" class="font-black text-blue-500 text-xl">$ 0</span>
                         </div>
                         <!-- Impuesto Neto a Pagar (impuesto - PPM - retenciones) -->
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto Neto</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-net-label">Impuesto Neto</span>
                             <span id="f22-idpc-net" class="font-black text-indigo-600 text-xl">$ 0</span>
                         </div>
                         <div class="flex justify-between items-center py-2 border-t border-slate-50 dark:border-slate-800 mt-4 pt-4">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Retiros Efectivos (Global Compl.)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-withdrawals-label">Retiros Efectivos (Global Compl.)</span>
                             <span id="f22-retiros" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
                         </div>
                     </div>
@@ -2287,9 +2287,11 @@ calculateReports(yearMovs);
             const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
             // Gastos no aceptados (para información)
             const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + Number(b.neto || 0), 0);
-            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
+            const retirosRegistrados = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
             const utilidad = vN - cMV - gO; // RLI (Ingresos - Costos - Gastos)
             const rliTributable = Math.max(0, utilidad);
+            const isRegimenGeneral = db.config.regimen === '14D3';
+            const retiros = isRegimenGeneral ? retirosRegistrados : (retirosRegistrados > 0 ? retirosRegistrados : rliTributable);
             safeSetText('f22-ventas', `$ ${vN.toLocaleString('es-CL')}`);
             safeSetText('f22-costos', `$ ${cMV.toLocaleString('es-CL')}`);
             safeSetText('f22-gastos', `$ ${gO.toLocaleString('es-CL')}`);
@@ -2302,15 +2304,27 @@ calculateReports(yearMovs);
             // Régimen 14D8: transparente, no determina IDPC en la empresa
             let idpc = 0;
             let idpcNet = 0;
-            if (db.config.regimen === '14D3') {
+            if (isRegimenGeneral) {
                 idpc = Math.round(rliTributable * 0.25);
                 idpcNet = Math.max(0, idpc - totalPPM - totalRet);
-            } else {
-                idpc = 0;
-                idpcNet = 0;
             }
             safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
             safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+
+            const f22TaxLabel = document.getElementById('f22-tax-label');
+            if (f22TaxLabel) {
+                f22TaxLabel.innerText = isRegimenGeneral ? 'Impuesto (25%)' : 'Impuesto Empresa (0% · 14 D8)';
+            }
+            const f22TaxNetLabel = document.getElementById('f22-tax-net-label');
+            if (f22TaxNetLabel) {
+                f22TaxNetLabel.innerText = isRegimenGeneral ? 'Impuesto Neto' : 'Impuesto Neto Empresa (0%)';
+            }
+            const f22WithdrawalsLabel = document.getElementById('f22-withdrawals-label');
+            if (f22WithdrawalsLabel) {
+                f22WithdrawalsLabel.innerText = isRegimenGeneral
+                    ? 'Retiros Efectivos (Global Compl.)'
+                    : 'Base Atribuible / Retiros (14 D8)';
+            }
             const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
             if (f22RegimeDisclaimer) {
                 f22RegimeDisclaimer.innerText = db.config.regimen === '14D3' ? 'ProPyme General (14 D3)' : 'ProPyme Transparente (14 D8)';
