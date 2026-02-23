@@ -556,7 +556,7 @@
                 <div class="help-box">
                     <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Renta Líquida Imponible (RLI)</h4>
                     <p class="text-[11px] text-slate-600 dark:text-slate-300">
-                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados y retenciones según régimen.
+                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados; en 14D8 la utilidad se atribuye al dueño y no genera IDPC en la empresa.
                     </p>
                 </div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
@@ -602,7 +602,7 @@
                             <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-label">Impuesto (25%)</span>
                             <span id="f22-idpc" class="font-black text-blue-500 text-xl">$ 0</span>
                         </div>
-                        <!-- Impuesto Neto a Pagar (impuesto - PPM - retenciones) -->
+                        <!-- Impuesto Neto a Pagar (impuesto - PPM) -->
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
                             <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-net-label">Impuesto Neto</span>
                             <span id="f22-idpc-net" class="font-black text-indigo-600 text-xl">$ 0</span>
@@ -2306,7 +2306,7 @@ calculateReports(yearMovs);
             let idpcNet = 0;
             if (isRegimenGeneral) {
                 idpc = Math.round(rliTributable * 0.25);
-                idpcNet = Math.max(0, idpc - totalPPM - totalRet);
+                idpcNet = Math.max(0, idpc - totalPPM);
             }
             safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
             safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
@@ -2324,6 +2324,12 @@ calculateReports(yearMovs);
                 f22WithdrawalsLabel.innerText = isRegimenGeneral
                     ? 'Retiros Efectivos (Global Compl.)'
                     : 'Base Atribuible / Retiros (14 D8)';
+            }
+            const f22RliNote = document.querySelector('#tab-f22 .text-[9px].text-slate-400.uppercase.font-bold');
+            if (f22RliNote) {
+                f22RliNote.innerText = isRegimenGeneral
+                    ? 'Monto sobre el cual pagas impuesto (1ra categoría)'
+                    : 'Renta atribuible al dueño (sin IDPC en la empresa)';
             }
             const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
             if (f22RegimeDisclaimer) {
