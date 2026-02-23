@@ -178,6 +178,36 @@ async function getFrontendState(_req, res) {
   });
 }
 
+
+function buildFrontendBackupFromDemoState(state) {
+  const tax = state.taxConfig || {};
+  return {
+    ...state,
+    config: {
+      usdRate: 950,
+      ppmRate: tax.ppmRate !== undefined ? tax.ppmRate : 0.2,
+      year: tax.year || 2026,
+      theme: 'light',
+      selectedMonth: 0,
+      contabMonth: 0,
+      contabMonthDiario: 0,
+      contabMonthMayor: 0,
+      contabMonthBalance: 0,
+      retRate: tax.retentionRate !== undefined ? tax.retentionRate : 14.5,
+      regimen: tax.regime || '14D8',
+      giro: '479100',
+      address: '',
+      apiToken: ''
+    }
+  };
+}
+
+async function getDemoBackup(_req, res) {
+  const demo = buildDemoState();
+  const backup = buildFrontendBackupFromDemoState(demo.state);
+  return sendJson(res, 200, { ok: true, backup, summary: { products: demo.products, movements: demo.movements, thirdParties: demo.thirdParties, accounts: demo.accounts } });
+}
+
 async function loadDemoData(_req, res) {
   const demo = buildDemoState();
   let demoAuthToken = null;
@@ -198,4 +228,4 @@ async function loadDemoData(_req, res) {
   });
 }
 
-module.exports = { coherenceCheck, getFrontendState, loadDemoData };
+module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData };

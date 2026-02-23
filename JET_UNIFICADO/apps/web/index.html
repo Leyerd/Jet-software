@@ -1287,7 +1287,7 @@
                 <input type="file" id="backup-file" class="hidden" accept=".json" onchange="importData(event); closeModal('modal-backup')">
                 <button onclick="document.getElementById('backup-file').click()" class="btn-jet bg-emerald-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest w-full">Cargar Datos</button>
             </div>
-            <button onclick="loadDemoDataFromBackend(); closeModal('modal-backup')" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cargar Demo 2024-2026</button>
+            <button onclick="loadDemoDataFromJson(); closeModal('modal-backup')" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cargar Demo 2024-2026</button>
             <button onclick="closeModal('modal-backup')" class="btn-jet bg-slate-700 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cancelar</button>
         </div>
     </div>
@@ -1492,6 +1492,17 @@
         }
 
         // Importar datos desde un archivo JSON
+        function applyBackupObject(imported) {
+            db = imported;
+            if (!db.config) db.config = {};
+            initPlanCuentas();
+            rebuildAsientos();
+            updateRetRate();
+            applyTheme();
+            updateUSD();
+            save();
+        }
+
         function importData(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1499,15 +1510,7 @@
             reader.onload = function(evt) {
                 try {
                     const imported = JSON.parse(evt.target.result);
-                    db = imported;
-                    // Asegurar que existan los nuevos campos de configuración
-                    if (!db.config) db.config = {};
-                    initPlanCuentas();
-                    rebuildAsientos();
-                    updateRetRate();
-                    applyTheme();
-                    updateUSD();
-                    save();
+                    applyBackupObject(imported);
                     alert('Backup importado correctamente');
                 } catch (err) {
                     alert('Error al importar el backup');
@@ -1515,6 +1518,19 @@
             };
             reader.readAsText(file);
         }
+        async function loadDemoDataFromJson() {
+            try {
+                const payload = await apiClient.get('/system/demo-backup');
+                if (!payload || !payload.backup) throw new Error('Respuesta demo-backup inválida');
+                applyBackupObject(payload.backup);
+                alert(`Base demo JSON cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
+                return;
+            } catch (err) {
+                console.warn('Fallo carga JSON demo, se intentará endpoint runtime.', err.message);
+                await loadDemoDataFromBackend();
+            }
+        }
+
         async function loadDemoDataFromBackend() {
             const attempts = [
                 () => apiClient.post('/system/load-demo-data', {}),
