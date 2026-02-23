@@ -38,6 +38,21 @@
             color: #60a5fa;
             border-right: 3px solid #60a5fa;
         }
+
+        .sidebar-scroll-wrap { flex: 1; min-height: 0; }
+        .sidebar-scroll {
+            height: 100%;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            scrollbar-gutter: stable both-edges;
+            scrollbar-width: auto;
+            scrollbar-color: #38bdf8 #020617;
+            padding-right: 2px;
+            max-height: 100%;
+        }
+        .sidebar-scroll::-webkit-scrollbar { width: 12px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: #020617; border-radius: 10px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 999px; border: 2px solid #020617; min-height: 24px; }
         .card {
             background-color: var(--bg-card);
             border-radius: 20px;
@@ -76,14 +91,15 @@
 <body class="flex min-h-screen overflow-hidden">
 
     <!-- Sidebar -->
-    <aside class="w-64 bg-slate-950 text-slate-400 flex-shrink-0 hidden md:flex flex-col border-r border-slate-800">
+    <aside class="w-64 h-screen overflow-hidden bg-slate-950 text-slate-400 flex-shrink-0 hidden md:flex flex-col border-r border-slate-800">
         <div class="p-8 border-b border-slate-800">
             <h1 class="text-2xl font-black text-white flex items-center gap-2 tracking-tighter">
                 <i data-lucide="rocket" class="text-blue-500 fill-blue-500/20"></i> JET PRO
             </h1>
             <p class="text-[9px] text-slate-500 uppercase font-black tracking-[0.3em] mt-2">ERP Chile v3.0</p>
         </div>
-        <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+        <div class="sidebar-scroll-wrap">
+        <nav id="sidebar-nav" class="flex-1 p-4 space-y-1 sidebar-scroll">
             <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operativa</div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
                 <i data-lucide="layout-grid" class="w-4 h-4"></i> Dashboard
@@ -114,6 +130,9 @@
             <button onclick="switchTab('f22')" id="btn-f22" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
                 <i data-lucide="landmark" class="w-4 h-4"></i> Renta F22
             </button>
+            <button onclick="switchTab('dueno-sii')" id="btn-dueno-sii" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-sky-400">
+                <i data-lucide="user-round" class="w-4 h-4"></i> SII Dueño
+            </button>
             <button onclick="switchTab('kpi')" id="btn-kpi" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-pink-400">
                 <i data-lucide="trending-up" class="w-4 h-4"></i> Indicadores
             </button>
@@ -125,6 +144,24 @@
             <button onclick="switchTab('contabilidad')" id="btn-contabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-yellow-400">
                 <i data-lucide="book-open" class="w-4 h-4"></i> Contabilidad
             </button>
+            <button onclick="switchTab('reporteria')" id="btn-reporteria" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-cyan-400">
+                <i data-lucide="files" class="w-4 h-4"></i> Reportería
+            </button>
+            <button onclick="switchTab('observabilidad')" id="btn-observabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-lime-400">
+                <i data-lucide="siren" class="w-4 h-4"></i> Observabilidad
+            </button>
+            <button onclick="switchTab('cumplimiento')" id="btn-cumplimiento" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-fuchsia-400">
+                <i data-lucide="calendar-check-2" class="w-4 h-4"></i> Cumplimiento
+            </button>
+            <button onclick="switchTab('gobernanza')" id="btn-gobernanza" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-indigo-400">
+                <i data-lucide="shield-ellipsis" class="w-4 h-4"></i> Gobernanza
+            </button>
+            <button onclick="switchTab('ejecutivo')" id="btn-ejecutivo" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-teal-400">
+                <i data-lucide="briefcase-business" class="w-4 h-4"></i> Ejecutivo EIRL
+            </button>
+            <button onclick="switchTab('normativa')" id="btn-normativa" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-violet-400">
+                <i data-lucide="scale" class="w-4 h-4"></i> Normativa
+            </button>
             <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Sistema</div>
             <button onclick="toggleTheme()" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold hover:text-white transition-all text-slate-500">
                 <i data-lucide="palette" id="theme-icon" class="w-4 h-4"></i> Interfaz
@@ -133,6 +170,7 @@
                 <i data-lucide="download-cloud" class="w-4 h-4"></i> Backup
             </button>
         </nav>
+        </div>
         <div class="p-4 bg-slate-900/50 m-4 rounded-2xl border border-slate-800/50">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Año Fiscal</span>
@@ -170,6 +208,7 @@
         <header class="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 z-20 shadow-sm transition-colors">
             <div class="flex items-center gap-4">
                 <span id="tab-title" class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-[0.25em]">Dashboard</span>
+                <button onclick="openTabHelp()" id="btn-tab-help" class="w-7 h-7 rounded-full bg-blue-600 text-white text-sm font-black" title="Ayuda del módulo">?</button>
             </div>
             <div class="flex items-center gap-8">
                     <div class="hidden lg:flex flex-col items-end text-right">
@@ -178,11 +217,6 @@
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <p class="text-xs font-black text-slate-900 dark:text-white tracking-tight">USD ADUANA: <span id="usd-val" class="text-blue-600 font-black">$ 0</span></p>
                     </div>
-                        <!-- Selector de año rápido en el header para mejorar la accesibilidad -->
-                        <div class="flex items-center gap-2 text-right mt-1">
-                            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-tight">Año</span>
-                            <input type="number" id="config-year-header" onchange="updateYear(this.value)" class="w-16 bg-slate-200 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-black rounded px-2 py-1 outline-none text-center" />
-                        </div>
                         <!-- Se eliminan indicadores UF, UTM e IPC ya que no se usan en los cálculos -->
                 </div>
                 <div class="h-8 w-px bg-slate-200 dark:bg-slate-800"></div>
@@ -525,7 +559,7 @@
                 <div class="help-box">
                     <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">Renta Líquida Imponible (RLI)</h4>
                     <p class="text-[11px] text-slate-600 dark:text-slate-300">
-                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b>ProPyme General (14 D3)</b> optimizado con control de inventario (CMV). Incluye PPM pagados y Retenciones.
+                        Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados; en 14D8 la utilidad se atribuye al dueño y no genera IDPC en la empresa.
                     </p>
                 </div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
@@ -562,24 +596,54 @@
                         <div class="flex justify-between items-center py-8 bg-slate-50 dark:bg-slate-800 px-10 rounded-[2.5rem] border-2 border-slate-950 dark:border-blue-900">
                             <div>
                                 <span class="block text-slate-950 dark:text-white font-black text-sm uppercase tracking-widest">Renta Líquida Imponible</span>
-                                <span class="text-[9px] text-slate-400 uppercase font-bold">Monto sobre el cual pagas impuesto (1ra Categoría)</span>
+                                <span id="f22-rli-note" class="text-[9px] text-slate-400 uppercase font-bold">Monto sobre el cual pagas impuesto (1ra Categoría)</span>
                             </div>
                             <span id="f22-utilidad" class="font-black text-blue-600 dark:text-blue-400 text-3xl">$ 0</span>
                         </div>
                         <!-- Impuesto de Primera Categoría según régimen (25% para 14D3) -->
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto (25%)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-label">Impuesto (25%)</span>
                             <span id="f22-idpc" class="font-black text-blue-500 text-xl">$ 0</span>
                         </div>
-                        <!-- Impuesto Neto a Pagar (impuesto - PPM - retenciones) -->
+                        <!-- Impuesto Neto a Pagar (impuesto - PPM) -->
                         <div class="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Impuesto Neto</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-tax-net-label">Impuesto Neto</span>
                             <span id="f22-idpc-net" class="font-black text-indigo-600 text-xl">$ 0</span>
                         </div>
                         <div class="flex justify-between items-center py-2 border-t border-slate-50 dark:border-slate-800 mt-4 pt-4">
-                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest">Retiros Efectivos (Global Compl.)</span>
+                            <span class="text-slate-500 dark:text-slate-400 font-bold text-xs uppercase tracking-widest" id="f22-withdrawals-label">Retiros Efectivos (Global Compl.)</span>
                             <span id="f22-retiros" class="font-black text-slate-950 dark:text-white text-xl">$ 0</span>
                         </div>
+                    </div>
+                </div>
+            </div>
+            <!-- SII Dueño (Impuesto personal y guía de declaración) -->
+            <div id="tab-dueno-sii" class="tab-content hidden space-y-6">
+                <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">SII Dueño · Impuesto Personal</h2>
+                <div class="help-box">
+                    <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">¿Cuándo, dónde y cómo declarar?</h4>
+                    <p class="text-[11px] text-slate-600 dark:text-slate-300">Módulo profesional para estimar carga tributaria del dueño según régimen (<b id="owner-regime-chip">14D8</b>), consolidar créditos y preparar la declaración en SII.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-6 border-l-4 border-sky-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Base tributable dueño</p><h3 id="owner-tax-base" class="text-2xl font-black text-sky-600">$ 0</h3></div>
+                    <div class="card p-6 border-l-4 border-amber-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">IGC determinado</p><h3 id="owner-tax-gross" class="text-2xl font-black text-amber-600">$ 0</h3></div>
+                    <div class="card p-6 border-l-4 border-emerald-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Impuesto final dueño</p><h3 id="owner-tax-net" class="text-2xl font-black text-emerald-600">$ 0</h3></div>
+                </div>
+                <div class="card p-6">
+                    <h3 class="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest mb-4">Detalle técnico de cálculo</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-bold">
+                        <div class="flex justify-between"><span class="text-slate-500">Régimen</span><span id="owner-detail-regime" class="dark:text-white">-</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Base en UTA</span><span id="owner-detail-uta" class="dark:text-white">0.00</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Crédito IDPC utilizable</span><span id="owner-detail-credit" class="dark:text-white">$ 0</span></div>
+                        <div class="flex justify-between"><span class="text-slate-500">Tasa efectiva</span><span id="owner-detail-rate" class="dark:text-white">0.00%</span></div>
+                        <div class="flex justify-between md:col-span-2"><span class="text-slate-500">Dónde declarar</span><span id="owner-where" class="dark:text-white text-right">SII.cl → Servicios online → Declaración de Renta (F22)</span></div>
+                        <div class="flex justify-between md:col-span-2"><span class="text-slate-500">Cómo declarar</span><span id="owner-how" class="dark:text-white text-right">Con propuesta F22 + DDJJ régimen + respaldo libro contable</span></div>
+                    </div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 dark:border-slate-800"><h3 class="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Tramos IGC usados por el simulador (UTA)</h3></div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full text-xs"><thead class="bg-slate-50 dark:bg-slate-800"><tr><th class="px-4 py-3 text-left">Desde UTA</th><th class="px-4 py-3 text-left">Hasta UTA</th><th class="px-4 py-3 text-left">Tasa marginal</th><th class="px-4 py-3 text-left">Rebaja fija (UTA)</th></tr></thead><tbody id="owner-tax-brackets" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody></table>
                     </div>
                 </div>
             </div>
@@ -596,8 +660,24 @@
                         <h3 id="kpi-mom" class="text-3xl font-black text-indigo-600">0.0%</h3>
                     </div>
                     <div class="card p-8 border-l-4 border-blue-500">
-                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilidad Acumulada</p>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Utilidad Acumulada (Año seleccionado)</p>
                         <h3 id="kpi-profit" class="text-3xl font-black text-blue-600">$ 0</h3>
+                        <p id="kpi-profit-year" class="text-[10px] mt-2 text-slate-500 font-bold uppercase tracking-widest">Año -</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="card p-6 border-l-4 border-slate-500">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Ventas 3 años</p>
+                        <h3 id="kpi-total-sales-general" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                    <div class="card p-6 border-l-4 border-slate-600">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Utilidad 3 años</p>
+                        <h3 id="kpi-profit-general" class="text-2xl font-black text-slate-900 dark:text-white">$ 0</h3>
+                    </div>
+                    <div class="card p-6 border-l-4 border-slate-700">
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Indicador General · Margen 3 años</p>
+                        <h3 id="kpi-margin-general" class="text-2xl font-black text-slate-900 dark:text-white">0.0%</h3>
                     </div>
                 </div>
                 <!-- Marketing y Métricas de E-commerce -->
@@ -761,6 +841,204 @@
                         </thead>
                         <tbody id="table-balance" class="divide-y divide-slate-100 dark:divide-slate-700"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Reportería auditable (Meta 11) -->
+            <div id="tab-reporteria" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Reportería Auditable</h2>
+                            <p class="text-xs text-slate-500 mt-2">Genera Libro Diario, Mayor, Balance, Estado de Resultados e IVA con hash reproducible y exportación CSV/XLSX/PDF.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
+                            <input id="report-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="report-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="">Acumulado anual</option>
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadAuditableReports()" class="btn-jet bg-cyan-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Consultar</button>
+                        </div>
+                    </div>
+                    <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input id="api-token" type="text" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Token de sesión (opcional, requerido por endpoints protegidos)">
+                        <div class="flex gap-2">
+                            <button onclick="saveApiToken()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Guardar token</button>
+                            <button onclick="clearApiToken()" class="btn-jet bg-slate-200 dark:bg-slate-700 dark:text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Limpiar</button>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex flex-wrap gap-2">
+                        <button onclick="exportAuditableReport('diario','csv')" class="btn-jet bg-blue-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Diario CSV</button>
+                        <button onclick="exportAuditableReport('mayor','xlsx')" class="btn-jet bg-purple-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Mayor XLSX</button>
+                        <button onclick="exportAuditableReport('balance','pdf')" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Balance PDF</button>
+                    </div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Resumen de generación</h3>
+                    <div id="reports-meta" class="text-xs text-slate-500">Sin consultas aún.</div>
+                    <pre id="reports-preview" class="mt-4 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-80">{}</pre>
+                </div>
+            </div>
+
+
+            <!-- Cumplimiento tributario operativo (Meta 13) -->
+            <div id="tab-cumplimiento" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Calendario & Semáforo Tributario</h2>
+                            <p class="text-xs text-slate-500 mt-2">Control diario de obligaciones: F29, F22, DDJJ y evidencias con acuse/hash.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto">
+                            <input id="comp-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="comp-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadComplianceStatus()" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="comp-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Obligaciones del período</h3>
+                    <div id="comp-obligations" class="space-y-2 text-xs">Sin datos.</div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Registrar evidencia</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <input id="comp-obligation-key" type="text" placeholder="Obligation key" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <select id="comp-lifecycle" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                            <option value="preparado">preparado</option><option value="validado">validado</option><option value="enviado">enviado</option><option value="acuse">acuse</option>
+                        </select>
+                        <input id="comp-ack" type="text" placeholder="Acuse/Folio" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="comp-source" type="text" placeholder="Fuente (SII/API)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="registerComplianceEvidence()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Guardar evidencia</button>
+                    </div>
+                    <div id="comp-evidence-result" class="text-xs mt-3 text-slate-500"></div>
+                </div>
+            </div>
+
+            <!-- Gobernanza contable (Meta 14) -->
+            <div id="tab-gobernanza" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Gobernanza Contable</h2>
+                            <p class="text-xs text-slate-500 mt-2">Plan de cuentas, validaciones cruzadas y doble aprobación para acciones críticas.</p>
+                        </div>
+                        <button onclick="runGovernanceConsistency()" class="btn-jet bg-indigo-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Validar</button>
+                    </div>
+                </div>
+                <div id="gov-consistency" class="card p-6 text-xs text-slate-600 dark:text-slate-300">Sin validaciones aún.</div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Solicitud de aprobación crítica</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <select id="gov-action" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                            <option value="period.close">period.close</option>
+                            <option value="period.reopen">period.reopen</option>
+                            <option value="tax.rectification">tax.rectification</option>
+                        </select>
+                        <input id="gov-reason" type="text" placeholder="Motivo (mín 10)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="createApprovalRequestUI()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Solicitar</button>
+                        <input id="gov-request-id" type="text" placeholder="Request ID" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <button onclick="approveRequestUI()" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Aprobar</button>
+                        <div id="gov-approval-result" class="text-xs text-slate-500"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meta 15: Panel ejecutivo + riesgo + paquete fiscalizador -->
+            <div id="tab-ejecutivo" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Panel Ejecutivo EIRL</h2>
+                            <p class="text-xs text-slate-500 mt-2">Riesgo esperado, cumplimiento y paquete fiscalizador exportable por período.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 w-full lg:w-auto">
+                            <input id="exec-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="exec-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadExecutivePanel()" class="btn-jet bg-teal-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="exec-cards" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Riesgo esperado</h3>
+                        <pre id="exec-risk" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Paquete fiscalizador (hash chain)</h3>
+                        <button onclick="loadAuditPackage()" class="btn-jet bg-slate-900 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest mb-3">Generar</button>
+                        <pre id="exec-pack" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meta 16: Gobierno normativo continuo -->
+            <div id="tab-normativa" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Gobierno Normativo</h2>
+                            <p class="text-xs text-slate-500 mt-2">Registro de cambios regulatorios y corrida de regresión normativa por año.</p>
+                        </div>
+                        <button onclick="loadNormativeChanges()" class="btn-jet bg-violet-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                    </div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Registrar cambio normativo</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                        <input id="norm-title" type="text" placeholder="Título cambio" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="norm-source" type="text" placeholder="Fuente (SII/LIR)" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <input id="norm-effective" type="date" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="registerNormativeChange()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Registrar</button>
+                    </div>
+                    <div class="mt-3 flex gap-2">
+                        <input id="norm-reg-year" type="number" placeholder="Año regresión" class="border-2 border-slate-100 dark:border-slate-800 p-2 rounded-xl text-xs bg-transparent font-bold dark:text-white" />
+                        <button onclick="runNormativeRegression()" class="btn-jet bg-emerald-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Correr regresión</button>
+                    </div>
+                    <div id="norm-result" class="text-xs mt-3 text-slate-500"></div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Cambios normativos</h3><pre id="norm-changes" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
+                    <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Corridas de regresión</h3><pre id="norm-runs" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
+                </div>
+            </div>
+
+            <!-- Observabilidad y cumplimiento (Meta 12) -->
+            <div id="tab-observabilidad" class="tab-content hidden space-y-6">
+                <div class="card p-8">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Observabilidad Operativa</h2>
+                            <p class="text-xs text-slate-500 mt-2">Monitorea errores, latencia, rechazos de validación y alertas activas del backend.</p>
+                        </div>
+                        <button onclick="loadObservabilityDashboard()" class="btn-jet bg-lime-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                    </div>
+                </div>
+                <div id="obs-metrics" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Alertas activas</h3>
+                        <div id="obs-alerts" class="space-y-2 text-xs">Sin datos.</div>
+                    </div>
+                    <div class="card p-6">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Últimos eventos app</h3>
+                        <pre id="obs-logs" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1058,8 +1336,20 @@
                 <input type="file" id="backup-file" class="hidden" accept=".json" onchange="importData(event); closeModal('modal-backup')">
                 <button onclick="document.getElementById('backup-file').click()" class="btn-jet bg-emerald-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest w-full">Cargar Datos</button>
             </div>
+            <button onclick="loadDemoDataFromJson(); closeModal('modal-backup')" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cargar Demo 2024-2026</button>
             <button onclick="closeModal('modal-backup')" class="btn-jet bg-slate-700 text-white px-4 py-3 rounded-3xl text-[11px] font-black uppercase tracking-widest">Cancelar</button>
         </div>
+    </div>
+</div>
+
+
+<div id="modal-tab-help" class="modal-overlay fixed inset-0 hidden flex items-center justify-center p-6 z-50">
+    <div class="bg-white dark:bg-slate-900 rounded-[2rem] p-8 max-w-2xl w-full shadow-2xl border border-slate-200 dark:border-slate-800">
+        <div class="flex items-center justify-between mb-4">
+            <h3 id="help-title" class="text-xl font-black text-slate-900 dark:text-white uppercase tracking-wider">Ayuda</h3>
+            <button onclick="closeModal('modal-tab-help')" class="text-slate-500 hover:text-red-500 text-xl font-black">×</button>
+        </div>
+        <div id="help-content" class="text-sm text-slate-700 dark:text-slate-200 space-y-2 max-h-[60vh] overflow-y-auto"></div>
     </div>
 </div>
 
@@ -1096,26 +1386,72 @@
                 contabMonthBalance: new Date().getMonth(),
                 retRate: 14.5, // porcentaje retención honorarios por defecto (2026)
                 // Régimen tributario por defecto (14D3 Pro Pyme General o 14D8 Pro Pyme Transparente)
-                regimen: '14D3',
+                regimen: '14D8',
                 // Giro principal (SII): código de actividad económica
                 giro: '479100',
                 // Domicilio principal de la empresa (para fines de importaciones y fiscalización)
-                address: ''
+                address: '',
+                apiToken: ''
             }
         };
 
         let performanceChart = null;
 
+
+        function resolveApiBase() {
+            if (db.config && db.config.apiBaseUrl) return String(db.config.apiBaseUrl).replace(/\/$/, '');
+            if (window.location.port === '3000') return `${window.location.protocol}//${window.location.hostname}:4000`;
+            return window.location.origin;
+        }
+
+        const apiClient = {
+            async request(path, options = {}) {
+                const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
+                const target = `${resolveApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+                const response = await fetch(target, {
+                    headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
+                    ...options
+                });
+                let payload = null;
+                try { payload = await response.json(); } catch (e) { payload = null; }
+                if (!response.ok || (payload && payload.ok === false)) {
+                    const msg = (payload && (payload.message || payload.error)) || `HTTP ${response.status}`;
+                    throw new Error(msg);
+                }
+                return payload;
+            },
+            get(path) { return this.request(path, { method: 'GET' }); },
+            post(path, body) { return this.request(path, { method: 'POST', body: JSON.stringify(body || {}) }); }
+        };
+
+        async function bootstrapFromBackend() {
+            try {
+                const data = await apiClient.get('/system/frontend-state');
+                const state = data && data.state ? data.state : null;
+                if (!state) return;
+                db.productos = Array.isArray(state.products) ? state.products : db.productos;
+                db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
+                db.cuentas = Array.isArray(state.accounts) && state.accounts.length ? state.accounts : db.cuentas;
+                db.terceros = Array.isArray(state.thirdParties) && state.thirdParties.length ? state.thirdParties : db.terceros;
+                if (!db.config) db.config = {};
+                db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
+                db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
+                if (state.demoAuthToken) db.config.apiToken = state.demoAuthToken;
+                if (state.defaults && state.defaults.ppmRate !== undefined) db.config.ppmRate = state.defaults.ppmRate;
+                if (state.defaults && state.defaults.retentionRate !== undefined) db.config.retRate = state.defaults.retentionRate;
+            } catch (err) {
+                console.warn('No se pudo cargar estado backend inicial, continuando en modo local de UX.', err.message);
+            }
+        }
+
         // Safe helpers
+
         function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
         function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
         function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const saved = localStorage.getItem('jet_db_v30_pro');
-            if (saved) {
-                db = JSON.parse(saved);
-            }
+        document.addEventListener('DOMContentLoaded', async () => {
+            // En modo backend-first, no se usa localStorage como fuente principal de datos.
             // Initialize or migrate previous versions if any
             if (!db.cuentas || db.cuentas.length === 0) {
                 db.cuentas = [
@@ -1134,14 +1470,22 @@
             if (db.config.contabMonthMayor === undefined) db.config.contabMonthMayor = db.config.selectedMonth;
             if (db.config.contabMonthBalance === undefined) db.config.contabMonthBalance = db.config.selectedMonth;
             // Asegurar que existan los campos de régimen, giro y domicilio
-            if (db.config.regimen === undefined) db.config.regimen = '14D3';
+            if (db.config.regimen === undefined) db.config.regimen = '14D8';
             if (db.config.giro === undefined) db.config.giro = '479100';
             if (db.config.address === undefined) db.config.address = '';
             // Asegurar que existan los registros de RCV, incluso si no fueron guardados previamente
             if (!db.rcvCompras) db.rcvCompras = [];
             if (!db.rcvVentas) db.rcvVentas = [];
+            await bootstrapFromBackend();
             safeSetText('current-date', new Date().toLocaleDateString('es-CL', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }));
             const yearInp = document.getElementById('config-year'); if (yearInp) yearInp.value = db.config.year;
+            const reportYearInp = document.getElementById('report-year'); if (reportYearInp) reportYearInp.value = db.config.year;
+            const reportMonthInp = document.getElementById('report-month'); if (reportMonthInp) reportMonthInp.value = String((db.config.selectedMonth || 0) + 1);
+            const tokenInp = document.getElementById('api-token'); if (tokenInp) tokenInp.value = db.config.apiToken || '';
+            const compYear = document.getElementById('comp-year'); if (compYear) compYear.value = db.config.year;
+            const compMonth = document.getElementById('comp-month'); if (compMonth) compMonth.value = String((db.config.selectedMonth || 0) + 1);
+            const execYear = document.getElementById('exec-year'); if (execYear) execYear.value = db.config.year;
+            const execMonth = document.getElementById('exec-month'); if (execMonth) execMonth.value = String((db.config.selectedMonth || 0) + 1);
             const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             // Establecer valores por defecto en los campos de régimen, giro y domicilio
             const regSel = document.getElementById('config-regimen'); if (regSel) regSel.value = db.config.regimen || '14D8';
@@ -1154,9 +1498,6 @@
             const balanceSel = document.getElementById('filter-month-balance'); if (balanceSel) balanceSel.value = db.config.contabMonthBalance;
             // Reflejar el año en los elementos que lo muestran (por ejemplo F22)
             document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
-            // Asignar valor inicial al selector de año en el header, si existe
-            const yearInpHeader = document.getElementById('config-year-header');
-            if (yearInpHeader) yearInpHeader.value = db.config.year;
             // Inicializar contabilidad y reconstruir asientos desde los movimientos guardados
             initPlanCuentas();
             rebuildAsientos();
@@ -1165,6 +1506,7 @@
             // Actualizar valor del dólar; UF/UTM/IPC se eliminan por no ser utilizados
             updateUSD();
             render();
+
         });
 
         function updateUSD() {
@@ -1175,10 +1517,14 @@
             }).catch(() => safeSetText('usd-val', `$ ${db.config.usdRate}`));
         }
         function save() {
-            // Recalcula asientos contables antes de guardar
-            rebuildAsientos();
-            localStorage.setItem('jet_db_v30_pro', JSON.stringify(db));
-            render();
+            try {
+                // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
+                rebuildAsientos();
+                render();
+            } catch (err) {
+                console.error('Error al refrescar UI después de guardar', err);
+                // No bloquear el flujo de usuario por fallos de renderizado puntual.
+            }
         }
 
         // Exportar datos: crea un archivo JSON con todo el contenido de la base de datos
@@ -1200,6 +1546,17 @@
         }
 
         // Importar datos desde un archivo JSON
+        function applyBackupObject(imported) {
+            db = imported;
+            if (!db.config) db.config = {};
+            initPlanCuentas();
+            rebuildAsientos();
+            updateRetRate();
+            applyTheme();
+            updateUSD();
+            save();
+        }
+
         function importData(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -1207,15 +1564,7 @@
             reader.onload = function(evt) {
                 try {
                     const imported = JSON.parse(evt.target.result);
-                    db = imported;
-                    // Asegurar que existan los nuevos campos de configuración
-                    if (!db.config) db.config = {};
-                    initPlanCuentas();
-                    rebuildAsientos();
-                    updateRetRate();
-                    applyTheme();
-                    updateUSD();
-                    save();
+                    applyBackupObject(imported);
                     alert('Backup importado correctamente');
                 } catch (err) {
                     alert('Error al importar el backup');
@@ -1223,9 +1572,47 @@
             };
             reader.readAsText(file);
         }
+        async function loadDemoDataFromJson() {
+            try {
+                const payload = await apiClient.get('/system/demo-backup');
+                if (!payload || !payload.backup) throw new Error('Respuesta demo-backup inválida');
+                applyBackupObject(payload.backup);
+                alert(`Base demo JSON cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
+                return;
+            } catch (err) {
+                console.warn('Fallo carga JSON demo, se intentará endpoint runtime.', err.message);
+                await loadDemoDataFromBackend();
+            }
+        }
+
+        async function loadDemoDataFromBackend() {
+            const attempts = [
+                () => apiClient.post('/system/load-demo-data', {}),
+                () => apiClient.get('/system/load-demo-data'),
+                () => apiClient.post('/system/demo/load', {})
+            ];
+            let payload = null;
+            let lastError = null;
+            for (const attempt of attempts) {
+                try {
+                    payload = await attempt();
+                    break;
+                } catch (err) {
+                    lastError = err;
+                }
+            }
+            if (!payload) {
+                alert(`No se pudo cargar la base demo: ${lastError ? lastError.message : 'error desconocido'}\nTip: ejecuta 'docker compose up -d --build' para tomar el backend actualizado.`);
+                return;
+            }
+            await bootstrapFromBackend();
+            save();
+            alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
+        }
+
         function resetApp() {
             if (confirm('¿Reiniciar todo? Se perderán datos.')) {
-                localStorage.removeItem('jet_db_v30_pro'); location.reload();
+                location.reload();
             }
         }
 
@@ -1252,8 +1639,6 @@
                 // Sincronizar los campos de selección de año en la interfaz
                 const yearSidebar = document.getElementById('config-year');
                 if (yearSidebar) yearSidebar.value = db.config.year;
-                const yearHeader = document.getElementById('config-year-header');
-                if (yearHeader) yearHeader.value = db.config.year;
                 updateRetRate();
                 // Actualizar textos que muestran el año actual (por ejemplo en F22)
                 document.querySelectorAll('.current-year-display').forEach(el => { el.innerText = db.config.year; });
@@ -1265,16 +1650,11 @@
         // Actualizar régimen tributario (14D3 o 14D8)
         function updateRegimen(v) {
             db.config.regimen = v;
-            // Ajustar tasa PPM por defecto cuando se elige régimen (si el usuario no la ha cambiado)
-            // 14D3: 0,25%; 14D8: 0,2%.
-            if (v === '14D3' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
-                db.config.ppmRate = 0.25;
-                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
-            }
-            if (v === '14D8' && (db.config.ppmRate === undefined || db.config.ppmRate === 1)) {
-                db.config.ppmRate = 0.2;
-                const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
-            }
+            // Ajuste explícito por régimen para mantener consistencia en F29/F22
+            // 14D3 (general): PPM 0,25%
+            // 14D8 (transparente): PPM 0,20%
+            db.config.ppmRate = v === '14D3' ? 0.25 : 0.2;
+            const ppmInp = document.getElementById('config-ppm'); if (ppmInp) ppmInp.value = db.config.ppmRate;
             save();
         }
 
@@ -1315,8 +1695,40 @@
             safeCreateIcons(); if (performanceChart) renderAnnualSummary();
         }
 
+
+        let currentTab = 'dashboard';
+        const TAB_HELP = {
+            dashboard: { title: 'Dashboard', text: 'Resumen general de caja, ventas y alertas. Úsalo para revisar estado diario.' },
+            tesoreria: { title: 'Caja & Bancos', text: 'Registra capital inicial y transferencias. Verifica saldos y flujo antes de cerrar el día.' },
+            movimientos: { title: 'Libro Diario', text: 'Registra ventas, importaciones y gastos. Completa fecha, documento y montos coherentes.' },
+            inventario: { title: 'Bodega / Stock', text: 'Administra productos y stock. Revisa costo promedio y quiebres de inventario.' },
+            terceros: { title: 'Directorio RUTs', text: 'Mantén clientes/proveedores con RUT correcto para documentos tributarios.' },
+            proyecciones: { title: 'Proyecciones', text: 'Usa escenarios para estimar flujo futuro y necesidades de caja.' },
+            f29: { title: 'F29 Mensual', text: 'Revisa débito/crédito IVA y prepara propuesta antes del envío oficial.' },
+            ddjj: { title: 'DDJJ Juradas', text: 'Controla declaraciones juradas y evidencia por período.' },
+            f22: { title: 'Renta F22', text: 'Visualiza base anual y consistencias previas a operación renta.' },
+            'dueno-sii': { title: 'SII Dueño', text: 'Responde cuándo, dónde y cómo declara el dueño y estima impuesto personal anual según régimen (14D3/14D8), base, tramos IGC y créditos.' },
+            kpi: { title: 'Indicadores', text: 'Monitorea margen, rotación y salud del negocio.' },
+            auditoria: { title: 'Auditoría', text: 'Consulta bitácora y trazabilidad de cambios críticos.' },
+            contabilidad: { title: 'Contabilidad', text: 'Gestiona asientos, publicación y reversas con validación.' },
+            reporteria: { title: 'Reportería', text: 'Genera reportes auditables y exportaciones CSV/XLSX/PDF con hash.' },
+            observabilidad: { title: 'Observabilidad', text: 'Monitorea errores, latencia y alertas operativas del backend.' },
+            cumplimiento: { title: 'Cumplimiento', text: 'Gestiona calendario legal, semáforo y evidencias para evitar multas.' },
+            gobernanza: { title: 'Gobernanza', text: 'Configura plan de cuentas, reglas y aprobaciones duales.' },
+            ejecutivo: { title: 'Ejecutivo EIRL', text: 'Revisa riesgo esperado, paquete fiscalizador y panel ejecutivo.' },
+            normativa: { title: 'Normativa', text: 'Registra cambios regulatorios y ejecuta regresión normativa anual.' }
+        };
+
+        function openTabHelp() {
+            const info = TAB_HELP[currentTab] || { title: currentTab.toUpperCase(), text: 'Sin guía registrada para este módulo.' };
+            safeSetText('help-title', `Ayuda · ${info.title}`);
+            safeSetHTML('help-content', `<p>${info.text}</p><p class="text-xs text-slate-500 mt-3">Tip: completa primero configuración de año, régimen y PPM en el panel izquierdo para mantener consistencia entre módulos.</p>`);
+            openModal('modal-tab-help');
+        }
+
         // Tab switcher
         function switchTab(t) {
+            currentTab = t;
             // Ocultar todos los contenidos
             document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
             // Mostrar el contenido solicitado
@@ -1331,12 +1743,238 @@
             if (t === 'kpi') renderKPI();
             if (t === 'contabilidad') renderContabilidad();
             if (t === 'auditoria') renderAuditoria();
+            if (t === 'reporteria') loadAuditableReports();
+            if (t === 'observabilidad') loadObservabilityDashboard();
+            if (t === 'cumplimiento') loadComplianceStatus();
+            if (t === 'gobernanza') runGovernanceConsistency();
+            if (t === 'ejecutivo') loadExecutivePanel();
+            if (t === 'normativa') loadNormativeChanges();
+            if (t === 'dueno-sii') renderOwnerTaxModule();
             // Actualizar la navegación activa
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
             const navBtn = document.getElementById(`btn-${t}`);
             if (navBtn) navBtn.classList.add('active');
             // Actualizar iconos
             safeCreateIcons();
+        }
+
+
+        function saveApiToken() {
+            const token = (document.getElementById('api-token')?.value || '').trim();
+            db.config.apiToken = token;
+            save();
+            alert(token ? 'Token guardado para consumo de API protegida.' : 'Token vacío.');
+        }
+
+        function clearApiToken() {
+            db.config.apiToken = '';
+            const tokenInp = document.getElementById('api-token');
+            if (tokenInp) tokenInp.value = '';
+            save();
+        }
+
+        function reportFilters() {
+            const year = Number(document.getElementById('report-year')?.value || db.config.year || new Date().getFullYear());
+            const monthRaw = document.getElementById('report-month')?.value || '';
+            const month = monthRaw ? Number(monthRaw) : null;
+            return { year, month };
+        }
+
+        async function loadAuditableReports() {
+            try {
+                const { year, month } = reportFilters();
+                const q = new URLSearchParams({ year: String(year) });
+                if (month) q.set('month', String(month));
+                const payload = await apiClient.get(`/reports?${q.toString()}`);
+                safeSetHTML('reports-meta', `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="text-xs"><span class="font-black">Período:</span> ${payload.metadata?.period || '-'} </div>
+                        <div class="text-xs"><span class="font-black">Usuario:</span> ${payload.metadata?.generatedBy || '-'} </div>
+                        <div class="text-xs"><span class="font-black">Generado:</span> ${payload.metadata?.generatedAt || '-'} </div>
+                        <div class="text-xs break-all"><span class="font-black">Hash:</span> ${payload.metadata?.hash || '-'} </div>
+                    </div>`);
+                safeSetText('reports-preview', JSON.stringify(payload.reports || {}, null, 2));
+            } catch (err) {
+                safeSetHTML('reports-meta', `<span class="text-red-500 font-bold">${err.message}</span>`);
+                safeSetText('reports-preview', '{}');
+            }
+        }
+
+        function exportAuditableReport(reportName, format) {
+            const { year, month } = reportFilters();
+            const q = new URLSearchParams({ report: reportName, format, year: String(year) });
+            if (month) q.set('month', String(month));
+            window.open(`${resolveApiBase()}/reports/export?${q.toString()}`, '_blank');
+        }
+
+        function obsMetricCard(label, value, tone = 'text-slate-900 dark:text-white') {
+            return `<div class="card p-5"><p class="text-[10px] uppercase font-black tracking-widest text-slate-400">${label}</p><p class="text-2xl font-black ${tone}">${value}</p></div>`;
+        }
+
+        async function loadObservabilityDashboard() {
+            try {
+                const payload = await apiClient.get('/observability/dashboard');
+                const rt = payload.dashboard?.runtime || {};
+                safeSetHTML('obs-metrics', [
+                    obsMetricCard('Requests', Number(rt.requests || 0).toLocaleString('es-CL')),
+                    obsMetricCard('Errores 5xx', Number(rt.errors || 0).toLocaleString('es-CL'), 'text-red-500'),
+                    obsMetricCard('Rechazos 4xx', Number(rt.validationRejects || 0).toLocaleString('es-CL'), 'text-amber-500'),
+                    obsMetricCard('Latencia p95 (ms)', Number(rt.p95Ms || 0).toLocaleString('es-CL'), 'text-blue-500')
+                ].join(''));
+
+                const alerts = payload.dashboard?.alerts || [];
+                if (!alerts.length) {
+                    safeSetHTML('obs-alerts', '<div class="text-emerald-600 font-bold">Sin alertas activas.</div>');
+                } else {
+                    safeSetHTML('obs-alerts', alerts.map(a => `<div class="rounded-xl px-3 py-2 ${a.severity === 'critical' ? 'bg-red-100 text-red-700' : a.severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'}"><span class="font-black uppercase">${a.key}</span>: ${a.message} (valor: ${a.value})</div>`).join(''));
+                }
+
+                safeSetText('obs-logs', JSON.stringify(payload.dashboard?.appLogsTail || [], null, 2));
+            } catch (err) {
+                safeSetHTML('obs-metrics', obsMetricCard('Estado', 'No disponible', 'text-red-500'));
+                safeSetHTML('obs-alerts', `<div class="text-red-500 font-bold">${err.message}</div>`);
+                safeSetText('obs-logs', '[]');
+            }
+        }
+
+
+        async function loadComplianceStatus() {
+            try {
+                const year = Number(document.getElementById('comp-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('comp-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/compliance/semaphore?year=${year}&month=${month}`);
+                const summary = payload.summary || { verde: 0, amarillo: 0, rojo: 0 };
+                safeSetHTML('comp-summary', [
+                    obsMetricCard('Verde', String(summary.verde || 0), 'text-emerald-500'),
+                    obsMetricCard('Amarillo', String(summary.amarillo || 0), 'text-amber-500'),
+                    obsMetricCard('Rojo', String(summary.rojo || 0), 'text-red-500')
+                ].join(''));
+
+                const rows = (payload.semaforo || []).map(ob => {
+                    const tone = ob.risk?.color === 'rojo' ? 'bg-red-100 text-red-700' : ob.risk?.color === 'amarillo' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+                    return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><span class="font-black">${ob.code}</span> · ${ob.name}<br><span class="text-slate-500">Vence: ${ob.dueDate} · Estado: ${ob.lifecycleStatus}</span><br><span class="text-[10px] text-slate-400">Key: ${ob.key}</span></div><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${ob.risk?.color || 'verde'}</span></div>`;
+                });
+                safeSetHTML('comp-obligations', rows.length ? rows.join('') : 'Sin obligaciones para el período.');
+            } catch (err) {
+                safeSetHTML('comp-summary', obsMetricCard('Cumplimiento', 'No disponible', 'text-red-500'));
+                safeSetHTML('comp-obligations', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function registerComplianceEvidence() {
+            try {
+                const obligationKey = (document.getElementById('comp-obligation-key')?.value || '').trim();
+                const lifecycleStatus = (document.getElementById('comp-lifecycle')?.value || '').trim();
+                const ackNumber = (document.getElementById('comp-ack')?.value || '').trim();
+                const source = (document.getElementById('comp-source')?.value || '').trim();
+                const payload = await apiClient.post('/compliance/evidence', { obligationKey, lifecycleStatus, ackNumber, source });
+                safeSetHTML('comp-evidence-result', `<span class="text-emerald-600 font-bold">Evidencia registrada: ${payload.evidence?.id || '-'}</span>`);
+                await loadComplianceStatus();
+            } catch (err) {
+                safeSetHTML('comp-evidence-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+
+        async function runGovernanceConsistency() {
+            try {
+                const payload = await apiClient.get('/accounting/consistency-check');
+                const r = payload.result || {};
+                safeSetHTML('gov-consistency', `<div class="text-xs"><span class="font-black">Resultado:</span> ${r.passed ? '<span class="text-emerald-600">OK</span>' : '<span class="text-red-600">Con observaciones</span>'}</div><pre class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-3 text-[11px] overflow-auto max-h-64">${JSON.stringify(r, null, 2)}</pre>`);
+            } catch (err) {
+                safeSetHTML('gov-consistency', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function createApprovalRequestUI() {
+            try {
+                const actionType = (document.getElementById('gov-action')?.value || '').trim();
+                const reason = (document.getElementById('gov-reason')?.value || '').trim();
+                const payload = await apiClient.post('/accounting/approval/request', { actionType, reason });
+                const id = payload.request?.id || '';
+                const input = document.getElementById('gov-request-id'); if (input) input.value = id;
+                safeSetHTML('gov-approval-result', `<span class="text-blue-600 font-bold">Solicitud creada: ${id}</span>`);
+            } catch (err) {
+                safeSetHTML('gov-approval-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function approveRequestUI() {
+            try {
+                const requestId = (document.getElementById('gov-request-id')?.value || '').trim();
+                const payload = await apiClient.post('/accounting/approval/approve', { requestId });
+                safeSetHTML('gov-approval-result', `<span class="text-emerald-600 font-bold">Aprobada: ${payload.request?.id || '-'}</span>`);
+            } catch (err) {
+                safeSetHTML('gov-approval-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+
+        async function loadExecutivePanel() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('exec-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/executive/dashboard?year=${year}&month=${month}`);
+                const d = payload.dashboard || {};
+                const risk = payload.risk || {};
+                safeSetHTML('exec-cards', [
+                    obsMetricCard('Caja', `$ ${Number(d.financial?.cash || 0).toLocaleString('es-CL')}`),
+                    obsMetricCard('Margen', `$ ${Number(d.financial?.margin || 0).toLocaleString('es-CL')}`, 'text-emerald-500'),
+                    obsMetricCard('Cumplimiento', `${Number(d.compliance?.score || 0)}%`, 'text-blue-500'),
+                    obsMetricCard('Riesgo Esperado', `$ ${Number(risk.totalExpectedRisk || 0).toLocaleString('es-CL')}`, 'text-red-500')
+                ].join(''));
+                safeSetText('exec-risk', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetHTML('exec-cards', obsMetricCard('Ejecutivo', 'No disponible', 'text-red-500'));
+                safeSetText('exec-risk', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+        async function loadAuditPackage() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('exec-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/executive/audit-package?year=${year}&month=${month}`);
+                safeSetText('exec-pack', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetText('exec-pack', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+
+        async function loadNormativeChanges() {
+            try {
+                const payload = await apiClient.get('/normative/changes');
+                safeSetText('norm-changes', JSON.stringify(payload.changes || [], null, 2));
+                safeSetText('norm-runs', JSON.stringify(payload.runs || [], null, 2));
+            } catch (err) {
+                safeSetText('norm-changes', JSON.stringify({ error: err.message }, null, 2));
+                safeSetText('norm-runs', '[]');
+            }
+        }
+
+        async function registerNormativeChange() {
+            try {
+                const title = (document.getElementById('norm-title')?.value || '').trim();
+                const source = (document.getElementById('norm-source')?.value || '').trim();
+                const effectiveDate = (document.getElementById('norm-effective')?.value || '').trim();
+                const payload = await apiClient.post('/normative/changes', { title, source, effectiveDate, impactedAreas: ['tax', 'reports'] });
+                safeSetHTML('norm-result', `<span class="text-emerald-600 font-bold">Cambio registrado: ${payload.change?.id || '-'}</span>`);
+                await loadNormativeChanges();
+            } catch (err) {
+                safeSetHTML('norm-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function runNormativeRegression() {
+            try {
+                const targetYear = Number(document.getElementById('norm-reg-year')?.value || db.config.year || new Date().getFullYear());
+                const payload = await apiClient.post('/normative/regression/run', { targetYear });
+                safeSetHTML('norm-result', `<span class="text-blue-600 font-bold">Regresión ejecutada: ${payload.run?.id || '-'}</span>`);
+                await loadNormativeChanges();
+            } catch (err) {
+                safeSetHTML('norm-result', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
         }
 
         // Modal utils (basic)
@@ -1358,8 +1996,11 @@
         }
 
         // Safe reversal for editing (no cambios)
+        function findProductById(prodId) {
+            return db.productos.find(p => String(p.id) === String(prodId));
+        }
         function revertMovement(m) {
-            const p = db.productos.find(x => x.id === m.prodId);
+            const p = findProductById(m.prodId);
             if (p && m.tipo === 'VENTA') p.stock += m.cant;
             if (p && m.tipo === 'IMPORTACION') p.stock -= m.cant;
         }
@@ -1428,7 +2069,8 @@
             else if (tipo === 'HONORARIOS') { ret = Math.round(monto * (db.config.retRate / 100)); neto = monto - ret; }
             db.movimientos.push({ id, fecha: fecha.toISOString(), tipo, desc: document.getElementById('gasto-desc').value, neto, iva, total: monto, retention: ret, nDoc: 'Egr.', terceroId: rutProv, accepted });
             registrarFlujo(fecha.toISOString(), cuenta, `Pago: ${document.getElementById('gasto-desc').value}`, monto, 'EGRESO', id);
-            save(); closeModal('modal-gasto');
+            closeModal('modal-gasto');
+            save();
         }
 
         // Calculate IVA payable for a given set of movements (dynamic PPM & retention)
@@ -1600,9 +2242,72 @@ calculateReports(yearMovs);
             for (let m = 1; m <= 12; m++) {
                 dates.push({ name: `F29 ${m}/${db.config.year}`, date: new Date(db.config.year, m - 1, 20) });
             }
+            dates.push({ name: `DDJJ 1887 / 1947 (${db.config.year})`, date: new Date(db.config.year, 2, 31) });
             dates.push({ name: `F22 ${db.config.year}`, date: new Date(db.config.year, 3, 30) });
+            dates.push({ name: `Pago IGC dueño (${db.config.year})`, date: new Date(db.config.year, 3, 30) });
             dates.push({ name: 'Patente Comercial', date: new Date(db.config.year, 6, 31) });
             safeSetHTML('fiscal-calendar', dates.map(d => `<li>${d.name}: <span class="text-blue-500">${d.date.toLocaleDateString('es-CL')}</span></li>`).join(''));
+        }
+
+        function getOwnerTaxBracketsUTA() {
+            return [
+                { from: 0, to: 13.5, rate: 0, rebateUTA: 0 },
+                { from: 13.5, to: 30, rate: 0.04, rebateUTA: 0.54 },
+                { from: 30, to: 50, rate: 0.08, rebateUTA: 1.74 },
+                { from: 50, to: 70, rate: 0.135, rebateUTA: 4.49 },
+                { from: 70, to: 90, rate: 0.23, rebateUTA: 11.14 },
+                { from: 90, to: 120, rate: 0.304, rebateUTA: 17.80 },
+                { from: 120, to: 310, rate: 0.35, rebateUTA: 23.32 },
+                { from: 310, to: Infinity, rate: 0.40, rebateUTA: 38.82 }
+            ];
+        }
+
+        function computeOwnerAnnualTax(yearMovs) {
+            const isRegimenGeneral = db.config.regimen === '14D3';
+            const sales = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const cmv = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+            const gastos = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
+            const rli = Math.max(0, sales - cmv - gastos);
+            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
+            const baseOwner = isRegimenGeneral ? Math.max(0, retiros) : rli;
+            const utaValue = 8268728; // UTA referencial anual CLP (ajustable por normativa anual)
+            const baseUTA = utaValue > 0 ? (baseOwner / utaValue) : 0;
+            const brackets = getOwnerTaxBracketsUTA();
+            const tramo = brackets.find(b => baseUTA >= b.from && baseUTA <= b.to) || brackets[brackets.length - 1];
+            const igcBrutoUTA = Math.max(0, (baseUTA * tramo.rate) - tramo.rebateUTA);
+            const igcBruto = Math.round(igcBrutoUTA * utaValue);
+
+            const idpcEmpresa = isRegimenGeneral ? Math.round(rli * 0.25) : 0;
+            const ownerCredit = isRegimenGeneral ? Math.min(idpcEmpresa, igcBruto) : 0;
+            const netOwnerTax = Math.max(0, igcBruto - ownerCredit);
+
+            return { isRegimenGeneral, baseOwner, baseUTA, igcBruto, ownerCredit, netOwnerTax, brackets, utaValue };
+        }
+
+        function renderOwnerTaxModule() {
+            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const data = computeOwnerAnnualTax(yearMovs);
+            safeSetText('owner-regime-chip', data.isRegimenGeneral ? 'ProPyme General (14D3)' : 'ProPyme Transparente (14D8)');
+            safeSetText('owner-tax-base', `$ ${Math.round(data.baseOwner).toLocaleString('es-CL')}`);
+            safeSetText('owner-tax-gross', `$ ${Math.round(data.igcBruto).toLocaleString('es-CL')}`);
+            safeSetText('owner-tax-net', `$ ${Math.round(data.netOwnerTax).toLocaleString('es-CL')}`);
+            safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros del dueño' : '14D8 · base atribuida anual');
+            safeSetText('owner-detail-uta', `${data.baseUTA.toFixed(2)} UTA`);
+            safeSetText('owner-detail-credit', `$ ${Math.round(data.ownerCredit).toLocaleString('es-CL')}`);
+            const effRate = data.baseOwner > 0 ? (data.netOwnerTax / data.baseOwner) * 100 : 0;
+            safeSetText('owner-detail-rate', `${effRate.toFixed(2)}%`);
+            safeSetText('owner-where', 'SII.cl → Servicios online → Declaración de Renta (F22)');
+            safeSetText('owner-how', data.isRegimenGeneral
+                ? 'Con retiros efectivos, registro empresarial 14D3, crédito IDPC y propuesta F22.'
+                : 'Con renta atribuida 14D8, respaldo de RLI/DDJJ 1947 y propuesta F22 del dueño.');
+            safeSetHTML('owner-tax-brackets', data.brackets.map(b => `
+                <tr>
+                    <td class="px-4 py-2">${b.from.toLocaleString('es-CL')}</td>
+                    <td class="px-4 py-2">${b.to === Infinity ? 'o más' : b.to.toLocaleString('es-CL')}</td>
+                    <td class="px-4 py-2">${(b.rate * 100).toFixed(1)}%</td>
+                    <td class="px-4 py-2">${b.rebateUTA.toFixed(2)}</td>
+                </tr>
+            `).join(''));
         }
 
         // Projections
@@ -1679,14 +2384,18 @@ calculateReports(yearMovs);
             });
             safeSetHTML('table-f29', f29H);
             // F22
-            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            const cMV = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            // CMV solo desde ventas (evita duplicar importaciones en la RLI)
+            const cMV = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
             // Gastos Operativos aceptados (se descartan los no aceptados)
-            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + b.neto, 0);
+            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
             // Gastos no aceptados (para información)
-            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + b.neto, 0);
-            const retiros = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + b.total, 0);
+            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + Number(b.neto || 0), 0);
+            const retirosRegistrados = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
             const utilidad = vN - cMV - gO; // RLI (Ingresos - Costos - Gastos)
+            const rliTributable = Math.max(0, utilidad);
+            const isRegimenGeneral = db.config.regimen === '14D3';
+            const retiros = isRegimenGeneral ? retirosRegistrados : (retirosRegistrados > 0 ? retirosRegistrados : rliTributable);
             safeSetText('f22-ventas', `$ ${vN.toLocaleString('es-CL')}`);
             safeSetText('f22-costos', `$ ${cMV.toLocaleString('es-CL')}`);
             safeSetText('f22-gastos', `$ ${gO.toLocaleString('es-CL')}`);
@@ -1695,15 +2404,41 @@ calculateReports(yearMovs);
             safeSetText('f22-retenciones', `$ ${totalRet.toLocaleString('es-CL')}`);
             safeSetText('f22-utilidad', `$ ${utilidad.toLocaleString('es-CL')}`);
             safeSetText('f22-retiros', `$ ${retiros.toLocaleString('es-CL')}`);
-            // Impuesto de primera categoría (25%) para régimen 14D3
+            // Régimen 14D3: IDPC 25% sobre RLI positiva
+            // Régimen 14D8: transparente, no determina IDPC en la empresa
             let idpc = 0;
-            if (db.config.regimen === '14D3') {
-                idpc = Math.round(utilidad * 0.25);
+            let idpcNet = 0;
+            if (isRegimenGeneral) {
+                idpc = Math.round(rliTributable * 0.25);
+                idpcNet = Math.max(0, idpc - totalPPM);
             }
             safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
-            // Impuesto neto a pagar: impuesto menos PPM menos retenciones
-            const idpcNet = idpc - totalPPM - totalRet;
             safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+
+            const f22TaxLabel = document.getElementById('f22-tax-label');
+            if (f22TaxLabel) {
+                f22TaxLabel.innerText = isRegimenGeneral ? 'Impuesto (25%)' : 'Impuesto Empresa (0% · 14 D8)';
+            }
+            const f22TaxNetLabel = document.getElementById('f22-tax-net-label');
+            if (f22TaxNetLabel) {
+                f22TaxNetLabel.innerText = isRegimenGeneral ? 'Impuesto Neto' : 'Impuesto Neto Empresa (0%)';
+            }
+            const f22WithdrawalsLabel = document.getElementById('f22-withdrawals-label');
+            if (f22WithdrawalsLabel) {
+                f22WithdrawalsLabel.innerText = isRegimenGeneral
+                    ? 'Retiros Efectivos (Global Compl.)'
+                    : 'Base Atribuible / Retiros (14 D8)';
+            }
+            const f22RliNote = document.getElementById('f22-rli-note');
+            if (f22RliNote) {
+                f22RliNote.innerText = isRegimenGeneral
+                    ? 'Monto sobre el cual pagas impuesto (1ra categoría)'
+                    : 'Renta atribuible al dueño (sin IDPC en la empresa)';
+            }
+            const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
+            if (f22RegimeDisclaimer) {
+                f22RegimeDisclaimer.innerText = db.config.regimen === '14D3' ? 'ProPyme General (14 D3)' : 'ProPyme Transparente (14 D8)';
+            }
             // DJ tables
             renderDDJJTables(yearMovs, totalPPM, totalRet);
         }
@@ -1752,10 +2487,21 @@ calculateReports(yearMovs);
             safeSetText('kpi-mom', `${growth.toFixed(1)}%`);
             // Profit: ventas netas - sum costos mercaderia - gastos (neto)
             const totalSales = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            const totalCost = yearMovs.reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const totalCost = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + (b.costoMercaderia || 0), 0);
             const totalGastos = yearMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + b.neto, 0);
             const profit = totalSales - totalCost - totalGastos;
             safeSetText('kpi-profit', `$ ${profit.toLocaleString('es-CL')}`);
+            safeSetText('kpi-profit-year', `Año ${db.config.year}`);
+
+            const allMovs = db.movimientos.filter(m => [2024, 2025, 2026].includes(new Date(m.fecha).getFullYear()));
+            const generalSales = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const generalCost = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+            const generalGastos = allMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + Number(b.neto || 0), 0);
+            const generalProfit = generalSales - generalCost - generalGastos;
+            const generalMargin = generalSales > 0 ? (generalProfit / generalSales) * 100 : 0;
+            safeSetText('kpi-total-sales-general', `$ ${Math.round(generalSales).toLocaleString('es-CL')}`);
+            safeSetText('kpi-profit-general', `$ ${Math.round(generalProfit).toLocaleString('es-CL')}`);
+            safeSetText('kpi-margin-general', `${generalMargin.toFixed(1)}%`);
             // Unit Economics table
             const ranking = db.productos.map(p => {
                 // Units sold
@@ -1872,14 +2618,17 @@ calculateReports(yearMovs);
                     observations.push({ tipo: 'Margen Negativo', detalle: m.desc, valor: diff });
                 }
             });
-            // 2) Conciliación bancaria: diferencia entre ingresos registrados y ventas netas
-            const totalVentas = db.movimientos.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-            // Suma de ingresos en cuentas bancarias y Mercado Pago
-            const totalIngresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'INGRESO').reduce((a, b) => a + b.monto, 0);
-            const totalEgresos = db.flujoCaja.filter(f => f.tipoMovimiento === 'EGRESO').reduce((a, b) => a + b.monto, 0);
-            const conciliacionDiff = Math.abs(totalVentas - (totalIngresos - totalEgresos));
-            if (conciliacionDiff > 0.01) {
-                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Diferencia entre ventas y flujos de caja', valor: conciliacionDiff });
+            // 2) Conciliación bancaria: ventas cobradas (brutas) vs ingresos asociados a ventas
+            const totalVentas = db.movimientos.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + (b.total || 0), 0);
+            const ventaIds = new Set(db.movimientos.filter(m => m.tipo === 'VENTA').map(m => String(m.id)));
+            const ingresosPorVentas = db.flujoCaja
+                .filter(f => f.tipoMovimiento === 'INGRESO' && ventaIds.has(String(f.refId)))
+                .reduce((a, b) => a + b.monto, 0);
+            const conciliacionDiff = Math.abs(totalVentas - ingresosPorVentas);
+            if (db.flujoCaja.length === 0) {
+                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Sin flujos de caja registrados para conciliar', valor: 0 });
+            } else if (conciliacionDiff > 5000) {
+                observations.push({ tipo: 'Conciliación Bancaria', detalle: 'Diferencia entre ventas y cobros de ventas en caja/banco', valor: conciliacionDiff });
             }
             // 3) Gastos no aceptados: gastos marcados como no aceptados
             db.movimientos.forEach(m => {
@@ -1925,8 +2674,8 @@ calculateReports(yearMovs);
             const nombre = document.getElementById('tercero-nombre').value;
             const tipo = document.getElementById('tercero-tipo').value;
             db.terceros.push({ id: rut, rut, nombre, tipo });
-            save();
             closeModal('modal-tercero');
+            save();
         }
         function deleteTercero(id) {
             if (!confirm('¿Eliminar contacto?')) return;
@@ -1951,7 +2700,7 @@ calculateReports(yearMovs);
             const cuenta = document.getElementById('venta-cuenta').value;
             const fechaRaw = document.getElementById('venta-fecha').value;
             const fecha = new Date(fechaRaw + 'T00:00:00');
-            const prod = db.productos.find(p => p.id === prodId);
+            const prod = findProductById(prodId);
             if (!prod || prod.stock < cant) { alert('Stock insuficiente'); return; }
             const neto = Math.round(bruto / 1.19);
             const iva = bruto - neto;
@@ -1963,8 +2712,8 @@ calculateReports(yearMovs);
             }
             registrarFlujo(fecha.toISOString(), cuenta, `Venta: ${prod.nombre}`, bruto, 'INGRESO', id);
             prod.stock -= cant;
-            save();
             closeModal('modal-venta');
+            save();
         }
         function handleImport(e) {
             e.preventDefault();
@@ -1999,20 +2748,24 @@ calculateReports(yearMovs);
             const baseImport = cif + adVal;
             const ivaImport = Math.round(baseImport * 0.19);
             const total = baseImport + ivaImport;
-            const prod = db.productos.find(p => p.id === prodId);
+            const prod = findProductById(prodId);
+            if (!prod) {
+                alert('Producto no encontrado. Selecciona un SKU válido.');
+                return;
+            }
             // Actualizar costo promedio de inventario con la base (costo + ad valorem) en CLP
             prod.costoPromedio = Math.round(((prod.stock * prod.costoPromedio) + baseImport) / (prod.stock + cant));
             prod.stock += cant;
             db.movimientos.push({ id, fecha: fecha.toISOString(), tipo: 'IMPORTACION', desc: `Import: ${prod.nombre}`, neto: baseImport, iva: ivaImport, total, prodId, cant, nDoc: document.getElementById('import-doc').value, fob, adVal, accepted: true });
             registrarFlujo(fecha.toISOString(), cuenta, `Pago Import (${prod.nombre})`, total, 'EGRESO', id);
-            save();
             closeModal('modal-import');
+            save();
         }
         function handleProducto(e) {
             e.preventDefault();
             db.productos.push({ id: Date.now().toString(), nombre: document.getElementById('prod-nombre').value, sku: document.getElementById('prod-sku').value, link: document.getElementById('prod-link').value, stock: 0, costoPromedio: 0 });
-            save();
             closeModal('modal-producto');
+            save();
         }
         function handleCapital(e) {
             e.preventDefault();
@@ -2028,8 +2781,8 @@ calculateReports(yearMovs);
                 registrarFlujo(fecha, cuenta, `Retiro Utilidad: ${desc}`, monto, 'EGRESO', id);
                 db.movimientos.push({ id, fecha, tipo: 'RETIRO', desc: `Retiro Dueño: ${desc}`, neto: 0, iva: 0, total: monto, retiro: monto, nDoc: 'Retiro' });
             }
-            save();
             closeModal('modal-capital');
+            save();
         }
         function handleTransfer(e) {
             e.preventDefault();
@@ -2045,8 +2798,8 @@ calculateReports(yearMovs);
             const fecha = new Date().toISOString();
             registrarFlujo(fecha, origen, `Traspaso a ${destino}`, monto, 'EGRESO', 'TRF');
             registrarFlujo(fecha, destino, `Traspaso de ${origen}`, monto, 'INGRESO', 'TRF');
-            save();
             closeModal('modal-transfer');
+            save();
         }
         function handleBulkImport() {
             const text = document.getElementById('ml-import-data').value.trim();
@@ -2076,8 +2829,8 @@ calculateReports(yearMovs);
                 }
             });
             alert(`Procesado: ${success}`);
-            save();
             closeModal('modal-import-ml');
+            save();
         }
 
         // Exportar declaraciones juradas en formato CSV según tipo (1887, 1948, 1947)
@@ -2175,26 +2928,14 @@ calculateReports(yearMovs);
             }
         }
 
-        // Sincronización Mercado Libre vía backend (sin exponer token en frontend)
+        // Sincronización Mercado Libre backend-first (sin token/manual prompt en UI)
         async function syncMercadoLibre() {
             try {
-                const raw = prompt('Pega aquí el JSON de órdenes exportadas desde Mercado Libre para importación segura por backend');
-                if (!raw) return;
-                const parsed = JSON.parse(raw);
-                const rows = Array.isArray(parsed) ? parsed : (parsed.results || parsed.rows || []);
-                if (!rows.length) throw new Error('No se encontraron órdenes en el JSON');
-
-                const response = await fetch('/integrations/mercadolibre/import-orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ rows })
-                });
-
-                if (!response.ok) throw new Error('No se pudo importar en backend');
-                alert('Órdenes enviadas al backend. Revisa conciliación para validar resultados.');
+                const payload = await apiClient.post('/integrations/sync/run', { provider: 'mercadolibre', maxAttempts: 3 });
+                alert('Sincronización de Mercado Libre enviada al backend. Revisa Integraciones/Conciliación para el resultado.');
             } catch (err) {
                 console.error(err);
-                alert('Error de importación. Verifica que el JSON sea válido y que el backend esté activo.');
+                alert('Error de sincronización backend. Revisa la configuración de credenciales del conector en el servidor.');
             }
         }
         function deleteMov(id) {
@@ -2365,7 +3106,9 @@ calculateReports(yearMovs);
         // Obtener la cuenta asociada a un movimiento buscando en el flujo de caja
         function getCuentaIdForMov(movId) {
             const flow = db.flujoCaja.find(f => f.refId == movId);
-            return flow ? flow.cuentaId : null;
+            if (flow && flow.cuentaId) return flow.cuentaId;
+            const mov = db.movimientos.find(m => m.id == movId);
+            return mov && mov.cuentaId ? mov.cuentaId : null;
         }
 
         // Reconstruir asientos contables a partir de los movimientos y flujos existentes

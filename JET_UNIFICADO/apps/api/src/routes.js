@@ -1,11 +1,11 @@
 const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
-const { register, login, me, logout } = require('./modules/auth');
+const { register, login, me, logout, revokeSession, mfaSetup, mfaEnable, mfaDisable } = require('./modules/auth');
 const { importJson, getSummary } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
-const { coherenceCheck } = require('./modules/system');
+const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
@@ -13,23 +13,35 @@ const {
   getReconciliationSummary,
   importCartola,
   importRCVVentas,
-  importMarketplaceOrders
+  importMarketplaceOrders,
+  listReconciliationDocuments,
+  updateReconciliationStatus
 } = require('./modules/reconciliation');
-const { getTaxConfig, updateTaxConfig, getTaxSummary } = require('./modules/tax');
+const { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog } = require('./modules/tax');
 const {
   updateIntegrationConfig,
   getIntegrationsStatus,
   importAlibabaCatalog,
   importMercadoLibre,
-  importSii
+  importSii,
+  runScheduledSync,
+  listDeadLetter
 } = require('./modules/integrations');
 const {
   getBackupPolicy,
   updateBackupPolicy,
   createBackup,
   listBackups,
-  restoreBackup
+  restoreBackup,
+  validateRestore
 } = require('./modules/backup');
+const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
+const { getReports, exportReport } = require('./modules/reports');
+const { getDashboard } = require('./modules/observability');
+const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
+const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
+const { getAuditPackage, getRiskSimulation, getExecutiveDashboard } = require('./modules/eirlExecutive');
+const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -49,7 +61,22 @@ const modulesList = [
   'inventory-kardex-fifo-sprint7',
   'external-connectors-sprint8',
   'auth-roles-backup-policies-sprint9',
-  'quality-ci-cd-sprint10'
+  'quality-ci-cd-sprint10',
+  'meta1-postgres-normalized-runtime-auth-products-movements-periods-tax',
+  'journal-double-entry-publish-validation',
+  'journal-auto-posting-reverse',
+  'tax-engine-versioned-f29-f22-rli-traceability',
+  'reconciliation-immutable-incremental-batches-status',
+  'enterprise-security-bcrypt-rate-limit-lockout-mfa-session-rotation',
+  'encrypted-backups-dr-validation-rpo-rto',
+  'secure-connectors-scheduler-retry-deadletter-status',
+  'frontend-backend-first-api-client-unified',
+  'auditable-exportable-reporting-reproducible-hash',
+  'observability-logs-metrics-alerts-dashboard',
+  'compliance-calendar-semaphore-evidence-escalation',
+  'governance-chart-rules-consistency-dual-approval',
+  'meta15-audit-package-risk-simulator-executive-dashboard',
+  'meta16-normative-governance-regression'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -61,7 +88,7 @@ function route(req, res) {
   const path = parsed.pathname;
 
   if (req.method === 'GET' && path === '/health') {
-    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '10', version: 'v1.10-sprint10' });
+    return sendJson(res, 200, { ok: true, service: 'jet-api', sprint: '16', version: 'v1.16-sprint16' });
   }
 
   if (req.method === 'GET' && path === '/modules') {
@@ -69,6 +96,16 @@ function route(req, res) {
   }
 
   if (req.method === 'GET' && path === '/system/coherence-check') return handle(coherenceCheck(req, res), res);
+  if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
+  if (req.method === 'GET' && path === '/system/demo-backup') return handle(getDemoBackup(req, res), res);
+  if (path === '/system/load-demo-data') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/system/demo/load') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
+    return methodNotAllowed(res);
+  }
   if (req.method === 'GET' && path === '/db/status') return handle(dbStatus(req, res), res);
   if (req.method === 'GET' && path === '/finance/projection') return handle(getProjection(req, res), res);
   if (req.method === 'GET' && path === '/inventory/overview') return handle(getInventoryOverview(req, res), res);
@@ -77,15 +114,18 @@ function route(req, res) {
   if (path === '/inventory/consume') return req.method === 'POST' ? handle(consumeStock(req, res), res) : methodNotAllowed(res);
 
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+  if (req.method === 'GET' && path === '/reconciliation/documents') return handle(listReconciliationDocuments(req, res), res);
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/marketplace') return req.method === 'POST' ? handle(importMarketplaceOrders(req, res), res) : methodNotAllowed(res);
+  if (path === '/reconciliation/documents/status') return req.method === 'POST' ? handle(updateReconciliationStatus(req, res), res) : methodNotAllowed(res);
 
   if (path === '/tax/config') {
     if (req.method === 'GET') return handle(getTaxConfig(req, res), res);
     if (req.method === 'POST') return handle(updateTaxConfig(req, res), res);
     return methodNotAllowed(res);
   }
+  if (path === '/tax/catalog' && req.method === 'GET') return handle(getTaxCatalog(req, res), res);
   if (path === '/tax/summary' && req.method === 'GET') return handle(getTaxSummary(req, res), res);
 
 
@@ -94,6 +134,8 @@ function route(req, res) {
   if (path === '/integrations/alibaba/import-products') return req.method === 'POST' ? handle(importAlibabaCatalog(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/mercadolibre/import-orders') return req.method === 'POST' ? handle(importMercadoLibre(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/sii/import-rcv') return req.method === 'POST' ? handle(importSii(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/sync/run') return req.method === 'POST' ? handle(runScheduledSync(req, res), res) : methodNotAllowed(res);
+  if (path === '/integrations/dead-letter' && req.method === 'GET') return handle(listDeadLetter(req, res), res);
 
 
   if (path === '/backup/policy') {
@@ -104,11 +146,17 @@ function route(req, res) {
   if (path === '/backup/create') return req.method === 'POST' ? handle(createBackup(req, res), res) : methodNotAllowed(res);
   if (path === '/backup/list' && req.method === 'GET') return handle(listBackups(req, res), res);
   if (path === '/backup/restore') return req.method === 'POST' ? handle(restoreBackup(req, res), res) : methodNotAllowed(res);
+  if (path === '/backup/validate-restore') return req.method === 'POST' ? handle(validateRestore(req, res), res) : methodNotAllowed(res);
 
   if (path === '/auth/register') return req.method === 'POST' ? handle(register(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/login') return req.method === 'POST' ? handle(login(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/me') return req.method === 'GET' ? handle(me(req, res), res) : methodNotAllowed(res);
   if (path === '/auth/logout') return req.method === 'POST' ? handle(logout(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/auth/revoke-session') return req.method === 'POST' ? handle(revokeSession(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/setup') return req.method === 'POST' ? handle(mfaSetup(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/enable') return req.method === 'POST' ? handle(mfaEnable(req, res), res) : methodNotAllowed(res);
+  if (path === '/auth/mfa/disable') return req.method === 'POST' ? handle(mfaDisable(req, res), res) : methodNotAllowed(res);
 
   if (path === '/migration/import-json') return req.method === 'POST' ? handle(importJson(req, res), res, 500) : methodNotAllowed(res);
   if (path === '/migration/summary') return req.method === 'GET' ? handle(getSummary(req, res), res) : methodNotAllowed(res);
@@ -122,6 +170,49 @@ function route(req, res) {
     if (req.method === 'POST') return handle(createMovement(req, res), res);
     return methodNotAllowed(res);
   }
+
+  if (path === '/accounting/entries') {
+    if (req.method === 'GET') return handle(listEntries(req, res), res);
+    if (req.method === 'POST') return handle(createEntry(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/entries/publish') return req.method === 'POST' ? handle(publishEntry(req, res), res) : methodNotAllowed(res);
+  if (path === '/accounting/entries/reverse') return req.method === 'POST' ? handle(reverseEntry(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/observability/dashboard' && req.method === 'GET') return handle(getDashboard(req, res), res);
+
+  if (path === '/accounting/chart') {
+    if (req.method === 'GET') return handle(getChart(req, res), res);
+    if (req.method === 'POST') return handle(updateChart(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/rules') {
+    if (req.method === 'GET') return handle(getRules(req, res), res);
+    if (req.method === 'POST') return handle(updateRules(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/accounting/consistency-check' && req.method === 'GET') return handle(runConsistencyCheck(req, res), res);
+  if (path === '/accounting/approval/request' && req.method === 'POST') return handle(createApprovalRequest(req, res), res);
+  if (path === '/accounting/approval/approve' && req.method === 'POST') return handle(approveRequest(req, res), res);
+
+  if (path === '/compliance/calendar' && req.method === 'GET') return handle(getCalendar(req, res), res);
+  if (path === '/compliance/semaphore' && req.method === 'GET') return handle(getSemaphore(req, res), res);
+  if (path === '/compliance/evidence') return req.method === 'POST' ? handle(registerEvidence(req, res), res) : methodNotAllowed(res);
+  if (path === '/compliance/config') return req.method === 'POST' ? handle(updateComplianceConfig(req, res), res) : methodNotAllowed(res);
+
+  if (path === '/executive/audit-package' && req.method === 'GET') return handle(getAuditPackage(req, res), res);
+  if (path === '/executive/risk-simulation' && req.method === 'GET') return handle(getRiskSimulation(req, res), res);
+  if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
+
+  if (path === '/normative/changes') {
+    if (req.method === 'GET') return handle(listChanges(req, res), res);
+    if (req.method === 'POST') return handle(registerChange(req, res), res);
+    return methodNotAllowed(res);
+  }
+  if (path === '/normative/regression/run' && req.method === 'POST') return handle(runRegression(req, res), res);
+
+  if (path === '/reports' && req.method === 'GET') return handle(getReports(req, res), res);
+  if (path === '/reports/export' && req.method === 'GET') return handle(exportReport(req, res), res);
 
   if (path === '/products') {
     if (req.method === 'GET') return handle(listProducts(req, res), res);

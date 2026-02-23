@@ -31,6 +31,20 @@ Documentos de avance:
 - `docs/SPRINT_10.md`
 - `docs/OBJETIVOS_1_AL_5_VALIDACION.md`
 
+
+## Instalación guiada (recomendada para no programadores)
+Si quieres una explicación paso a paso, abre: `docs/GUIA_INSTALACION_PARA_PRINCIPIANTES.md`.
+
+## Inicio en 1 clic (Windows, .cmd/.ps1)
+Si quieres abrir el sistema como un programa (sin terminal manual):
+
+1. Doble clic en `desktop/JET_Lanzar.cmd`.
+2. El launcher intenta primero levantar **Docker Compose** automáticamente (`docker compose up -d --build`).
+3. Verifica Web/API y abre el navegador en `http://localhost:3000`.
+4. Si Docker no está disponible, usa fallback local con Node.js.
+
+Detalle técnico: `docs/INSTALACION_UN_CLICK_WINDOWS.md`.
+
 ## Regla de trabajo acordada (importante)
 Antes de cada sprint nuevo se debe ejecutar una verificación de coherencia del código completo.
 Endpoints de apoyo:
@@ -239,4 +253,23 @@ Se aplicaron correcciones inmediatas:
 - Autenticación migrada de `sha256` simple a `scrypt` con salt.
 - UI alinea régimen por defecto a `14D8` y elimina prompt de token directo para Mercado Libre.
 
-Nota: aún queda pendiente la eliminación completa del patrón `app_state` monolítico y la migración total de UI a backend-first sin `localStorage` como fuente primaria.
+Nota: el runtime operativo ya migró fuera de `app_state` monolítico y la UI quedó en enfoque backend-first sin `localStorage` como fuente primaria.
+
+
+## Meta 2: migración segura y trazable
+Guía y comandos en: `docs/META2_MIGRACION_SEGURA_TRAZABLE.md`.
+
+## Auditoría integral EIRL (estado actual)
+Se agregó un informe técnico de capacidad real del software para tus objetivos de negocio:
+- `docs/AUDITORIA_SOFTWARE_ACTUAL_EIRL.md`
+
+## Plan de metas para reemplazo operativo del contador
+Se agregó roadmap de cierre de brechas (Meta 17-22):
+- `docs/PLAN_METAS_REEMPLAZO_CONTADOR_EIRL.md`
+
+## Base demo multianual para pruebas
+Puedes cargar una base ficticia 2024-2026 con:
+- `node JET_UNIFICADO/scripts/seed_demo_multiyear.js`
+- Detalle: `docs/BASE_DEMO_MULTIANIO.md`
+
+- En UI: menú `Backup` > botón `Cargar Demo 2024-2026`.

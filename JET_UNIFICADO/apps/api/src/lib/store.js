@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { getRequestContext } = require('./requestContext');
 
 const DATA_FILE = path.join(__dirname, '..', '..', 'data', 'store.json');
 
@@ -15,6 +16,8 @@ const defaultState = {
   flujoCaja: [],
   periodos: [],
   auditLog: [],
+  asientos: [],
+  asientoLineas: [],
   taxConfig: {
     regime: '14D8',
     year: new Date().getFullYear(),
@@ -22,7 +25,6 @@ const defaultState = {
     ivaRate: 0.19,
     retentionRate: 14.5
   },
-  // Fuentes externas para conciliación Sprint 5
   cartolaMovimientos: [],
   rcvVentas: [],
   marketplaceOrders: [],
@@ -33,6 +35,20 @@ const defaultState = {
     sii: { enabled: false, lastSyncAt: null }
   },
   integrationSyncLog: [],
+  complianceObligations: [],
+  complianceEvidence: [],
+  complianceConfig: {
+    taxpayerType: 'EIRL',
+    alerts: { emailEnabled: false, webhookEnabled: false, emailTo: '', webhookUrl: '' },
+    escalationDaysBefore: [7, 3, 1]
+  },
+  chartOfAccounts: [],
+  accountingRules: [],
+  costCenters: [],
+  approvalRequests: [],
+  normativeChanges: [],
+  normativeRegressionRuns: [],
+  normativePolicy: { monthlyReviewEnabled: true, ownerRole: 'contador_admin', hotfixWindowHours: 24, lastReviewedAt: null },
   backups: [],
   backupPolicy: {
     retentionMaxFiles: 20,
@@ -42,10 +58,45 @@ const defaultState = {
   }
 };
 
+const POSTGRES_FRAGMENT_KEYS = [
+  'migratedAt',
+  'source',
+  'usuarios',
+  'sesiones',
+  'productos',
+  'movimientos',
+  'cuentas',
+  'terceros',
+  'flujoCaja',
+  'periodos',
+  'auditLog',
+  'asientos',
+  'asientoLineas',
+  'taxConfig',
+  'cartolaMovimientos',
+  'rcvVentas',
+  'marketplaceOrders',
+  'rcvCompras',
+  'integrationConfigs',
+  'integrationSyncLog',
+  'complianceObligations',
+  'complianceEvidence',
+  'complianceConfig',
+  'chartOfAccounts',
+  'accountingRules',
+  'costCenters',
+  'approvalRequests',
+  'normativeChanges',
+  'normativeRegressionRuns',
+  'normativePolicy',
+  'backups',
+  'backupPolicy'
+];
+
 function ensureArrays(state) {
   const keys = [
     'usuarios', 'sesiones', 'productos', 'movimientos', 'cuentas', 'terceros', 'flujoCaja', 'periodos', 'auditLog',
-    'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'backups'
+    'asientos', 'asientoLineas', 'cartolaMovimientos', 'rcvVentas', 'rcvCompras', 'marketplaceOrders', 'integrationSyncLog', 'complianceObligations', 'complianceEvidence', 'chartOfAccounts', 'accountingRules', 'costCenters', 'approvalRequests', 'normativeChanges', 'normativeRegressionRuns', 'backups'
   ];
   for (const k of keys) {
     if (!Array.isArray(state[k])) state[k] = [];
@@ -62,6 +113,25 @@ function ensureArrays(state) {
       mercadolibre: { enabled: false, lastSyncAt: null },
       sii: { enabled: false, lastSyncAt: null }
     };
+  }
+
+  if (!state.complianceConfig || typeof state.complianceConfig !== 'object') {
+    state.complianceConfig = {
+      taxpayerType: 'EIRL',
+      alerts: { emailEnabled: false, webhookEnabled: false, emailTo: '', webhookUrl: '' },
+      escalationDaysBefore: [7, 3, 1]
+    };
+  }
+
+  if (!Array.isArray(state.chartOfAccounts)) state.chartOfAccounts = [];
+  if (!Array.isArray(state.accountingRules)) state.accountingRules = [];
+  if (!Array.isArray(state.costCenters)) state.costCenters = [];
+  if (!Array.isArray(state.approvalRequests)) state.approvalRequests = [];
+
+  if (!Array.isArray(state.normativeChanges)) state.normativeChanges = [];
+  if (!Array.isArray(state.normativeRegressionRuns)) state.normativeRegressionRuns = [];
+  if (!state.normativePolicy || typeof state.normativePolicy !== 'object') {
+    state.normativePolicy = { monthlyReviewEnabled: true, ownerRole: 'contador_admin', hotfixWindowHours: 24, lastReviewedAt: null };
   }
 
   if (!state.backupPolicy || typeof state.backupPolicy !== 'object') {
@@ -110,50 +180,50 @@ async function getPgClient() {
   return client;
 }
 
+async function ensureRuntimeFragmentsTable(client) {
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS runtime_fragments (
+      key TEXT PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
+}
+
 async function readPostgresStore() {
   const client = await getPgClient();
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        id SERIAL PRIMARY KEY,
-        key TEXT UNIQUE NOT NULL,
-        value JSONB NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    const result = await client.query('SELECT value FROM app_state WHERE key = $1 LIMIT 1', ['jet_store_runtime']);
-    if (!result.rows.length) {
-      const base = { ...defaultState };
-      await client.query(
-        `INSERT INTO app_state (key, value, updated_at) VALUES ($1, $2::jsonb, NOW())`,
-        ['jet_store_runtime', JSON.stringify(base)]
-      );
-      return base;
+    await ensureRuntimeFragmentsTable(client);
+    const rs = await client.query('SELECT key, value FROM runtime_fragments');
+    const next = { ...defaultState };
+    for (const row of rs.rows) {
+      if (POSTGRES_FRAGMENT_KEYS.includes(row.key)) next[row.key] = row.value;
     }
-    return ensureArrays(result.rows[0].value || {});
+    return ensureArrays(next);
   } finally {
     await client.end();
   }
 }
 
 async function writePostgresStore(next) {
+  const safe = ensureArrays(next);
   const client = await getPgClient();
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS app_state (
-        id SERIAL PRIMARY KEY,
-        key TEXT UNIQUE NOT NULL,
-        value JSONB NOT NULL,
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
-    `);
-    await client.query(
-      `INSERT INTO app_state (key, value, updated_at)
-       VALUES ($1, $2::jsonb, NOW())
-       ON CONFLICT (key)
-       DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-      ['jet_store_runtime', JSON.stringify(ensureArrays(next))]
-    );
+    await ensureRuntimeFragmentsTable(client);
+    await client.query('BEGIN');
+    for (const key of POSTGRES_FRAGMENT_KEYS) {
+      await client.query(
+        `INSERT INTO runtime_fragments (key, value, updated_at)
+         VALUES ($1, $2::jsonb, NOW())
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, JSON.stringify(safe[key])]
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
   } finally {
     await client.end();
   }
@@ -173,11 +243,14 @@ async function writeStore(next) {
 
 async function appendAudit(action, detail, user = 'system') {
   const state = await readStore();
+  const ctx = getRequestContext();
   state.auditLog.push({
     id: `AUD-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
     action,
     detail,
     user,
+    requestId: ctx.requestId || null,
+    path: ctx.path || null,
     createdAt: new Date().toISOString()
   });
   await writeStore(state);
