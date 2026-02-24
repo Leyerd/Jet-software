@@ -249,13 +249,95 @@ async function getFiscalProposal(req, res) {
   return sendJson(res, 200, { ok: true, proposal });
 }
 
+
+function addMonths(year, month, delta) {
+  const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+}
+
+function buildAccountantReplacementPilot(state, startYear, startMonth) {
+  const guided = Array.isArray(state.guidedTaskExecutions) ? state.guidedTaskExecutions : [];
+  const periods = [0, 1, 2].map((i) => addMonths(startYear, startMonth, i));
+
+  const monthly = periods.map(({ year, month }) => {
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    const obligations = (state.complianceObligations || []).filter((o) => o.period === period);
+    const criticalPending = obligations.filter((o) => String(o.severity || '').toLowerCase() === 'critical' && String(o.lifecycleStatus || '').toLowerCase() !== 'acuse');
+
+    const ownerObs = obligations.filter((o) => o.ownerScope === 'dueno');
+    const companyObs = obligations.filter((o) => o.ownerScope !== 'dueno');
+    const ownerAck = ownerObs.filter((o) => String(o.lifecycleStatus || '').toLowerCase() === 'acuse').length;
+    const companyAck = companyObs.filter((o) => String(o.lifecycleStatus || '').toLowerCase() === 'acuse').length;
+
+    const auditPackage = buildAuditPackage(state, year, month);
+
+    const taskKeys = ['cierre', 'f29', 'ddjj'];
+    const taskDone = taskKeys.filter((taskKey) => guided.some((g) => g.period === period && g.taskKey === taskKey && g.status === 'done' && g.guided));
+    const guidedCoverage = taskKeys.length ? Number((taskDone.length / taskKeys.length).toFixed(2)) : 0;
+
+    const closedWithJet = criticalPending.length === 0 && guidedCoverage >= 0.67;
+    const externalDependency = guidedCoverage < 0.67;
+
+    const deviations = [];
+    if (criticalPending.length) deviations.push(`${criticalPending.length} obligación(es) crítica(s) sin acuse`);
+    if (guidedCoverage < 0.67) deviations.push('Cobertura guiada insuficiente en tareas críticas mensuales');
+    if (!auditPackage.hashChain) deviations.push('Paquete fiscalizador sin hashChain');
+
+    return {
+      period,
+      closeWithJet: closedWithJet,
+      externalDependency,
+      guidedCoverage,
+      evidence: {
+        company: { total: companyObs.length, withAck: companyAck },
+        owner: { total: ownerObs.length, withAck: ownerAck },
+        auditHashChain: auditPackage.hashChain
+      },
+      deviations,
+      correctiveActions: deviations.map((d) => d.includes('Cobertura guiada')
+        ? 'Ejecutar tareas críticas desde /operations/guided-flow y completar evidencia bloqueante.'
+        : d.includes('obligación')
+          ? 'Registrar evidencia con acuse en /compliance/evidence para empresa y dueño.'
+          : 'Generar nuevamente paquete fiscalizador para asegurar hashChain trazable.')
+    };
+  });
+
+  const consecutiveNoExternal = monthly.every((m) => m.closeWithJet && !m.externalDependency);
+  const report = {
+    generatedAt: new Date().toISOString(),
+    window: { start: monthly[0]?.period, end: monthly[monthly.length - 1]?.period, months: monthly.length },
+    monthly,
+    summary: {
+      closeSuccessCount: monthly.filter((m) => m.closeWithJet).length,
+      noExternalDependencyCount: monthly.filter((m) => !m.externalDependency).length,
+      gateReached: consecutiveNoExternal
+    }
+  };
+
+  return report;
+}
+
+async function getAccountantReplacementPilot(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const startYear = Number(query.get('year') || new Date().getFullYear());
+  const startMonth = Number(query.get('month') || (new Date().getMonth() + 1));
+
+  const state = await readStore();
+  const pilot = buildAccountantReplacementPilot(state, startYear, startMonth);
+  return sendJson(res, 200, { ok: true, pilot });
+}
+
 module.exports = {
   getAuditPackage,
   getRiskSimulation,
   getExecutiveDashboard,
   getFiscalProposal,
+  getAccountantReplacementPilot,
   buildAuditPackage,
   runRiskSimulation,
   buildExecutiveDashboard,
-  buildAnnualFiscalProposal
+  buildAnnualFiscalProposal,
+  buildAccountantReplacementPilot
 };
