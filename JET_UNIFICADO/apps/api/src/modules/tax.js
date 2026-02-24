@@ -284,8 +284,18 @@ async function getTaxSummary(req, res) {
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
     yearMovs = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS retention NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS comision NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
       const rs = await client.query(
-        `SELECT fecha, tipo, total, neto, iva
+        `SELECT fecha, tipo, total, neto, iva,
+                COALESCE(retention, 0) AS retention,
+                COALESCE(comision, 0) AS comision,
+                COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
+                COALESCE(accepted, TRUE) AS accepted,
+                document_ref AS "documentRef"
          FROM movimientos
          WHERE EXTRACT(YEAR FROM fecha) = $1`,
         [year]
