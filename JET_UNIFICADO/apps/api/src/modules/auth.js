@@ -9,7 +9,7 @@ const SCRYPT_P = Number(process.env.SCRYPT_P || 1);
 const KEY_LEN = 64;
 const BCRYPT_COST = Number(process.env.BCRYPT_COST || 12);
 const SESSION_TTL_HOURS = Number(process.env.SESSION_TTL_HOURS || 12);
-const DISABLE_AUTH = String(process.env.JET_DISABLE_AUTH || '1') === '1';
+const DISABLE_AUTH = true;
 const MFA_ISSUER = process.env.MFA_ISSUER || 'JET';
 
 const MAX_ATTEMPTS_WINDOW = Number(process.env.AUTH_MAX_ATTEMPTS_WINDOW || 5);
@@ -82,11 +82,8 @@ function verifyTotp(code, secretHex, stepSeconds = 30, skew = 1) {
   return false;
 }
 
-function validatePassword(password) {
-  if (typeof password !== 'string' || password.length < 8) return 'password debe tener al menos 8 caracteres';
-  if (!/[A-Z]/.test(password)) return 'password debe incluir al menos una mayúscula';
-  if (!/[a-z]/.test(password)) return 'password debe incluir al menos una minúscula';
-  if (!/[0-9]/.test(password)) return 'password debe incluir al menos un número';
+function validatePassword(_password) {
+  // Seguridad desactivada en modo single-user local por requerimiento de negocio.
   return null;
 }
 
@@ -519,6 +516,7 @@ async function me(req, res) {
 }
 
 async function logout(req, res) {
+  if (DISABLE_AUTH) return sendJson(res, 200, { ok: true, authBypassed: true });
   const token = getBearerToken(req);
   if (!token) return sendJson(res, 401, { ok: false, message: 'No autenticado' });
 
@@ -546,6 +544,7 @@ async function logout(req, res) {
 }
 
 async function revokeSession(req, res) {
+  if (DISABLE_AUTH) return sendJson(res, 200, { ok: true, revoked: 0, authBypassed: true });
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
   const body = await parseBody(req);
@@ -585,6 +584,7 @@ async function revokeSession(req, res) {
 }
 
 async function mfaSetup(req, res) {
+  if (DISABLE_AUTH) return sendJson(res, 200, { ok: true, mfaBypassed: true, message: 'MFA desactivado en modo single-user.' });
   const auth = await requireRoles(req, ['dueno', 'contador_admin']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 
@@ -611,6 +611,7 @@ async function mfaSetup(req, res) {
 }
 
 async function mfaEnable(req, res) {
+  if (DISABLE_AUTH) return sendJson(res, 200, { ok: true, mfaEnabled: false, mfaBypassed: true });
   const auth = await requireRoles(req, ['dueno', 'contador_admin']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
   const body = await parseBody(req);
@@ -643,6 +644,7 @@ async function mfaEnable(req, res) {
 }
 
 async function mfaDisable(req, res) {
+  if (DISABLE_AUTH) return sendJson(res, 200, { ok: true, mfaEnabled: false, mfaBypassed: true });
   const auth = await requireRoles(req, ['dueno', 'contador_admin']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
 

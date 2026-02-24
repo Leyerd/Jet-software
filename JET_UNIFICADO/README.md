@@ -264,7 +264,7 @@ Se agregó un informe técnico de capacidad real del software para tus objetivos
 - `docs/AUDITORIA_SOFTWARE_ACTUAL_EIRL.md`
 
 ## Plan de metas para reemplazo operativo del contador
-Se agregó roadmap vigente de cierre de brechas (Meta 17):
+Se agregó roadmap vigente de cierre de brechas (Metas A1-A6):
 - `docs/PLAN_METAS_REEMPLAZO_CONTADOR_EIRL.md`
 
 ## Base demo multianual para pruebas
