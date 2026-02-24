@@ -421,7 +421,12 @@ async function getTaxSummary(req, res) {
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+         WHERE (
+                  CASE
+                    WHEN fecha IS NULL THEN NULL
+                    ELSE NULLIF(regexp_replace(SUBSTRING(fecha::text, 1, 4), '\D', '', 'g'), '')::INT
+                  END
+                ) = $1`,
         [year]
       );
       return rs.rows;
@@ -493,7 +498,12 @@ async function getTaxExplainability(req, res) {
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+         WHERE (
+                  CASE
+                    WHEN fecha IS NULL THEN NULL
+                    ELSE NULLIF(regexp_replace(SUBSTRING(fecha::text, 1, 4), '\D', '', 'g'), '')::INT
+                  END
+                ) = $1`,
         [year]
       );
       return rs.rows;
