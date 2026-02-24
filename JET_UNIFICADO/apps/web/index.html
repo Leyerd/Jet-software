@@ -2799,13 +2799,28 @@ calculateReports(yearMovs);
             });
         }
 
-        function augmentTaxDiagnosticsWithFrontendContext(health, year) {
+        function augmentTaxDiagnosticsWithFrontendContext(health, year, payload = null) {
             const diagnostics = Array.isArray(health?.diagnostics) ? [...health.diagnostics] : [];
             const localYearMovs = (db.movimientos || []).filter((m) => {
                 const dt = new Date(m?.fecha);
                 return !Number.isNaN(dt.getTime()) && dt.getFullYear() === Number(year);
             }).length;
             const backendYearMovs = Number(health?.stats?.movementsInYear || 0);
+            const rli = Number(payload?.f22?.rli?.components?.rli || 0);
+            const regime = String(payload?.f22?.selectedRegime?.regime || db.config?.regimen || '14D8');
+            if (rli < 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-103',
+                    message: `RLI negativa (${Math.round(rli).toLocaleString('es-CL')}). En SII dueño la base queda en 0 mientras exista pérdida tributaria.`
+                });
+                if (regime === '14D8') {
+                    diagnostics.push({
+                        code: 'TAX-UI-DIAG-104',
+                        message: 'Régimen 14D8: la renta atribuible del dueño se trunca a 0 cuando la RLI anual es negativa.'
+                    });
+                }
+            }
+
 
             if (backendYearMovs === 0 && localYearMovs > 0) {
                 diagnostics.push({
@@ -2851,14 +2866,14 @@ calculateReports(yearMovs);
             }
 
             let payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
-            let health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+            let health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year, payload);
 
             const hasDrift = (health?.diagnostics || []).some((d) => d.code === 'TAX-UI-DIAG-101');
             if (hasDrift) {
                 const syncResult = await syncFrontendMovementsToBackend({ silent: true, yearOverride: year });
                 if ((syncResult?.imported || 0) > 0 || Number(syncResult?.failed || 0) > 0) {
                     payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
-                    health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+                    health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year, payload);
                 }
             }
 

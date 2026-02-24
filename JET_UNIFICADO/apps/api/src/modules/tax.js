@@ -238,7 +238,7 @@ function extractAvailableYears(movements) {
   return Array.from(years).sort((a, b) => a - b);
 }
 
-function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [] }) {
+function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [], rliComponents = null }) {
   const diagnostics = [];
   const hasYearData = yearMovs.length > 0;
   const hasMonthData = monthMovs.length > 0;
@@ -299,6 +299,30 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
     });
   }
 
+
+  const rli = Number(rliComponents?.rli || 0);
+  const ventasNetas = Number(rliComponents?.ventasNetas || 0);
+  const costos = Number(rliComponents?.costos || 0);
+  const gastos = Number(rliComponents?.gastos || 0);
+
+  if (rli < 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-008',
+      severity: 'warning',
+      reason: 'NEGATIVE_RLI_LOSS',
+      message: `La RLI anual está negativa (${Math.round(rli).toLocaleString('es-CL')}). Corresponde a pérdida tributaria del período.`
+    });
+  }
+
+  if (ventasNetas <= 0 && (costos > 0 || gastos > 0)) {
+    diagnostics.push({
+      code: 'TAX-DIAG-009',
+      severity: 'warning',
+      reason: 'NO_TAXABLE_SALES_WITH_EXPENSES',
+      message: 'No hay ventas netas tributarias en el año, pero sí costos/gastos. Verifica clasificación de movimientos y año activo.'
+    });
+  }
+
   if (!['14D8', '14D3'].includes(String(cfg?.regime || ''))) {
     diagnostics.push({
       code: 'TAX-DIAG-005',
@@ -320,7 +344,11 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       movementsInMonth: monthMovs.length,
       invalidDateCount,
       totalMovements,
-      availableYears
+      availableYears,
+      rli: Math.round(rli),
+      ventasNetas: Math.round(ventasNetas),
+      costos: Math.round(costos),
+      gastos: Math.round(gastos)
     }
   };
 }
@@ -595,10 +623,10 @@ async function getTaxSummary(req, res) {
     const movementDate = parseMovementDate(m?.fecha);
     return movementDate && (movementDate.getMonth() + 1) === month;
   });
-  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears });
 
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
+  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears, rliComponents: rli.components });
   const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
   const altCatalog = getCatalog(cfg.year || year, cfg.regime === '14D8' ? '14D3' : '14D8');
   const alternativeRegime = computeF22ByRegime(rli.components.rli, cfg.regime === '14D8' ? '14D3' : '14D8', altCatalog);
