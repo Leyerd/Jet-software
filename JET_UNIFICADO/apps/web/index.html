@@ -2721,6 +2721,58 @@ calculateReports(yearMovs);
 
         const taxSummaryCache = new Map();
 
+
+        function movementSignature(m) {
+            const fecha = String(m?.fecha || '').slice(0, 10);
+            const tipo = String(m?.tipo || '').toUpperCase();
+            const total = Number(m?.total ?? m?.monto ?? 0);
+            const neto = Number(m?.neto || 0);
+            return `${fecha}|${tipo}|${Math.round(total)}|${Math.round(neto)}`;
+        }
+
+        async function syncFrontendMovementsToBackend() {
+            try {
+                const backend = await apiClient.get('/movements');
+                const backendSet = new Set((backend?.movements || []).map(movementSignature));
+                const year = Number(db.config.year || new Date().getFullYear());
+                const candidates = (db.movimientos || []).filter((m) => {
+                    const dt = new Date(m?.fecha);
+                    return !Number.isNaN(dt.getTime()) && dt.getFullYear() === year;
+                });
+                const pending = candidates.filter((m) => !backendSet.has(movementSignature(m)));
+
+                let imported = 0;
+                let skipped = 0;
+                for (const m of pending) {
+                    const payload = {
+                        fecha: String(m?.fecha || '').slice(0, 10),
+                        tipo: String(m?.tipo || '').toUpperCase() || 'GASTO_LOCAL',
+                        descripcion: m?.descripcion || m?.desc || 'Migración frontend local',
+                        total: Number(m?.total ?? m?.monto ?? 0),
+                        neto: Number(m?.neto || 0),
+                        iva: Number(m?.iva || 0),
+                        retention: Number(m?.retention || 0),
+                        comision: Number(m?.comision || 0),
+                        costoMercaderia: Number(m?.costoMercaderia || 0),
+                        accepted: m?.accepted !== undefined ? m.accepted : true,
+                        documentRef: m?.documentRef || m?.nDoc || null
+                    };
+                    if (!payload.fecha || !payload.tipo) { skipped += 1; continue; }
+                    await apiClient.post('/movements', payload);
+                    imported += 1;
+                }
+
+                taxSummaryCache.clear();
+                await getTaxSummaryFromApi(year, Number((db.config.selectedMonth || 0) + 1));
+                calculateReports(db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year));
+                renderOwnerTaxModule();
+                alert(`Sincronización completada. Importados: ${imported}. Omitidos: ${skipped}.`);
+            } catch (err) {
+                alert(`No se pudo sincronizar al backend: ${err.message}`);
+                renderTaxDiagnosticsFromError(err);
+            }
+        }
+
         function renderTaxDiagnostics(health) {
             const targets = ['tax-diagnostics-f29', 'tax-diagnostics-f22', 'tax-diagnostics-owner'];
             const diagnostics = Array.isArray(health?.diagnostics) ? health.diagnostics : [];
@@ -2731,14 +2783,18 @@ calculateReports(yearMovs);
                 : status === 'warning'
                     ? 'border-amber-300 bg-amber-50 text-amber-700'
                     : 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            const hasFrontendDrift = diagnostics.some(d => d.code === 'TAX-UI-DIAG-101');
             const message = visible
                 ? diagnostics.map(d => `<div><b>${d.code}</b> · ${d.message}</div>`).join('')
                 : '<div><b>TAX-DIAG-000</b> · Integración tributaria OK para el período consultado.</div>';
+            const action = hasFrontendDrift
+                ? `<div class="mt-3"><button onclick="syncFrontendMovementsToBackend()" class="btn-jet bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">Sincronizar movimientos locales al backend</button></div>`
+                : '';
             targets.forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.className = `text-xs font-bold rounded-2xl border px-4 py-3 ${css}`;
-                el.innerHTML = message;
+                el.innerHTML = message + action;
             });
         }
 
