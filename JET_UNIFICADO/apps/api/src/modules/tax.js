@@ -134,6 +134,49 @@ function ensureTaxConfig(state) {
   return state.taxConfig;
 }
 
+
+function getTaxTipo(movement) {
+  const raw = String(movement?.tipo || '').trim().toUpperCase();
+  const category = String(movement?.categoria || '').trim().toUpperCase();
+  if (['VENTA', 'GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE', 'RETIRO'].includes(raw)) return raw;
+  if (['INGRESO', 'VENTA_MARKETPLACE', 'VENTA_ML'].includes(raw)) return 'VENTA';
+  if (['COMISION', 'COMISION_ML', 'COMISIÓN', 'COMISIÓN_ML'].includes(raw)) return 'COMISION_MARKETPLACE';
+  if (['EGRESO', 'GASTO', 'COMPRA'].includes(raw)) {
+    if (category.includes('HONOR')) return 'HONORARIOS';
+    if (category.includes('IMPORT')) return 'IMPORTACION';
+    if (category.includes('COMISION')) return 'COMISION_MARKETPLACE';
+    return 'GASTO_LOCAL';
+  }
+  if (category.includes('VENTA')) return 'VENTA';
+  if (category.includes('HONOR')) return 'HONORARIOS';
+  if (category.includes('IMPORT')) return 'IMPORTACION';
+  if (category.includes('COMISION')) return 'COMISION_MARKETPLACE';
+  if (category.includes('GASTO')) return 'GASTO_LOCAL';
+  return raw;
+}
+
+function getTaxNeto(movement, tipoNormalized) {
+  const declaredNeto = Number(movement?.neto || 0);
+  if (!Number.isNaN(declaredNeto) && declaredNeto > 0) return declaredNeto;
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(tipoNormalized)) return Math.round(total / 1.19);
+  if (tipoNormalized === 'HONORARIOS') return Math.max(0, total - Number(movement?.retention || 0));
+  return total;
+}
+
+function getTaxIva(movement, tipoNormalized) {
+  const declaredIva = Number(movement?.iva || 0);
+  if (!Number.isNaN(declaredIva) && declaredIva > 0) return declaredIva;
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(tipoNormalized)) {
+    const neto = getTaxNeto(movement, tipoNormalized);
+    return Math.max(0, Math.round(total - neto));
+  }
+  return 0;
+}
+
 function isAcceptedForTax(movement) {
   if (!movement || movement.accepted === undefined || movement.accepted === null) return true;
   if (typeof movement.accepted === 'boolean') return movement.accepted;
@@ -143,13 +186,13 @@ function isAcceptedForTax(movement) {
 }
 
 function computeMonthlyF29(movs, config, catalog) {
-  const debit = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.iva || 0), 0);
+  const debit = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxIva(b, getTaxTipo(b)), 0);
   const credit = movs
-    .filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
-    .reduce((a, b) => a + Number(b.iva || 0), 0);
-  const netSales = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
+    .filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxIva(b, getTaxTipo(b)), 0);
+  const netSales = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
   const retention = movs
-    .filter(m => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m))
+    .filter(m => getTaxTipo(m) === 'HONORARIOS' && isAcceptedForTax(m))
     .reduce((a, b) => a + Number(b.retention || 0), 0);
   const ppm = Math.round(netSales * (Number(config.ppmRate || 0) / 100));
   const ivaToPay = Math.max(0, Math.round(debit - credit));
@@ -185,11 +228,11 @@ function computeMonthlyF29(movs, config, catalog) {
 }
 
 function computeYearlyRli(movs, catalog) {
-  const ventasNetas = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
-  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+  const ventasNetas = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
+  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
   const gastos = movs
-    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
-    .reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
+    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
   const rli = ventasNetas - costos - gastos;
 
   return {
@@ -473,17 +516,17 @@ async function getTaxExplainability(req, res) {
       casilla_538_debitoFiscal: {
         amount: f29.casillas.casilla_538_debitoFiscal,
         formula: 'SUM(iva) para VENTA',
-        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'VENTA').length
+        evidenceCount: monthMovs.filter((m) => getTaxTipo(m) === 'VENTA').length
       },
       casilla_511_creditoFiscal: {
         amount: f29.casillas.casilla_511_creditoFiscal,
         formula: 'SUM(iva) para GASTO_LOCAL/IMPORTACION con accepted=true',
-        evidenceCount: monthMovs.filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m)).length
+        evidenceCount: monthMovs.filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(getTaxTipo(m)) && isAcceptedForTax(m)).length
       },
       casilla_151_retHonorarios: {
         amount: f29.casillas.casilla_151_retHonorarios,
         formula: 'SUM(retention) para HONORARIOS con accepted=true',
-        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m)).length
+        evidenceCount: monthMovs.filter((m) => getTaxTipo(m) === 'HONORARIOS' && isAcceptedForTax(m)).length
       },
       casilla_062_ppm: {
         amount: f29.casillas.casilla_062_ppm,
