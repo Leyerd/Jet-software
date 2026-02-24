@@ -18,6 +18,9 @@ async function createMovement(req, res) {
   const iva = Number(body.iva || 0);
   const retention = Number(body.retention || 0);
   const comision = Number(body.comision || 0);
+  const costoMercaderia = Number(body.costoMercaderia || 0);
+  const accepted = body.accepted === undefined ? true : Boolean(body.accepted);
+  const documentRef = body.documentRef || null;
   const desc = body.descripcion || '';
 
   if (!fecha || !tipo) return sendJson(res, 400, { ok: false, message: 'fecha y tipo son requeridos' });
@@ -36,13 +39,20 @@ async function createMovement(req, res) {
     const movement = await withPgClient(async (client) => {
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_created BOOLEAN DEFAULT FALSE');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_id TEXT');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS retention NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS comision NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
       const rs = await client.query(
-        `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, creado_en)
-         VALUES ($1::date, $2, $3, $4, $5, $6, NOW())
-         RETURNING id, fecha, tipo, descripcion, total, neto, iva, auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId"`,
-        [fecha, tipo, desc, total, neto, iva]
+        `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, retention, comision, costo_mercaderia, accepted, document_ref, creado_en)
+         VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+         RETURNING id, fecha, tipo, descripcion, total, neto, iva, retention, comision,
+                   costo_mercaderia AS "costoMercaderia", accepted, document_ref AS "documentRef",
+                   auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId"`,
+        [fecha, tipo, desc, total, neto, iva, retention, comision, costoMercaderia, accepted, documentRef]
       );
-      return { ...rs.rows[0], retention, comision };
+      return rs.rows[0];
     });
 
     await appendAuditLog('movement.create', movement, auth.user.email);
@@ -63,7 +73,22 @@ async function createMovement(req, res) {
     return sendJson(res, 409, { ok: false, message: compliance.reason, blockers: compliance.blockers, code: 'COMPLIANCE_BLOCK' });
   }
 
-  const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total, neto, iva, retention, comision, autoJournalCreated: false, autoJournalEntryId: null };
+  const movement = {
+    id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    fecha,
+    tipo,
+    descripcion: desc,
+    total,
+    neto,
+    iva,
+    retention,
+    comision,
+    costoMercaderia,
+    accepted,
+    documentRef,
+    autoJournalCreated: false,
+    autoJournalEntryId: null
+  };
   state.movimientos.push(movement);
   await writeStore(state);
   await appendAudit('movement.create', movement, auth.user.email);
@@ -81,8 +106,13 @@ async function listMovements(req, res) {
 
   if (isPostgresMode()) {
     const movements = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS retention NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS comision NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
       const rs = await client.query(
-        'SELECT id, fecha, tipo, descripcion, total, neto, iva, auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId" FROM movimientos ORDER BY fecha ASC, id ASC'
+        'SELECT id, fecha, tipo, descripcion, total, neto, iva, retention, comision, costo_mercaderia AS "costoMercaderia", accepted, document_ref AS "documentRef", auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId" FROM movimientos ORDER BY fecha ASC, id ASC'
       );
       return rs.rows;
     });
