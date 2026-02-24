@@ -322,12 +322,40 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       message: 'No hay ventas netas tributarias en el año, pero sí costos/gastos. Verifica clasificación de movimientos y año activo.'
     });
   }
-  if (rli < 0 && Number(rliComponents?.importacionesNetas || 0) > 0 && ventasNetas > 0) {
+  const importacionesNetas = Number(rliComponents?.importacionesNetas || 0);
+  const importacionesYearCount = yearMovs.filter((m) => getTaxTipo(m) === 'IMPORTACION' && isAcceptedForTax(m)).length;
+  const importacionesIvaCredito = Math.round(yearMovs
+    .filter((m) => getTaxTipo(m) === 'IMPORTACION' && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxIva(b, 'IMPORTACION'), 0));
+
+  if (rli < 0 && importacionesNetas > 0 && ventasNetas > 0) {
     diagnostics.push({
       code: 'TAX-DIAG-010',
       severity: 'warning',
       reason: 'INVENTORY_RECOGNITION_APPLIED',
       message: 'Se detectan importaciones/compras de inventario en el año. En RLI se excluyen de gasto y se reconoce CMV solo en ventas.'
+    });
+  }
+
+  if (importacionesYearCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-011',
+      severity: 'warning',
+      reason: 'IMPORTS_TAX_TREATMENT_TRACE',
+      message: `Hay ${importacionesYearCount} importaciones aceptadas. Se usan para crédito IVA F29 (IVA ${importacionesIvaCredito.toLocaleString('es-CL')}) y no como gasto directo en RLI/F22.`
+    });
+  }
+
+  if (!hasYearData && totalMovements > 0 && Array.isArray(availableYears) && availableYears.length > 0) {
+    const nearestYear = availableYears.reduce((acc, y) => {
+      if (acc === null) return y;
+      return Math.abs(Number(y) - Number(year)) < Math.abs(Number(acc) - Number(year)) ? y : acc;
+    }, null);
+    diagnostics.push({
+      code: 'TAX-DIAG-012',
+      severity: 'warning',
+      reason: 'PERIOD_SELECTION_OUT_OF_RANGE',
+      message: `El período ${year} no tiene movimientos en backend. Año más cercano con datos: ${nearestYear}.`
     });
   }
 
@@ -357,7 +385,9 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       ventasNetas: Math.round(ventasNetas),
       costos: Math.round(costos),
       gastos: Math.round(gastos),
-      importacionesNetas: Math.round(Number(rliComponents?.importacionesNetas || 0))
+      importacionesNetas: Math.round(importacionesNetas),
+      importacionesYearCount,
+      importacionesIvaCredito
     }
   };
 }

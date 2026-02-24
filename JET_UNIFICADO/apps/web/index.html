@@ -1648,17 +1648,18 @@
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
                 const movementYears = Array.from(new Set((db.movimientos || [])
-                    .map(m => new Date(m.fecha).getFullYear())
+                    .map(m => { const dt = parseMovementDateUi(m.fecha); return dt ? dt.getFullYear() : NaN; })
                     .filter(y => Number.isFinite(y) && y > 2000))).sort((a, b) => a - b);
                 if (movementYears.length) {
-                    const hasDataForConfiguredYear = (db.movimientos || []).some(m => new Date(m.fecha).getFullYear() === Number(db.config.year));
+                    const hasDataForConfiguredYear = (db.movimientos || []).some(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
                     if (!hasDataForConfiguredYear) {
                         const latestYear = movementYears[movementYears.length - 1];
                         db.config.year = latestYear;
                         const latestMonthMovs = (db.movimientos || [])
-                            .filter(m => new Date(m.fecha).getFullYear() === latestYear)
-                            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-                        const latestMonth = latestMonthMovs.length ? new Date(latestMonthMovs[latestMonthMovs.length - 1].fecha).getMonth() : 0;
+                            .filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === latestYear; })
+                            .sort((a, b) => { const da = parseMovementDateUi(a.fecha); const dbb = parseMovementDateUi(b.fecha); return (da ? da.getTime() : 0) - (dbb ? dbb.getTime() : 0); });
+                        const latestDate = latestMonthMovs.length ? parseMovementDateUi(latestMonthMovs[latestMonthMovs.length - 1].fecha) : null;
+                        const latestMonth = latestDate ? latestDate.getMonth() : 0;
                         db.config.selectedMonth = latestMonth;
                     }
                 }
@@ -2506,7 +2507,7 @@
         // Stock runout (unchanged)
         function calculateStockRunout(prodId) {
             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const sales = db.movimientos.filter(m => m.tipo === 'VENTA' && m.prodId == prodId && new Date(m.fecha) >= thirtyDaysAgo).reduce((a, b) => a + b.cant, 0);
+            const sales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && m.prodId == prodId && dt && dt >= thirtyDaysAgo; }).reduce((a, b) => a + b.cant, 0);
             const dailySales = sales / 30;
             const prod = db.productos.find(p => p.id == prodId);
             if (dailySales === 0) return { days: 999, date: 'Estable' };
@@ -2518,7 +2519,7 @@
         // Burn Rate (unchanged)
         function calculateBurnRate() {
             const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-            const expenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS' || m.tipo === 'IMPORTACION') && new Date(m.fecha) >= threeMonthsAgo).reduce((a, b) => a + b.total, 0);
+            const expenses = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS' || m.tipo === 'IMPORTACION') && dt && dt >= threeMonthsAgo; }).reduce((a, b) => a + b.total, 0);
             return Math.round(expenses / 3);
         }
 
@@ -2563,7 +2564,29 @@
             save();
         }
 
-        async function syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal) {
+
+        function parseMovementDateUi(value) {
+            if (!value) return null;
+            const raw = String(value).trim();
+            if (!raw) return null;
+            const native = new Date(raw);
+            if (!Number.isNaN(native.getTime())) return native;
+            const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (slash) {
+                const [, d, m, y] = slash;
+                const dt = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+                if (!Number.isNaN(dt.getTime())) return dt;
+            }
+            const compact = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+            if (compact) {
+                const [, y, m, d] = compact;
+                const dt = new Date(`${y}-${m}-${d}`);
+                if (!Number.isNaN(dt.getTime())) return dt;
+            }
+            return null;
+        }
+
+        async function syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal, localYearSales = 0) {
             try {
                 let accumulated = 0;
                 let selected = null;
@@ -2575,8 +2598,14 @@
                 }
 
                 const ivaPagar = Number(selected?.f29?.totals?.totalToPay || 0);
+                const apiYearSales = Number(selected?.f22?.rli?.components?.ventasNetas || 0);
                 safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString('es-CL')}`);
                 safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString('es-CL')}`);
+                safeSetText('dash-ventas', `$ ${apiYearSales.toLocaleString('es-CL')}`);
+                if (Math.abs(apiYearSales - Number(localYearSales || 0)) > 0) {
+                    const health = { status: 'warning', diagnostics: [{ code: 'TAX-UI-DIAG-106', message: `Diferencia entre ventas locales (${Number(localYearSales).toLocaleString('es-CL')}) y API tributaria (${apiYearSales.toLocaleString('es-CL')}). Se prioriza API.` }] };
+                    renderTaxDiagnostics(health);
+                }
                 renderTaxPanelFromApi(accumulated);
             } catch (_) {
                 safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
@@ -2587,14 +2616,15 @@
 
         // Render dashboard & others
         function render() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
-            const monthMovs = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
+            const monthMovs = yearMovs.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getMonth() === Number(db.config.selectedMonth); });
             // Dashboard summary
             const cajaTotal = db.cuentas.reduce((a, c) => a + c.saldo, 0);
             const year = Number(db.config.year || new Date().getFullYear());
             const selectedMonth = Number((db.config.selectedMonth || 0) + 1);
             safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
-            safeSetText('dash-ventas', `$ ${yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0).toLocaleString('es-CL')}`);
+            const localYearSales = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            safeSetText('dash-ventas', `$ ${localYearSales.toLocaleString('es-CL')}`);
             safeSetText('dash-iva-pagar', '$ 0');
             safeSetText('dash-stock', `$ ${db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0).toLocaleString('es-CL')}`);
             // Treasury cards
@@ -2631,7 +2661,7 @@
                     </tr>`).join('');
             }
             // Update tax panel and calendar
-            syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal);
+            syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal, localYearSales);
             renderFiscalCalendar();
             safeCreateIcons();
             // Inventory grid
@@ -2740,8 +2770,8 @@ calculateReports(yearMovs);
             try {
                 const year = Number(yearOverride || db.config.year || new Date().getFullYear());
                 const candidates = (db.movimientos || []).filter((m) => {
-                    const dt = new Date(m?.fecha);
-                    return !Number.isNaN(dt.getTime()) && dt.getFullYear() === year;
+                    const dt = parseMovementDateUi(m?.fecha);
+                    return !!dt && dt.getFullYear() === year;
                 });
                 const payload = await apiClient.post('/migration/sync-frontend-movements', { year, movements: candidates });
                 const imported = Number(payload?.imported || 0);
@@ -2751,7 +2781,7 @@ calculateReports(yearMovs);
 
                 if (refresh) {
                     taxSummaryCache.clear();
-                    calculateReports(db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year));
+                    calculateReports(db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === year; }));
                     renderOwnerTaxModule();
                 }
                 const result = { imported, skipped, failed, errors, year };
@@ -2802,8 +2832,8 @@ calculateReports(yearMovs);
         function augmentTaxDiagnosticsWithFrontendContext(health, year, payload = null) {
             const diagnostics = Array.isArray(health?.diagnostics) ? [...health.diagnostics] : [];
             const localYearMovs = (db.movimientos || []).filter((m) => {
-                const dt = new Date(m?.fecha);
-                return !Number.isNaN(dt.getTime()) && dt.getFullYear() === Number(year);
+                const dt = parseMovementDateUi(m?.fecha);
+                return !!dt && dt.getFullYear() === Number(year);
             }).length;
             const backendYearMovs = Number(health?.stats?.movementsInYear || 0);
             const rli = Number(payload?.f22?.rli?.components?.rli || 0);
@@ -2919,7 +2949,7 @@ calculateReports(yearMovs);
         }
 
         function renderOwnerTaxModule() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             const year = Number(db.config.year || new Date().getFullYear());
             const month = Number((db.config.selectedMonth || 0) + 1);
             getTaxSummaryFromApi(year, month).then((taxSummary) => {
@@ -2957,7 +2987,7 @@ calculateReports(yearMovs);
         // Projections
         function renderProjections() {
             const now = new Date(); const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); const currentDay = now.getDate();
-            const currentMonthSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const currentMonthSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + b.neto, 0);
             const dailyAvg = currentMonthSales / currentDay; const projectedTotal = Math.round(dailyAvg * daysInMonth);
             safeSetText('proj-sales-current', `$ ${currentMonthSales.toLocaleString('es-CL')}`);
             safeSetText('proj-sales-forecast', `$ ${projectedTotal.toLocaleString('es-CL')}`);
@@ -2979,17 +3009,17 @@ calculateReports(yearMovs);
                 });
             // Calcular utilidad mensual proyectada y crecimiento interanual
             // Costo de mercaderías vendidas este mes
-            const currentMonthCost = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const currentMonthCost = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
             // Gastos (aceptados y honorarios) del mes
-            const currentMonthExpenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const currentMonthExpenses = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + b.neto, 0);
             const projectedCost = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthCost : 0;
             const projectedExpenses = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthExpenses : 0;
             const projectedProfit = projectedTotal - projectedCost - projectedExpenses;
             safeSetText('proj-profit-forecast', `$ ${Math.round(projectedProfit).toLocaleString('es-CL')}`);
             // Crecimiento interanual: comparación entre las ventas netas del año actual y del año anterior
             const currentYear = now.getFullYear();
-            const currentYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === currentYear).reduce((a, b) => a + b.neto, 0);
-            const prevYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === (currentYear - 1)).reduce((a, b) => a + b.neto, 0);
+            const currentYearSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getFullYear() === currentYear; }).reduce((a, b) => a + b.neto, 0);
+            const prevYearSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getFullYear() === (currentYear - 1); }).reduce((a, b) => a + b.neto, 0);
             let yoy = 0;
             if (prevYearSales > 0) yoy = ((currentYearSales - prevYearSales) / prevYearSales) * 100;
             safeSetText('proj-yoy-growth', `${yoy.toFixed(1)}%`);
@@ -3107,9 +3137,9 @@ calculateReports(yearMovs);
 
         // KPI rendering
         function renderKPI() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             // Rotacion: promedio mensual ventas / inventario promedio
-            const salesByMonth = {}; yearMovs.forEach(m => { const k = new Date(m.fecha).getMonth(); if (m.tipo === 'VENTA') salesByMonth[k] = (salesByMonth[k] || 0) + m.neto; });
+            const salesByMonth = {}; yearMovs.forEach(m => { const dt = parseMovementDateUi(m.fecha); if (!dt) return; const k = dt.getMonth(); if (m.tipo === 'VENTA') salesByMonth[k] = (salesByMonth[k] || 0) + m.neto; });
             const avgMonthlySales = Object.values(salesByMonth).length ? Object.values(salesByMonth).reduce((a, b) => a + b, 0) / Object.values(salesByMonth).length : 0;
             const avgInventoryValue = db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0);
             const rotation = avgInventoryValue > 0 ? (avgMonthlySales / avgInventoryValue) : 0;
@@ -3129,7 +3159,7 @@ calculateReports(yearMovs);
             safeSetText('kpi-profit', `$ ${profit.toLocaleString('es-CL')}`);
             safeSetText('kpi-profit-year', `Año ${db.config.year}`);
 
-            const allMovs = db.movimientos.filter(m => [2024, 2025, 2026].includes(new Date(m.fecha).getFullYear()));
+            const allMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && [2024, 2025, 2026].includes(dt.getFullYear()); });
             const generalSales = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
             const generalCost = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
             const generalGastos = allMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + Number(b.neto || 0), 0);
@@ -3209,11 +3239,13 @@ calculateReports(yearMovs);
         // Annual summary (chart and P&L) reused from original
         function renderAnnualSummary() {
             const ctx = document.getElementById('chart-performance').getContext('2d'); if (performanceChart) performanceChart.destroy();
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             const sD = Array(12).fill(0); const eD = Array(12).fill(0);
             let a_vne = 0, a_cmv = 0, a_gas = 0;
             yearMovs.forEach(m => {
-                const idx = new Date(m.fecha).getMonth();
+                const dt = parseMovementDateUi(m.fecha);
+                if (!dt) return;
+                const idx = dt.getMonth();
                 if (m.tipo === 'VENTA') { sD[idx] += m.neto; a_vne += m.neto; a_cmv += (m.costoMercaderia || 0); }
                 else { eD[idx] += m.neto; if (m.tipo !== 'IMPORTACION') a_gas += m.neto; }
             });
@@ -3232,7 +3264,7 @@ calculateReports(yearMovs);
 
         // Render DDJJ (calls separate tables)
         function renderDDJJ() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             // The tables are prepared by calculateReports -> renderDDJJTables
             calculateReports(yearMovs);
             // Actualizar el encabezado de la DJ miscelánea según el régimen
@@ -3473,7 +3505,7 @@ calculateReports(yearMovs);
         function exportDJ(type) {
             const year = db.config.year;
             // Filtrar movimientos del año
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === year; });
             let csv = '';
             let filename = '';
             if (type === '1887') {
