@@ -89,6 +89,15 @@ if ($usedDockerMode) {
 
   Open-Url 'http://localhost:3000'
   Write-Host "[JET] Lanzamiento finalizado (modo Docker)." -ForegroundColor Cyan
+  Write-Host "[JET] Para cerrar: presiona Q en esta ventana (o ejecuta 'docker compose down')." -ForegroundColor Yellow
+  while ($true) {
+    $k = [Console]::ReadKey($true)
+    if ($k.Key -eq [ConsoleKey]::Q) {
+      Write-Host "[JET] Deteniendo contenedores..." -ForegroundColor Yellow
+      try { & docker compose down } catch { Write-Host "[JET] No se pudo ejecutar docker compose down automáticamente." -ForegroundColor Red }
+      break
+    }
+  }
   exit 0
 }
 
@@ -124,4 +133,5 @@ if (-not (Test-Path $shortcutPath)) {
 }
 
 Write-Host "[JET] Iniciando instalación de dependencias y servicios (modo local)..." -ForegroundColor Green
+Write-Host "[JET] Para cerrar en modo local: Ctrl+C o Q + Enter." -ForegroundColor Yellow
 node $launcher

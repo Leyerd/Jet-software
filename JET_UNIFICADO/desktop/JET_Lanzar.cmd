@@ -15,5 +15,6 @@ if errorlevel 1 (
 echo.
 echo [JET] Proceso finalizado correctamente.
 echo [JET] Si no abre la pagina, revisa: docker compose ps
+echo [JET] Cierre rapido: modo local = Ctrl+C o Q + Enter ; modo Docker = tecla Q en esta ventana o docker compose down
 echo.
 pause

@@ -79,13 +79,19 @@ async function main() {
   console.log(`[JET] Abriendo navegador en ${url}`);
   openBrowser(url);
 
+  let shuttingDown = false;
   const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log('\n[JET] Cerrando servicios...');
     for (const p of [api, web]) {
       if (p && !p.killed) p.kill('SIGTERM');
     }
-    process.exit(0);
+    setTimeout(() => process.exit(0), 150);
   };
+
+  api.on('exit', () => { if (!shuttingDown) shutdown(); });
+  web.on('exit', () => { if (!shuttingDown) shutdown(); });
 
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
