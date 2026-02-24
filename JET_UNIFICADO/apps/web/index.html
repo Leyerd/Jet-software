@@ -2738,44 +2738,16 @@ calculateReports(yearMovs);
             if (backendSyncInFlight) return { imported: 0, skipped: 0, inFlight: true, failed: 0, errors: [] };
             backendSyncInFlight = true;
             try {
-                const backend = await apiClient.get('/movements');
-                const backendSet = new Set((backend?.movements || []).map(movementSignature));
                 const year = Number(yearOverride || db.config.year || new Date().getFullYear());
                 const candidates = (db.movimientos || []).filter((m) => {
                     const dt = new Date(m?.fecha);
                     return !Number.isNaN(dt.getTime()) && dt.getFullYear() === year;
                 });
-                const pending = candidates.filter((m) => !backendSet.has(movementSignature(m)));
-
-                let imported = 0;
-                let skipped = 0;
-                let failed = 0;
+                const payload = await apiClient.post('/migration/sync-frontend-movements', { year, movements: candidates });
+                const imported = Number(payload?.imported || 0);
+                const skipped = Number(payload?.skipped || 0);
+                const failed = 0;
                 const errors = [];
-                for (const m of pending) {
-                    const payload = {
-                        fecha: String(m?.fecha || '').slice(0, 10),
-                        tipo: String(m?.tipo || '').toUpperCase() || 'GASTO_LOCAL',
-                        descripcion: m?.descripcion || m?.desc || 'Migración frontend local',
-                        total: Number(m?.total ?? m?.monto ?? 0),
-                        neto: Number(m?.neto || 0),
-                        iva: Number(m?.iva || 0),
-                        retention: Number(m?.retention || 0),
-                        comision: Number(m?.comision || 0),
-                        costoMercaderia: Number(m?.costoMercaderia || 0),
-                        accepted: m?.accepted !== undefined ? m.accepted : true,
-                        documentRef: m?.documentRef || m?.nDoc || null
-                    };
-                    if (!payload.fecha || !payload.tipo) { skipped += 1; continue; }
-                    try {
-                        await apiClient.post('/movements', payload);
-                        imported += 1;
-                    } catch (err) {
-                        failed += 1;
-                        const code = String(err?.code || 'TAX-UI-SYNC-UNKNOWN');
-                        const message = String(err?.message || 'error_sync');
-                        errors.push({ code, message });
-                    }
-                }
 
                 if (refresh) {
                     taxSummaryCache.clear();

@@ -1,7 +1,7 @@
 const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
 const { register, login, me, logout, revokeSession, mfaSetup, mfaEnable, mfaDisable } = require('./modules/auth');
-const { importJson, getSummary } = require('./modules/migration');
+const { importJson, getSummary, syncFrontendMovements } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods, getCloseChecklist } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
@@ -178,6 +178,7 @@ function route(req, res) {
 
   if (path === '/migration/import-json') return req.method === 'POST' ? handle(importJson(req, res), res, 500) : methodNotAllowed(res);
   if (path === '/migration/summary') return req.method === 'GET' ? handle(getSummary(req, res), res) : methodNotAllowed(res);
+  if (path === '/migration/sync-frontend-movements') return req.method === 'POST' ? handle(syncFrontendMovements(req, res), res) : methodNotAllowed(res);
 
   if (path === '/periods/close') return req.method === 'POST' ? handle(closePeriod(req, res), res) : methodNotAllowed(res);
   if (path === '/periods/reopen') return req.method === 'POST' ? handle(reopenPeriod(req, res), res) : methodNotAllowed(res);
