@@ -1721,6 +1721,7 @@
         }
         function save() {
             try {
+                if (typeof taxSummaryCache !== 'undefined' && taxSummaryCache?.clear) taxSummaryCache.clear();
                 // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
                 rebuildAsientos();
                 render();
@@ -2707,6 +2708,16 @@ calculateReports(yearMovs);
             safeSetHTML('fiscal-calendar', dates.map(d => `<li>${d.name}: <span class="text-blue-500">${d.date.toLocaleDateString('es-CL')}</span></li>`).join(''));
         }
 
+        const taxSummaryCache = new Map();
+
+        async function getTaxSummaryFromApi(year, month) {
+            const key = `${year}-${month}`;
+            if (taxSummaryCache.has(key)) return taxSummaryCache.get(key);
+            const payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+            taxSummaryCache.set(key, payload);
+            return payload;
+        }
+
         function getOwnerTaxBracketsUTA() {
             return [
                 { from: 0, to: 13.5, rate: 0, rebateUTA: 0 },
@@ -2720,22 +2731,20 @@ calculateReports(yearMovs);
             ];
         }
 
-        function computeOwnerAnnualTax(yearMovs) {
-            const isRegimenGeneral = db.config.regimen === '14D3';
-            const sales = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
-            const cmv = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
-            const gastos = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
-            const rli = Math.max(0, sales - cmv - gastos);
+        function computeOwnerAnnualTax(yearMovs, taxSummary) {
+            const selectedRegime = taxSummary?.f22?.selectedRegime || {};
+            const rli = Math.max(0, Number(taxSummary?.f22?.rli?.components?.rli || 0));
+            const isRegimenGeneral = String(selectedRegime.regime || db.config.regimen || '14D8') === '14D3';
             const retiros = Math.max(0, yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0));
             const baseOwner = isRegimenGeneral ? retiros : rli;
-            const utaValue = Number(db.config.utaValue || 0) > 0 ? Number(db.config.utaValue) : 8268728; // UTA anual
+            const utaValue = Number(db.config.utaValue || 0) > 0 ? Number(db.config.utaValue) : 8268728;
             const baseUTA = utaValue > 0 ? (baseOwner / utaValue) : 0;
             const brackets = getOwnerTaxBracketsUTA();
             const tramo = brackets.find(b => baseUTA >= b.from && baseUTA <= b.to) || brackets[brackets.length - 1];
             const igcBrutoUTA = Math.max(0, (baseUTA * tramo.rate) - tramo.rebateUTA);
             const igcBruto = Math.round(igcBrutoUTA * utaValue);
 
-            const idpcEmpresa = isRegimenGeneral ? Math.round(rli * 0.25) : 0;
+            const idpcEmpresa = Number(selectedRegime.idpc || 0);
             const retiroSobreRli = isRegimenGeneral && rli > 0 ? Math.min(1, baseOwner / rli) : 0;
             const creditoMaximoPorRetiros = Math.round(idpcEmpresa * retiroSobreRli);
             const ownerCredit = isRegimenGeneral ? Math.min(creditoMaximoPorRetiros, igcBruto) : 0;
@@ -2746,30 +2755,37 @@ calculateReports(yearMovs);
 
         function renderOwnerTaxModule() {
             const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
-            const data = computeOwnerAnnualTax(yearMovs);
-            safeSetText('owner-regime-chip', data.isRegimenGeneral ? 'ProPyme General (14D3)' : 'ProPyme Transparente (14D8)');
-            safeSetText('owner-tax-base', `$ ${Math.round(data.baseOwner).toLocaleString('es-CL')}`);
-            safeSetText('owner-tax-gross', `$ ${Math.round(data.igcBruto).toLocaleString('es-CL')}`);
-            safeSetText('owner-tax-net', `$ ${Math.round(data.netOwnerTax).toLocaleString('es-CL')}`);
-            safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros efectivos del dueño' : '14D8 · base atribuida anual');
-            safeSetText('owner-detail-rli', `$ ${Math.round(data.rli || 0).toLocaleString('es-CL')}`);
-            safeSetText('owner-detail-retiros', `$ ${Math.round(data.retiros || 0).toLocaleString('es-CL')}`);
-            safeSetText('owner-detail-uta', `${data.baseUTA.toFixed(2)} UTA`);
-            safeSetText('owner-detail-credit', `$ ${Math.round(data.ownerCredit).toLocaleString('es-CL')}`);
-            const effRate = data.baseOwner > 0 ? (data.netOwnerTax / data.baseOwner) * 100 : 0;
-            safeSetText('owner-detail-rate', `${effRate.toFixed(2)}%`);
-            safeSetText('owner-where', 'SII.cl → Servicios online → Declaración de Renta (F22)');
-            safeSetText('owner-how', data.isRegimenGeneral
-                ? 'Con retiros efectivos, registro 14D3, control de crédito IDPC proporcional a retiros y propuesta F22 del dueño.'
-                : 'Con renta atribuida 14D8, respaldo de RLI/DDJJ 1947 y propuesta F22 del dueño.');
-            safeSetHTML('owner-tax-brackets', data.brackets.map(b => `
-                <tr>
-                    <td class="px-4 py-2">${b.from.toLocaleString('es-CL')}</td>
-                    <td class="px-4 py-2">${b.to === Infinity ? 'o más' : b.to.toLocaleString('es-CL')}</td>
-                    <td class="px-4 py-2">${(b.rate * 100).toFixed(1)}%</td>
-                    <td class="px-4 py-2">${b.rebateUTA.toFixed(2)}</td>
-                </tr>
-            `).join(''));
+            const year = Number(db.config.year || new Date().getFullYear());
+            const month = Number((db.config.selectedMonth || 0) + 1);
+            getTaxSummaryFromApi(year, month).then((taxSummary) => {
+                const data = computeOwnerAnnualTax(yearMovs, taxSummary);
+                safeSetText('owner-regime-chip', data.isRegimenGeneral ? 'ProPyme General (14D3)' : 'ProPyme Transparente (14D8)');
+                safeSetText('owner-tax-base', `$ ${Math.round(data.baseOwner).toLocaleString('es-CL')}`);
+                safeSetText('owner-tax-gross', `$ ${Math.round(data.igcBruto).toLocaleString('es-CL')}`);
+                safeSetText('owner-tax-net', `$ ${Math.round(data.netOwnerTax).toLocaleString('es-CL')}`);
+                safeSetText('owner-detail-regime', data.isRegimenGeneral ? '14D3 · base por retiros efectivos del dueño' : '14D8 · base atribuida anual (API tributaria)');
+                safeSetText('owner-detail-rli', `$ ${Math.round(data.rli || 0).toLocaleString('es-CL')}`);
+                safeSetText('owner-detail-retiros', `$ ${Math.round(data.retiros || 0).toLocaleString('es-CL')}`);
+                safeSetText('owner-detail-uta', `${data.baseUTA.toFixed(2)} UTA`);
+                safeSetText('owner-detail-credit', `$ ${Math.round(data.ownerCredit).toLocaleString('es-CL')}`);
+                const effRate = data.baseOwner > 0 ? (data.netOwnerTax / data.baseOwner) * 100 : 0;
+                safeSetText('owner-detail-rate', `${effRate.toFixed(2)}%`);
+                safeSetText('owner-where', 'SII.cl → Servicios online → Declaración de Renta (F22)');
+                safeSetText('owner-how', data.isRegimenGeneral
+                    ? 'Calculado con RLI/IDPC de API tributaria y retiros efectivos del período.'
+                    : 'Calculado con base atribuida desde API tributaria (RLI anual).');
+                safeSetHTML('owner-tax-brackets', data.brackets.map(b => `
+                    <tr>
+                        <td class="px-4 py-2">${b.from.toLocaleString('es-CL')}</td>
+                        <td class="px-4 py-2">${b.to === Infinity ? 'o más' : b.to.toLocaleString('es-CL')}</td>
+                        <td class="px-4 py-2">${(b.rate * 100).toFixed(1)}%</td>
+                        <td class="px-4 py-2">${b.rebateUTA.toFixed(2)}</td>
+                    </tr>
+                `).join(''));
+            }).catch((err) => {
+                safeSetText('owner-tax-net', `$ 0`);
+                safeSetText('owner-how', `No disponible: ${err.message}`);
+            });
         }
 
         // Projections
@@ -2823,86 +2839,66 @@ calculateReports(yearMovs);
         // Annual summary & P&L
         function calculateReports(yearMovs) {
             const meses = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-            let remanente = 0; let f29H = ''; let totalPPM = 0; let totalRet = 0;
-            meses.forEach((mes, idx) => {
-                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
-                const ivaV = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
-                // IVA crédito: sólo gastos aceptados
-                const ivaC = m.filter(x => x.tipo === 'GASTO_LOCAL' && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
-                const ivaD = m.filter(x => x.tipo === 'IMPORTACION' && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
-                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
-                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-                const ppm = Math.round(netoSales * (db.config.ppmRate / 100)); totalPPM += ppm; totalRet += retHon;
-                let neto = ivaV - ivaC - ivaD - remanente;
-                if (neto < 0) { remanente = Math.abs(neto); neto = 0; } else { remanente = 0; }
-                f29H += `<tr>
-                    <td class="px-6 py-4 font-black text-xs">${mes}</td>
-                    <td class="text-right text-xs">$ ${ivaV.toLocaleString('es-CL')}</td>
-                    <td class="text-right text-xs text-emerald-500">$ ${ (ivaC + ivaD).toLocaleString('es-CL') }</td>
-                    <td class="text-right text-xs text-orange-500">$ ${retHon.toLocaleString('es-CL')}</td>
-                    <td class="text-right text-xs text-blue-500">$ ${remanente.toLocaleString('es-CL')}</td>
-                    <td class="text-right font-black text-xs">$ ${(neto + retHon + ppm).toLocaleString('es-CL')}</td>
-                </tr>`;
-            });
-            safeSetHTML('table-f29', f29H);
-            // F22
-            const vN = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
-            // CMV solo desde ventas (evita duplicar importaciones en la RLI)
-            const cMV = yearMovs.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
-            // Gastos Operativos aceptados (se descartan los no aceptados)
-            const gO = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && (x.accepted !== false)).reduce((a, b) => a + Number(b.neto || 0), 0);
-            // Gastos no aceptados (para información)
-            const gNo = yearMovs.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'HONORARIOS') && x.accepted === false).reduce((a, b) => a + Number(b.neto || 0), 0);
-            const retirosRegistrados = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
-            const utilidad = vN - cMV - gO; // RLI (Ingresos - Costos - Gastos)
-            const rliTributable = Math.max(0, utilidad);
-            const isRegimenGeneral = db.config.regimen === '14D3';
-            const retiros = isRegimenGeneral ? retirosRegistrados : (retirosRegistrados > 0 ? retirosRegistrados : rliTributable);
-            safeSetText('f22-ventas', `$ ${vN.toLocaleString('es-CL')}`);
-            safeSetText('f22-costos', `$ ${cMV.toLocaleString('es-CL')}`);
-            safeSetText('f22-gastos', `$ ${gO.toLocaleString('es-CL')}`);
-            safeSetText('f22-noaceptados', `$ ${gNo.toLocaleString('es-CL')}`);
-            safeSetText('f22-ppm', `$ ${totalPPM.toLocaleString('es-CL')}`);
-            safeSetText('f22-retenciones', `$ ${totalRet.toLocaleString('es-CL')}`);
-            safeSetText('f22-utilidad', `$ ${utilidad.toLocaleString('es-CL')}`);
-            safeSetText('f22-retiros', `$ ${retiros.toLocaleString('es-CL')}`);
-            // Régimen 14D3: IDPC 25% sobre RLI positiva
-            // Régimen 14D8: transparente, no determina IDPC en la empresa
-            let idpc = 0;
-            let idpcNet = 0;
-            if (isRegimenGeneral) {
-                idpc = Math.round(rliTributable * 0.25);
-                idpcNet = Math.max(0, idpc - totalPPM);
-            }
-            safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
-            safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+            const year = Number(db.config.year || new Date().getFullYear());
+            const selectedMonth = Number((db.config.selectedMonth || 0) + 1);
 
-            const f22TaxLabel = document.getElementById('f22-tax-label');
-            if (f22TaxLabel) {
-                f22TaxLabel.innerText = isRegimenGeneral ? 'Impuesto (25%)' : 'Impuesto Empresa (0% · 14 D8)';
-            }
-            const f22TaxNetLabel = document.getElementById('f22-tax-net-label');
-            if (f22TaxNetLabel) {
-                f22TaxNetLabel.innerText = isRegimenGeneral ? 'Impuesto Neto' : 'Impuesto Neto Empresa (0%)';
-            }
-            const f22WithdrawalsLabel = document.getElementById('f22-withdrawals-label');
-            if (f22WithdrawalsLabel) {
-                f22WithdrawalsLabel.innerText = isRegimenGeneral
-                    ? 'Retiros Efectivos (Global Compl.)'
-                    : 'Base Atribuible / Retiros (14 D8)';
-            }
-            const f22RliNote = document.getElementById('f22-rli-note');
-            if (f22RliNote) {
-                f22RliNote.innerText = isRegimenGeneral
-                    ? 'Monto sobre el cual pagas impuesto (1ra categoría)'
-                    : 'Renta atribuible al dueño (sin IDPC en la empresa)';
-            }
-            const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
-            if (f22RegimeDisclaimer) {
-                f22RegimeDisclaimer.innerText = db.config.regimen === '14D3' ? 'ProPyme General (14 D3)' : 'ProPyme Transparente (14 D8)';
-            }
-            // DJ tables
-            renderDDJJTables(yearMovs, totalPPM, totalRet);
+            (async () => {
+                let f29H = '';
+                let totalPPM = 0;
+                let totalRet = 0;
+                for (let month = 1; month <= 12; month++) {
+                    const taxSummary = await getTaxSummaryFromApi(year, month);
+                    const totals = taxSummary?.f29?.totals || {};
+                    totalPPM += Number(totals.ppm || 0);
+                    totalRet += Number(totals.retention || 0);
+                    f29H += `<tr>
+                        <td class="px-6 py-4 font-black text-xs">${meses[month - 1]}</td>
+                        <td class="text-right text-xs">$ ${Number(totals.debit || 0).toLocaleString('es-CL')}</td>
+                        <td class="text-right text-xs text-emerald-500">$ ${Number(totals.credit || 0).toLocaleString('es-CL')}</td>
+                        <td class="text-right text-xs text-orange-500">$ ${Number(totals.retention || 0).toLocaleString('es-CL')}</td>
+                        <td class="text-right text-xs text-blue-500">$ 0</td>
+                        <td class="text-right font-black text-xs">$ ${Number(totals.totalToPay || 0).toLocaleString('es-CL')}</td>
+                    </tr>`;
+                }
+                safeSetHTML('table-f29', f29H);
+
+                const summary = await getTaxSummaryFromApi(year, selectedMonth);
+                const rliComp = summary?.f22?.rli?.components || {};
+                const selected = summary?.f22?.selectedRegime || {};
+                const isRegimenGeneral = String(selected.regime || db.config.regimen || '14D8') === '14D3';
+                const retirosRegistrados = yearMovs.filter(x => x.tipo === 'RETIRO').reduce((a, b) => a + Number(b.total || 0), 0);
+                const rliTributable = Math.max(0, Number(rliComp.rli || 0));
+                const retiros = isRegimenGeneral ? retirosRegistrados : (retirosRegistrados > 0 ? retirosRegistrados : rliTributable);
+
+                safeSetText('f22-ventas', `$ ${Number(rliComp.ventasNetas || 0).toLocaleString('es-CL')}`);
+                safeSetText('f22-costos', `$ ${Number(rliComp.costos || 0).toLocaleString('es-CL')}`);
+                safeSetText('f22-gastos', `$ ${Number(rliComp.gastos || 0).toLocaleString('es-CL')}`);
+                safeSetText('f22-noaceptados', '$ 0');
+                safeSetText('f22-ppm', `$ ${Math.round(totalPPM).toLocaleString('es-CL')}`);
+                safeSetText('f22-retenciones', `$ ${Math.round(totalRet).toLocaleString('es-CL')}`);
+                safeSetText('f22-utilidad', `$ ${Number(rliComp.rli || 0).toLocaleString('es-CL')}`);
+                safeSetText('f22-retiros', `$ ${Math.round(retiros).toLocaleString('es-CL')}`);
+
+                const idpc = Math.round(Number(selected.idpc || 0));
+                const idpcNet = isRegimenGeneral ? Math.max(0, idpc - Math.round(totalPPM)) : 0;
+                safeSetText('f22-idpc', `$ ${idpc.toLocaleString('es-CL')}`);
+                safeSetText('f22-idpc-net', `$ ${idpcNet.toLocaleString('es-CL')}`);
+
+                const f22TaxLabel = document.getElementById('f22-tax-label');
+                if (f22TaxLabel) f22TaxLabel.innerText = isRegimenGeneral ? 'Impuesto (25%)' : 'Impuesto Empresa (0% · 14 D8)';
+                const f22TaxNetLabel = document.getElementById('f22-tax-net-label');
+                if (f22TaxNetLabel) f22TaxNetLabel.innerText = isRegimenGeneral ? 'Impuesto Neto' : 'Impuesto Neto Empresa (0%)';
+                const f22WithdrawalsLabel = document.getElementById('f22-withdrawals-label');
+                if (f22WithdrawalsLabel) f22WithdrawalsLabel.innerText = isRegimenGeneral ? 'Retiros Efectivos (Global Compl.)' : 'Base Atribuible / Retiros (14 D8)';
+                const f22RliNote = document.getElementById('f22-rli-note');
+                if (f22RliNote) f22RliNote.innerText = isRegimenGeneral ? 'Monto sobre el cual pagas impuesto (1ra categoría)' : 'Renta atribuible al dueño (sin IDPC en la empresa)';
+                const f22RegimeDisclaimer = document.getElementById('f22-regime-disclaimer');
+                if (f22RegimeDisclaimer) f22RegimeDisclaimer.innerText = isRegimenGeneral ? 'ProPyme General (14 D3)' : 'ProPyme Transparente (14 D8)';
+
+                renderDDJJTables(yearMovs, totalPPM, totalRet);
+            })().catch((err) => {
+                safeSetHTML('table-f29', `<tr><td colspan="6" class="px-4 py-3 text-red-500 font-bold">${err.message}</td></tr>`);
+            });
         }
 
         function renderDDJJTables(yearMovs, totalPPM, totalRet) {
