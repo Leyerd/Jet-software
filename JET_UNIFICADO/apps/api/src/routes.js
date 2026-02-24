@@ -45,6 +45,7 @@ const { getCalendar, getSemaphore, getComplianceChecklist, getComplianceBlockers
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
 const { getAuditPackage, getRiskSimulation, getExecutiveDashboard, getFiscalProposal } = require('./modules/eirlExecutive');
 const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
+const { getGuidedFlow, completeGuidedStep, getRunbooks } = require('./modules/operationsGuided');
 
 const modulesList = [
   'arquitectura-unificada',
@@ -79,7 +80,8 @@ const modulesList = [
   'compliance-calendar-semaphore-evidence-escalation',
   'governance-chart-rules-consistency-dual-approval',
   'meta15-audit-package-risk-simulator-executive-dashboard',
-  'meta16-normative-governance-regression'
+  'meta16-normative-governance-regression',
+  'metaA8-guided-operations-blocking-checklists-runbooks'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -214,6 +216,11 @@ function route(req, res) {
   if (path === '/executive/risk-simulation' && req.method === 'GET') return handle(getRiskSimulation(req, res), res);
   if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
   if (path === '/executive/fiscal-proposal' && req.method === 'GET') return handle(getFiscalProposal(req, res), res);
+
+
+  if (path === '/operations/guided-flow' && req.method === 'GET') return handle(getGuidedFlow(req, res), res);
+  if (path === '/operations/guided-flow/complete-step') return req.method === 'POST' ? handle(completeGuidedStep(req, res), res) : methodNotAllowed(res);
+  if (path === '/operations/runbooks' && req.method === 'GET') return handle(getRunbooks(req, res), res);
 
   if (path === '/normative/changes') {
     if (req.method === 'GET') return handle(listChanges(req, res), res);

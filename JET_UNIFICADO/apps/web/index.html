@@ -939,6 +939,26 @@
                     </div>
                     <div id="comp-evidence-result" class="text-xs mt-3 text-slate-500"></div>
                 </div>
+
+                <div class="card p-8">
+                    <div class="flex items-center justify-between gap-3 mb-3">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Operación guiada anti-error humano (Meta A8)</h3>
+                        <button onclick="loadA8Runbooks()" class="btn-jet bg-fuchsia-100 text-fuchsia-800 px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">Runbooks</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-2">
+                        <select id="a8-task" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                            <option value="cierre">cierre</option><option value="f29">f29</option><option value="f22">f22</option><option value="ddjj">ddjj</option>
+                        </select>
+                        <input id="a8-evidence-ref" type="text" placeholder="Referencia evidencia" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" />
+                        <label class="inline-flex items-center gap-2 text-xs font-bold"><input id="a8-evidence-confirm" type="checkbox" class="accent-fuchsia-600"> Confirmo evidencia</label>
+                        <button onclick="loadA8GuidedFlow()" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Cargar asistente</button>
+                        <button onclick="completeA8Step()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Completar paso</button>
+                    </div>
+                    <div id="a8-guide-meta" class="text-xs mt-3 text-slate-500">Sin flujo cargado.</div>
+                    <div id="a8-guide-steps" class="space-y-2 mt-3 text-xs"></div>
+                    <pre id="a8-runbooks" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                </div>
+
             </div>
 
             <!-- Gobernanza contable (Meta 14) -->
@@ -1745,6 +1765,7 @@
                     if (yearInput && !yearInput.value) yearInput.value = String(db.config.year || new Date().getFullYear());
                     if (monthInput && !monthInput.value) monthInput.value = String(new Date().getMonth() + 1);
                     await loadComplianceStatus();
+                    await loadA8GuidedFlow();
                     switchTab('cumplimiento');
                 },
                 observabilidad: async () => {
@@ -2008,7 +2029,7 @@
             if (t === 'auditoria') renderAuditoria();
             if (t === 'reporteria') loadAuditableReports();
             if (t === 'observabilidad') loadObservabilityDashboard();
-            if (t === 'cumplimiento') loadComplianceStatus();
+            if (t === 'cumplimiento') { loadComplianceStatus(); loadA8GuidedFlow(); }
             if (t === 'gobernanza') runGovernanceConsistency();
             if (t === 'ejecutivo') loadExecutivePanel();
             if (t === 'auditoria') loadA7CrossCheck();
@@ -2074,6 +2095,58 @@
 
         function obsMetricCard(label, value, tone = 'text-slate-900 dark:text-white') {
             return `<div class="card p-5"><p class="text-[10px] uppercase font-black tracking-widest text-slate-400">${label}</p><p class="text-2xl font-black ${tone}">${value}</p></div>`;
+        }
+
+
+        let a8FlowCache = null;
+
+        async function loadA8GuidedFlow() {
+            try {
+                const year = Number(document.getElementById('comp-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('comp-month')?.value || (new Date().getMonth() + 1));
+                const taskKey = String(document.getElementById('a8-task')?.value || 'cierre');
+                const payload = await apiClient.get(`/operations/guided-flow?task=${encodeURIComponent(taskKey)}&year=${year}&month=${month}`);
+                a8FlowCache = payload.flow || null;
+                const summary = payload.flow?.summary || { completed: 0, total: 0 };
+                safeSetHTML('a8-guide-meta', `<span class="font-black">Task:</span> ${payload.flow?.taskName || taskKey} · <span class="font-black">Completado:</span> ${summary.completed}/${summary.total} · <span class="font-black">Trace:</span> ${payload.traceId || '-'}`);
+                const rows = (payload.flow?.steps || []).map((step) => {
+                    const tone = step.status === 'done' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+                    return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-3 py-3"><div class="flex items-center justify-between gap-2"><span class="font-black">${step.order}. ${step.title}</span><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${step.status}</span></div><p class="text-[11px] text-slate-500 mt-1">${step.requiresEvidence ? `Evidencia requerida: ${step.evidenceHint || 'sí'}` : 'Sin evidencia obligatoria'}</p></div>`;
+                });
+                safeSetHTML('a8-guide-steps', rows.join(''));
+            } catch (err) {
+                safeSetHTML('a8-guide-meta', `<span class="text-red-500 font-bold">${err.message}</span>`);
+                safeSetHTML('a8-guide-steps', '');
+            }
+        }
+
+        async function completeA8Step() {
+            try {
+                const flow = a8FlowCache;
+                const step = (flow?.steps || []).find((x) => x.status !== 'done');
+                if (!flow || !step) throw new Error('No hay pasos pendientes en el flujo actual');
+                const year = Number(document.getElementById('comp-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('comp-month')?.value || (new Date().getMonth() + 1));
+                const evidenceConfirmed = Boolean(document.getElementById('a8-evidence-confirm')?.checked);
+                const evidenceRef = String(document.getElementById('a8-evidence-ref')?.value || '').trim();
+                await apiClient.post('/operations/guided-flow/complete-step', { taskKey: flow.taskKey, stepId: step.id, year, month, evidenceConfirmed, evidenceRef });
+                await loadA8GuidedFlow();
+                if (step.requiresEvidence) {
+                    document.getElementById('a8-evidence-confirm').checked = false;
+                    document.getElementById('a8-evidence-ref').value = '';
+                }
+            } catch (err) {
+                safeSetHTML('a8-guide-meta', `<span class="text-red-500 font-bold">${err.message}</span>`);
+            }
+        }
+
+        async function loadA8Runbooks() {
+            try {
+                const payload = await apiClient.get('/operations/runbooks');
+                safeSetText('a8-runbooks', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetText('a8-runbooks', JSON.stringify({ error: err.message }, null, 2));
+            }
         }
 
         async function loadObservabilityDashboard() {
