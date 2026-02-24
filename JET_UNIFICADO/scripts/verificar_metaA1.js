@@ -12,7 +12,7 @@ const routes = read('apps/api/src/routes.js');
 const plan = read('docs/PLAN_METAS_REEMPLAZO_CONTADOR_EIRL.md');
 
 const checks = [
-  check('Checklist fiscal mensual empresa + dueño implementado', /buildMonthlyChecklist/.test(compliance) && /F22_DUENO/.test(compliance) && /F22_EMPRESA/.test(compliance)),
+  check('Checklist fiscal mensual empresa + dueño implementado', /buildMonthlyChecklist/.test(compliance) && /F22_DUENO/.test(compliance) && /F22_EMPRESA/.test(compliance) && /appliesThisMonth/.test(compliance)),
   check('Endpoint checklist expuesto', /\/compliance\/checklist/.test(routes)),
   check('Evidencia y acuse obligacional soportados', /registerEvidence/.test(compliance) && /ackNumber/.test(compliance)),
   check('Bloqueo operativo por vencidos críticos', /COMPLIANCE_BLOCK/.test(movements) && /evaluateComplianceBlockers/.test(compliance)),

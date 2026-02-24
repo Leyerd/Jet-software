@@ -142,16 +142,33 @@ async function getComplianceBlockers(req, res) {
 }
 
 
-function buildMonthlyChecklist(obligations) {
-  const required = obligations.filter((o) => ['F29', 'DDJJ', 'F22_EMPRESA', 'F22_DUENO'].includes(o.code));
-  const items = required.map((ob) => ({
-    obligationKey: ob.key,
-    code: ob.code,
-    ownerScope: ob.ownerScope || 'empresa',
-    dueDate: ob.dueDate,
-    lifecycleStatus: ob.lifecycleStatus,
-    completed: String(ob.lifecycleStatus || '').toLowerCase() === 'acuse'
-  }));
+function buildMonthlyChecklist(obligations, year, month) {
+  const byCode = new Map((obligations || []).map((o) => [o.code, o]));
+  const requiredCodes = ['F29', 'DDJJ', 'F22_EMPRESA', 'F22_DUENO'];
+  const annualCodes = new Set(['F22_EMPRESA', 'F22_DUENO']);
+
+  const items = requiredCodes.map((code) => {
+    const ob = byCode.get(code);
+    const appliesThisMonth = !annualCodes.has(code) || Number(month) === 4;
+    const fallbackDueDate = annualCodes.has(code)
+      ? `${year}-04-30`
+      : `${year}-${String(month).padStart(2, '0')}-20`;
+
+    const lifecycleStatus = ob
+      ? String(ob.lifecycleStatus || 'pendiente').toLowerCase()
+      : (appliesThisMonth ? 'pendiente' : 'no_aplica_mes');
+
+    return {
+      obligationKey: ob?.key || `${code}-${year}-${String(month).padStart(2, '0')}`,
+      code,
+      ownerScope: ob?.ownerScope || (code === 'F22_DUENO' ? 'dueno' : 'empresa'),
+      dueDate: ob?.dueDate || fallbackDueDate,
+      lifecycleStatus,
+      appliesThisMonth,
+      completed: appliesThisMonth ? lifecycleStatus === 'acuse' : true
+    };
+  });
+
   const complete = items.every((i) => i.completed);
   return { items, complete, total: items.length, completed: items.filter((i) => i.completed).length };
 }
@@ -165,7 +182,7 @@ async function getComplianceChecklist(req, res) {
   const state = await loadOrCreateObligations(year, month);
   const period = `${year}-${String(month).padStart(2, '0')}`;
   const obligations = state.complianceObligations.filter((x) => x.period === period);
-  const checklist = buildMonthlyChecklist(obligations);
+  const checklist = buildMonthlyChecklist(obligations, year, month);
   const blockers = evaluateComplianceBlockers(state);
   return sendJson(res, 200, { ok: true, period, checklist, blockers, generatedAt: new Date().toISOString() });
 }
