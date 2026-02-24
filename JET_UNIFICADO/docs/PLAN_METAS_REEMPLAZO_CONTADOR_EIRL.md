@@ -21,61 +21,6 @@ Convertir JET UNIFICADO en una plataforma profesional que minimice riesgo de mul
 **Gate**
 - `meta17GateReached: true` con casos de prueba de vencimientos y escalamiento.
 
-## Meta 18 (30-60 días) — Validación cruzada tributaria/contable profunda
-**Problema a resolver:** inconsistencias entre fuentes que gatillan observaciones/multas.
-
-**Entregables**
-1. Validadores cruzados automáticos: ventas vs RCV vs bancos vs inventario vs IVA.
-2. Matriz de severidad (bloqueante/alta/media) con playbooks de corrección.
-3. Reporte diario de brechas con dueño y fecha compromiso.
-
-**Gate**
-- Detección automática de discrepancias en dataset de prueba realista.
-
-## Meta 19 (60-90 días) — Plan de cuentas y reglas contables enterprise
-**Problema a resolver:** mapeos simplificados insuficientes para operación profesional.
-
-**Entregables**
-1. Plan de cuentas parametrizable por empresa/costos/centros.
-2. Motor de reglas contables por tipo de operación real.
-3. Ajustes automáticos de cierre y validaciones NIIF/tributarias avanzadas.
-
-**Gate**
-- 100% asientos críticos generados por reglas parametrizadas + aprobación dual.
-
-## Meta 20 (90-120 días) — Gobierno normativo continuo con regresión avanzada
-**Problema a resolver:** cambios regulatorios frecuentes y riesgo de desalineación.
-
-**Entregables**
-1. Catálogo normativo multi-año versionado y trazable.
-2. Pipeline de regresión por formulario/régimen con datasets históricos.
-3. Control formal de cambios legales y bitácora de decisiones.
-
-**Gate**
-- Ningún cambio normativo pasa a producción sin regresión aprobada.
-
-## Meta 21 (120-150 días) — Confiabilidad productiva/SRE y seguridad reforzada
-**Problema a resolver:** brechas operativas que afectan continuidad y evidencia.
-
-**Entregables**
-1. SLO/SLA, tableros on-call y alertas de disponibilidad/latencia/error budget.
-2. DR operativo con pruebas periódicas de restore evidenciadas.
-3. Hardening de seguridad (secret management, rotación de llaves, SAST/DAST).
-
-**Gate**
-- Cumplimiento sostenido de SLO y restores validados en ventanas programadas.
-
-## Meta 22 (150-180 días) — Certificación interna “listo para reemplazo operativo”
-**Problema a resolver:** demostrar confiabilidad integral antes de delegación total.
-
-**Entregables**
-1. Auditoría interna + auditoría externa técnica/contable.
-2. Manual operativo de cumplimiento y matriz RACI.
-3. Simulacro de cierre y ciclo fiscal completo sin intervención correctiva externa.
-
-**Gate**
-- Dictamen interno favorable + checklist de reemplazo operativo cumplida.
-
 ## KPI de seguimiento (semanal)
 - % obligaciones en verde.
 - % obligaciones con acuse oficial validado.
@@ -84,6 +29,6 @@ Convertir JET UNIFICADO en una plataforma profesional que minimice riesgo de mul
 - Tiempo medio de cierre de brechas tributarias.
 
 ## Secuencia recomendada
-Meta 17 → 18 → 19 → 20 → 21 → 22.
+Meta 17 como ciclo continuo de mejora semanal.
 
-> Nota: el sistema actual ya cubre base fuerte (metas 10-16), pero este plan cierra las brechas para un uso profesional comparable al estándar de estudio contable.
+> Nota: este plan fue simplificado a Meta 17 según instrucción de negocio vigente.
