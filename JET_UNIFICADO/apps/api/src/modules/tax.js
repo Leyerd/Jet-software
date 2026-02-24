@@ -74,11 +74,23 @@ function ensureTaxConfig(state) {
   return state.taxConfig;
 }
 
+function isAcceptedForTax(movement) {
+  if (!movement || movement.accepted === undefined || movement.accepted === null) return true;
+  if (typeof movement.accepted === 'boolean') return movement.accepted;
+  if (typeof movement.accepted === 'number') return movement.accepted !== 0;
+  const normalized = String(movement.accepted).trim().toLowerCase();
+  return !['false', '0', 'no', 'rechazado'].includes(normalized);
+}
+
 function computeMonthlyF29(movs, config, catalog) {
   const debit = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.iva || 0), 0);
-  const credit = movs.filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase())).reduce((a, b) => a + Number(b.iva || 0), 0);
+  const credit = movs
+    .filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
+    .reduce((a, b) => a + Number(b.iva || 0), 0);
   const netSales = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
-  const retention = movs.filter(m => String(m.tipo).toUpperCase() === 'HONORARIOS').reduce((a, b) => a + Number(b.retention || 0), 0);
+  const retention = movs
+    .filter(m => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m))
+    .reduce((a, b) => a + Number(b.retention || 0), 0);
   const ppm = Math.round(netSales * (Number(config.ppmRate || 0) / 100));
   const ivaToPay = Math.max(0, Math.round(debit - credit));
 
@@ -111,8 +123,10 @@ function computeMonthlyF29(movs, config, catalog) {
 
 function computeYearlyRli(movs, catalog) {
   const ventasNetas = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
-  const costos = movs.reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
-  const gastos = movs.filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(String(m.tipo).toUpperCase())).reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
+  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+  const gastos = movs
+    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
+    .reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
   const rli = ventasNetas - costos - gastos;
 
   return {
@@ -341,4 +355,15 @@ async function getTaxSummary(req, res) {
   });
 }
 
-module.exports = { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog, ensureTaxConfig, getCatalog };
+module.exports = {
+  getTaxConfig,
+  updateTaxConfig,
+  getTaxSummary,
+  getTaxCatalog,
+  ensureTaxConfig,
+  getCatalog,
+  computeMonthlyF29,
+  computeYearlyRli,
+  computeF22ByRegime,
+  isAcceptedForTax
+};
