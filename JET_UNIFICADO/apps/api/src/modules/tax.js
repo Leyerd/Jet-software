@@ -199,7 +199,34 @@ function parseMovementDate(value) {
     if (!Number.isNaN(fallback.getTime())) return fallback;
   }
 
+  const dashMatch = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dashMatch) {
+    const [, d, m, y] = dashMatch;
+    const fallback = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  const compactMatch = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compactMatch) {
+    const [, y, m, d] = compactMatch;
+    const fallback = new Date(`${y}-${m}-${d}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
   return null;
+}
+
+function filterYearMovementsByDate(movements, year) {
+  let invalidDateCount = 0;
+  const yearMovs = (movements || []).filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    if (!movementDate) {
+      invalidDateCount += 1;
+      return false;
+    }
+    return movementDate.getFullYear() === Number(year);
+  });
+  return { yearMovs, invalidDateCount };
 }
 
 function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount }) {
@@ -510,24 +537,20 @@ async function getTaxSummary(req, res) {
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
-         FROM movimientos
-         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
-        [year]
+         FROM movimientos`
       );
       return rs.rows;
     });
+    const filtered = filterYearMovementsByDate(yearMovs, year);
+    yearMovs = filtered.yearMovs;
+    invalidDateCount = filtered.invalidDateCount;
   } else {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
     const baseMovs = Array.isArray(state.movimientos) ? state.movimientos : [];
-    yearMovs = baseMovs.filter((m) => {
-      const movementDate = parseMovementDate(m?.fecha);
-      if (!movementDate) {
-        invalidDateCount += 1;
-        return false;
-      }
-      return movementDate.getFullYear() === year;
-    });
+    const filtered = filterYearMovementsByDate(baseMovs, year);
+    yearMovs = filtered.yearMovs;
+    invalidDateCount = filtered.invalidDateCount;
   }
 
   const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
@@ -602,20 +625,23 @@ async function getTaxExplainability(req, res) {
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
-         FROM movimientos
-         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
-        [year]
+         FROM movimientos`
       );
       return rs.rows;
     });
+    const filtered = filterYearMovementsByDate(yearMovs, year);
+    yearMovs = filtered.yearMovs;
   } else {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
-    yearMovs = (state.movimientos || []).filter((m) => new Date(m.fecha).getFullYear() === year);
+    yearMovs = filterYearMovementsByDate(state.movimientos || [], year).yearMovs;
   }
 
   const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
-  const monthMovs = yearMovs.filter((m) => (new Date(m.fecha).getMonth() + 1) === month);
+  const monthMovs = yearMovs.filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    return movementDate && (movementDate.getMonth() + 1) === month;
+  });
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
   const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
