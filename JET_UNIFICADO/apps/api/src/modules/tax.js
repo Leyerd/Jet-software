@@ -175,8 +175,24 @@ function getTaxIva(movement, tipoNormalized) {
   return 0;
 }
 
+function hasTaxRelevantAmount(movement, tipoNormalized = getTaxTipo(movement)) {
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  const neto = Number(movement?.neto || 0);
+  const iva = Number(movement?.iva || 0);
+  const retention = Number(movement?.retention || 0);
+
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE', 'HONORARIOS'].includes(tipoNormalized)) {
+    return [total, neto, iva, retention].some((v) => Number.isFinite(v) && v > 0);
+  }
+  if (tipoNormalized === 'RETIRO') return Number.isFinite(total) && total > 0;
+  return [total, neto, iva, retention].some((v) => Number.isFinite(v) && v > 0);
+}
+
 function isAcceptedForTax(movement) {
-  if (!movement || movement.accepted === undefined || movement.accepted === null) return true;
+  if (!movement) return false;
+  const tipoNormalized = getTaxTipo(movement);
+  if (!hasTaxRelevantAmount(movement, tipoNormalized)) return false;
+  if (movement.accepted === undefined || movement.accepted === null) return true;
   if (typeof movement.accepted === 'boolean') return movement.accepted;
   if (typeof movement.accepted === 'number') return movement.accepted !== 0;
   const normalized = String(movement.accepted).trim().toLowerCase();
@@ -346,6 +362,21 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
     });
   }
 
+  const zeroAmountAcceptedCount = yearMovs.filter((m) => {
+    const tipo = getTaxTipo(m);
+    if (tipo !== 'IMPORTACION') return false;
+    const acceptedFlag = m?.accepted === undefined || m?.accepted === null ? true : isAcceptedForTax(m);
+    return acceptedFlag && !hasTaxRelevantAmount(m, tipo);
+  }).length;
+  if (zeroAmountAcceptedCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-013',
+      severity: 'warning',
+      reason: 'ZERO_AMOUNT_IMPORT_ROWS',
+      message: `Se detectaron ${zeroAmountAcceptedCount} importaciones con monto/neto/iva en 0. Se excluyen del cálculo tributario por posible dato fantasma o apertura incompleta.`
+    });
+  }
+
   if (!hasYearData && totalMovements > 0 && Array.isArray(availableYears) && availableYears.length > 0) {
     const nearestYear = availableYears.reduce((acc, y) => {
       if (acc === null) return y;
@@ -387,7 +418,8 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       gastos: Math.round(gastos),
       importacionesNetas: Math.round(importacionesNetas),
       importacionesYearCount,
-      importacionesIvaCredito
+      importacionesIvaCredito,
+      zeroAmountAcceptedCount
     }
   };
 }
