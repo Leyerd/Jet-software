@@ -428,7 +428,7 @@ async function getTaxSummary(req, res) {
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)')`,
+         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
         [year]
       );
       return rs.rows;
@@ -507,7 +507,7 @@ async function getTaxExplainability(req, res) {
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)')`,
+         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
         [year]
       );
       return rs.rows;
