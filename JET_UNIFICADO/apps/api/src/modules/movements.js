@@ -4,6 +4,7 @@ const { isPeriodClosed, isPeriodClosedInDb } = require('./accountingClose');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
 const { createAutoEntryForMovement } = require('./journal');
+const { evaluateComplianceBlockers } = require('./compliance');
 
 async function createMovement(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador']);
@@ -22,6 +23,12 @@ async function createMovement(req, res) {
   if (!fecha || !tipo) return sendJson(res, 400, { ok: false, message: 'fecha y tipo son requeridos' });
 
   if (isPostgresMode()) {
+    const stateForCompliance = await readStore();
+    const compliance = evaluateComplianceBlockers(stateForCompliance);
+    if (compliance.blocked) {
+      return sendJson(res, 409, { ok: false, message: compliance.reason, blockers: compliance.blockers, code: 'COMPLIANCE_BLOCK' });
+    }
+
     if (await isPeriodClosedInDb(fecha)) {
       return sendJson(res, 409, { ok: false, message: 'No se puede registrar: período contable cerrado' });
     }
@@ -43,6 +50,11 @@ async function createMovement(req, res) {
 
   const state = await readStore();
   if (isPeriodClosed(state, fecha)) return sendJson(res, 409, { ok: false, message: 'No se puede registrar: período contable cerrado' });
+
+  const compliance = evaluateComplianceBlockers(state);
+  if (compliance.blocked) {
+    return sendJson(res, 409, { ok: false, message: compliance.reason, blockers: compliance.blockers, code: 'COMPLIANCE_BLOCK' });
+  }
 
   const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total, neto, iva, retention, comision };
   state.movimientos.push(movement);

@@ -38,7 +38,7 @@ const {
 const { createEntry, publishEntry, reverseEntry, listEntries } = require('./modules/journal');
 const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
-const { getCalendar, getSemaphore, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
+const { getCalendar, getSemaphore, getComplianceBlockers, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
 const { getAuditPackage, getRiskSimulation, getExecutiveDashboard } = require('./modules/eirlExecutive');
 const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
@@ -198,6 +198,7 @@ function route(req, res) {
 
   if (path === '/compliance/calendar' && req.method === 'GET') return handle(getCalendar(req, res), res);
   if (path === '/compliance/semaphore' && req.method === 'GET') return handle(getSemaphore(req, res), res);
+  if (path === '/compliance/blockers' && req.method === 'GET') return handle(getComplianceBlockers(req, res), res);
   if (path === '/compliance/evidence') return req.method === 'POST' ? handle(registerEvidence(req, res), res) : methodNotAllowed(res);
   if (path === '/compliance/config') return req.method === 'POST' ? handle(updateComplianceConfig(req, res), res) : methodNotAllowed(res);
 

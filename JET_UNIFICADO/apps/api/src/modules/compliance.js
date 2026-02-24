@@ -106,6 +106,39 @@ async function loadOrCreateObligations(year, month) {
   return state;
 }
 
+
+function evaluateComplianceBlockers(state, today = new Date()) {
+  ensureComplianceStructures(state);
+  const now = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const overdueCritical = (state.complianceObligations || []).filter((ob) => {
+    if (!ob || String(ob.severity || '').toLowerCase() !== 'critical') return false;
+    const lifecycle = String(ob.lifecycleStatus || 'pendiente').toLowerCase();
+    if (lifecycle === 'acuse') return false;
+    const due = new Date(`${ob.dueDate}T00:00:00Z`);
+    return Number.isFinite(due.getTime()) && due < now;
+  });
+  return {
+    blocked: overdueCritical.length > 0,
+    reason: overdueCritical.length ? 'Existen obligaciones críticas vencidas sin acuse.' : 'Sin bloqueos críticos de cumplimiento.',
+    blockers: overdueCritical.map((ob) => ({
+      key: ob.key,
+      code: ob.code,
+      period: ob.period,
+      dueDate: ob.dueDate,
+      lifecycleStatus: ob.lifecycleStatus,
+      severity: ob.severity
+    }))
+  };
+}
+
+async function getComplianceBlockers(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const state = await readStore();
+  const result = evaluateComplianceBlockers(state);
+  return sendJson(res, 200, { ok: true, ...result, generatedAt: new Date().toISOString() });
+}
+
 async function getCalendar(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
@@ -216,7 +249,9 @@ async function updateComplianceConfig(req, res) {
 module.exports = {
   getCalendar,
   getSemaphore,
+  getComplianceBlockers,
   registerEvidence,
   updateComplianceConfig,
-  ensureComplianceStructures
+  ensureComplianceStructures,
+  evaluateComplianceBlockers
 };
