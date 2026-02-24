@@ -355,11 +355,98 @@ async function getTaxSummary(req, res) {
   });
 }
 
+
+async function getTaxExplainability(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const year = Number(query.get('year') || new Date().getFullYear());
+  const month = Number(query.get('month') || (new Date().getMonth() + 1));
+
+  let cfg;
+  let yearMovs;
+
+  if (isPostgresMode()) {
+    cfg = await loadTaxConfigFromDb(year);
+    yearMovs = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT fecha, tipo, total, neto, iva,
+                COALESCE(retention, 0) AS retention,
+                COALESCE(comision, 0) AS comision,
+                COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
+                COALESCE(accepted, TRUE) AS accepted,
+                document_ref AS "documentRef"
+         FROM movimientos
+         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+        [year]
+      );
+      return rs.rows;
+    });
+  } else {
+    const state = await readStore();
+    cfg = ensureTaxConfig(state);
+    yearMovs = (state.movimientos || []).filter((m) => new Date(m.fecha).getFullYear() === year);
+  }
+
+  const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
+  const monthMovs = yearMovs.filter((m) => (new Date(m.fecha).getMonth() + 1) === month);
+  const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
+  const rli = computeYearlyRli(yearMovs, catalog);
+  const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
+
+  const explainability = {
+    period: { year, month, regime: cfg.regime },
+    casillas: {
+      casilla_538_debitoFiscal: {
+        amount: f29.casillas.casilla_538_debitoFiscal,
+        formula: 'SUM(iva) para VENTA',
+        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'VENTA').length
+      },
+      casilla_511_creditoFiscal: {
+        amount: f29.casillas.casilla_511_creditoFiscal,
+        formula: 'SUM(iva) para GASTO_LOCAL/IMPORTACION con accepted=true',
+        evidenceCount: monthMovs.filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m)).length
+      },
+      casilla_151_retHonorarios: {
+        amount: f29.casillas.casilla_151_retHonorarios,
+        formula: 'SUM(retention) para HONORARIOS con accepted=true',
+        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m)).length
+      },
+      casilla_062_ppm: {
+        amount: f29.casillas.casilla_062_ppm,
+        formula: 'SUM(neto ventas) * ppmRate/100',
+        ppmRate: Number(cfg.ppmRate || 0)
+      }
+    },
+    f22: {
+      rli: rli.components,
+      selectedRegime,
+      ddjjBase: rli.ddjjBase
+    },
+    trace: {
+      normativeVersion: catalog.version,
+      normativeSource: catalog.source,
+      rules: {
+        f29: catalog.rules.f29,
+        f22: catalog.rules.f22,
+        ddjj: catalog.rules.ddjj
+      }
+    }
+  };
+
+  await appendAudit('tax.explainability.generated', { year, month, regime: cfg.regime, normativeVersion: catalog.version }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('tax.explainability.generated', { year, month, regime: cfg.regime, normativeVersion: catalog.version }, auth.user.email);
+
+  return sendJson(res, 200, { ok: true, explainability });
+}
+
 module.exports = {
   getTaxConfig,
   updateTaxConfig,
   getTaxSummary,
   getTaxCatalog,
+  getTaxExplainability,
   ensureTaxConfig,
   getCatalog,
   computeMonthlyF29,
