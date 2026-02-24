@@ -2750,11 +2750,39 @@ calculateReports(yearMovs);
             });
         }
 
+        function augmentTaxDiagnosticsWithFrontendContext(health, year) {
+            const diagnostics = Array.isArray(health?.diagnostics) ? [...health.diagnostics] : [];
+            const localYearMovs = (db.movimientos || []).filter((m) => {
+                const dt = new Date(m?.fecha);
+                return !Number.isNaN(dt.getTime()) && dt.getFullYear() === Number(year);
+            }).length;
+            const backendYearMovs = Number(health?.stats?.movementsInYear || 0);
+
+            if (backendYearMovs === 0 && localYearMovs > 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-101',
+                    message: `Hay ${localYearMovs} movimientos en frontend local para ${year}, pero 0 en backend. Posible desfase por migración backend-first.`
+                });
+            }
+
+            if (!db.config?.apiToken) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-102',
+                    message: 'Frontend sin token API activo. Puede impedir lectura backend protegida.'
+                });
+            }
+
+            const status = diagnostics.some((d) => String(d.code || '').includes('001') || String(d.code || '').includes('006')) ? 'error' : (diagnostics.length ? 'warning' : 'ok');
+            return { ...health, status, diagnostics };
+        }
+
         async function getTaxSummaryFromApi(year, month) {
             const key = `${year}-${month}`;
             if (taxSummaryCache.has(key)) return taxSummaryCache.get(key);
             const payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
-            renderTaxDiagnostics(payload?.dataHealth);
+            const health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+            renderTaxDiagnostics(health);
+            payload.dataHealth = health;
             taxSummaryCache.set(key, payload);
             return payload;
         }

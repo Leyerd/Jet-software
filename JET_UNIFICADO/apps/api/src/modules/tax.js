@@ -229,7 +229,16 @@ function filterYearMovementsByDate(movements, year) {
   return { yearMovs, invalidDateCount };
 }
 
-function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount }) {
+function extractAvailableYears(movements) {
+  const years = new Set();
+  (movements || []).forEach((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    if (movementDate) years.add(movementDate.getFullYear());
+  });
+  return Array.from(years).sort((a, b) => a - b);
+}
+
+function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [] }) {
   const diagnostics = [];
   const hasYearData = yearMovs.length > 0;
   const hasMonthData = monthMovs.length > 0;
@@ -249,6 +258,26 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       severity: 'critical',
       reason: 'NO_MOVEMENTS_FOR_YEAR',
       message: `No existen movimientos tributarios para el año ${year}.`
+    });
+  }
+
+  if (!hasYearData && totalMovements === 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-006',
+      severity: 'critical',
+      reason: 'BACKEND_STORAGE_EMPTY',
+      message: 'No existen movimientos en el backend. Posible desfase por migración desde frontend local a backend.'
+    });
+  }
+
+  if (!hasYearData && totalMovements > 0 && Array.isArray(availableYears) && availableYears.length > 0) {
+    const minY = Math.min(...availableYears);
+    const maxY = Math.max(...availableYears);
+    diagnostics.push({
+      code: 'TAX-DIAG-007',
+      severity: 'warning',
+      reason: 'YEAR_WITHOUT_DATA_IN_BACKEND',
+      message: `El backend tiene movimientos, pero no para ${year}. Años disponibles: ${minY}-${maxY}.`
     });
   }
 
@@ -289,7 +318,9 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       configuredRegime: cfg?.regime || '14D8',
       movementsInYear: yearMovs.length,
       movementsInMonth: monthMovs.length,
-      invalidDateCount
+      invalidDateCount,
+      totalMovements,
+      availableYears
     }
   };
 }
@@ -514,6 +545,8 @@ async function getTaxSummary(req, res) {
   let cfg;
   let yearMovs;
   let invalidDateCount = 0;
+  let totalMovements = 0;
+  let availableYears = [];
 
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
@@ -541,6 +574,8 @@ async function getTaxSummary(req, res) {
       );
       return rs.rows;
     });
+    totalMovements = Array.isArray(yearMovs) ? yearMovs.length : 0;
+    availableYears = extractAvailableYears(yearMovs);
     const filtered = filterYearMovementsByDate(yearMovs, year);
     yearMovs = filtered.yearMovs;
     invalidDateCount = filtered.invalidDateCount;
@@ -548,6 +583,8 @@ async function getTaxSummary(req, res) {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
     const baseMovs = Array.isArray(state.movimientos) ? state.movimientos : [];
+    totalMovements = baseMovs.length;
+    availableYears = extractAvailableYears(baseMovs);
     const filtered = filterYearMovementsByDate(baseMovs, year);
     yearMovs = filtered.yearMovs;
     invalidDateCount = filtered.invalidDateCount;
@@ -558,7 +595,7 @@ async function getTaxSummary(req, res) {
     const movementDate = parseMovementDate(m?.fecha);
     return movementDate && (movementDate.getMonth() + 1) === month;
   });
-  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount });
+  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears });
 
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
