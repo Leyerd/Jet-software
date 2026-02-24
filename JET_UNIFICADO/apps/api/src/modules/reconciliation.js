@@ -451,8 +451,111 @@ async function getReconciliationSummary(req, res) {
   });
 }
 
+function severityMatrix(absDelta, reference = 0) {
+  const baseline = Math.max(1, Math.abs(reference));
+  const ratio = absDelta / baseline;
+  if (absDelta >= 150000 || ratio >= 0.15) return { severity: 'critical', slaHours: 24, owner: 'dueno' };
+  if (absDelta >= 50000 || ratio >= 0.08) return { severity: 'high', slaHours: 48, owner: 'contador_admin' };
+  if (absDelta >= 10000 || ratio >= 0.03) return { severity: 'medium', slaHours: 72, owner: 'operador' };
+  return { severity: 'low', slaHours: 120, owner: 'operador' };
+}
+
+async function getCrossValidationReport(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  const state = await readStore();
+  const movements = state.movimientos || [];
+  const inventory = state.productos || [];
+  const rcvVentas = state.rcvVentas || [];
+  const cartola = state.cartolaMovimientos || [];
+  const now = new Date();
+
+  const periods = new Set();
+  for (const m of movements) { const k = toMonthKey(m.fecha); if (k) periods.add(k); }
+  for (const r of rcvVentas) { const k = toMonthKey(r.fecha); if (k) periods.add(k); }
+  for (const c of cartola) { const k = toMonthKey(c.fecha); if (k) periods.add(k); }
+
+  const byPeriod = {};
+  for (const p of periods) byPeriod[p] = { salesMov: 0, salesRcv: 0, cashBank: 0, stockValue: 0 };
+
+  for (const m of movements) {
+    const p = toMonthKey(m.fecha); if (!p || !byPeriod[p]) continue;
+    if (String(m.tipo || '').toUpperCase() === 'VENTA') byPeriod[p].salesMov += Number(m.total || m.neto || 0);
+  }
+  for (const r of rcvVentas) { const p = toMonthKey(r.fecha); if (p && byPeriod[p]) byPeriod[p].salesRcv += Number(r.total || 0); }
+  for (const c of cartola) {
+    const p = toMonthKey(c.fecha); if (!p || !byPeriod[p]) continue;
+    const sign = String(c.tipoMovimiento || '').toUpperCase() === 'EGRESO' ? -1 : 1;
+    byPeriod[p].cashBank += sign * Number(c.monto || 0);
+  }
+
+  const totalStockValue = inventory.reduce((s, it) => s + (Number(it.stock || 0) * Number(it.costoPromedio || 0)), 0);
+  Object.values(byPeriod).forEach((x) => { x.stockValue = totalStockValue; });
+
+  const breaches = [];
+  const sorted = Object.keys(byPeriod).sort();
+  for (const period of sorted) {
+    const row = byPeriod[period];
+    const dSales = Math.round(row.salesMov - row.salesRcv);
+    const dCash = Math.round(row.salesMov - row.cashBank);
+    const dInv = Math.round(row.stockValue - (row.salesMov * 0.5));
+
+    const rules = [
+      { key: 'ventas_vs_rcv', delta: dSales, reference: row.salesMov, openedAt: `${period}-15T00:00:00.000Z` },
+      { key: 'ventas_vs_bancos', delta: dCash, reference: row.salesMov, openedAt: `${period}-20T00:00:00.000Z` },
+      { key: 'ventas_vs_inventario', delta: dInv, reference: row.stockValue, openedAt: `${period}-25T00:00:00.000Z` }
+    ];
+
+    for (const r of rules) {
+      const m = severityMatrix(Math.abs(r.delta), r.reference);
+      if (Math.abs(r.delta) <= 1000) continue;
+      const openedAt = new Date(r.openedAt);
+      const ageHours = Math.max(0, Math.floor((now.getTime() - openedAt.getTime()) / (1000 * 60 * 60)));
+      breaches.push({
+        id: `${r.key}:${period}`,
+        period,
+        ruleKey: r.key,
+        delta: r.delta,
+        severity: m.severity,
+        slaHours: m.slaHours,
+        owner: m.owner,
+        ageHours,
+        status: ageHours > m.slaHours ? 'over_sla' : 'open'
+      });
+    }
+  }
+
+  const summary = {
+    totalBreaches: breaches.length,
+    criticalOpenOver48h: breaches.filter((b) => b.severity === 'critical' && b.ageHours > 48).length,
+    bySeverity: {
+      critical: breaches.filter((b) => b.severity === 'critical').length,
+      high: breaches.filter((b) => b.severity === 'high').length,
+      medium: breaches.filter((b) => b.severity === 'medium').length,
+      low: breaches.filter((b) => b.severity === 'low').length
+    }
+  };
+
+  const topOwners = {};
+  for (const b of breaches) topOwners[b.owner] = (topOwners[b.owner] || 0) + 1;
+  const owners = Object.entries(topOwners).map(([owner, count]) => ({ owner, count })).sort((a, b) => b.count - a.count);
+
+  await appendAudit('reconciliation.cross_check.daily', { totalBreaches: summary.totalBreaches, criticalOpenOver48h: summary.criticalOpenOver48h }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('reconciliation.cross_check.daily', { totalBreaches: summary.totalBreaches, criticalOpenOver48h: summary.criticalOpenOver48h }, auth.user.email);
+
+  return sendJson(res, 200, {
+    ok: true,
+    generatedAt: now.toISOString(),
+    summary,
+    owners,
+    breaches
+  });
+}
+
 module.exports = {
   getReconciliationSummary,
+  getCrossValidationReport,
   importCartola,
   importRCVVentas,
   importMarketplaceOrders,

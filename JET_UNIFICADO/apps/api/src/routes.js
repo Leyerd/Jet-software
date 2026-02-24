@@ -11,6 +11,7 @@ const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
 const {
   getReconciliationSummary,
+  getCrossValidationReport,
   importCartola,
   importRCVVentas,
   importMarketplaceOrders,
@@ -117,6 +118,7 @@ function route(req, res) {
   if (path === '/inventory/consume') return req.method === 'POST' ? handle(consumeStock(req, res), res) : methodNotAllowed(res);
 
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
+  if (req.method === 'GET' && path === '/reconciliation/cross-check') return handle(getCrossValidationReport(req, res), res);
   if (req.method === 'GET' && path === '/reconciliation/documents') return handle(listReconciliationDocuments(req, res), res);
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);

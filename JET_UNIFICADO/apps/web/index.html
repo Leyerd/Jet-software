@@ -711,6 +711,11 @@
                     </p>
                 </div>
                 <div class="card p-6 overflow-auto">
+                    <div class="flex items-center justify-between mb-4">
+                        <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest">Cruce tributario-contable (Meta A7)</h4>
+                        <button onclick="loadA7CrossCheck()" class="btn-jet bg-red-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Reporte diario</button>
+                    </div>
+                    <pre id="a7-cross-check" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72 mb-4">{}</pre>
                     <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest mb-4">Resumen de Observaciones</h4>
                     <table class="w-full text-sm">
                         <thead class="bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold text-[9px] uppercase tracking-wider">
@@ -2006,6 +2011,7 @@
             if (t === 'cumplimiento') loadComplianceStatus();
             if (t === 'gobernanza') runGovernanceConsistency();
             if (t === 'ejecutivo') loadExecutivePanel();
+            if (t === 'auditoria') loadA7CrossCheck();
             if (t === 'normativa') loadNormativeChanges();
             if (t === 'configuracion') updateRetRate();
             if (t === 'dueno-sii') renderOwnerTaxModule();
@@ -2248,6 +2254,15 @@
             }
         }
 
+
+        async function loadA7CrossCheck() {
+            try {
+                const payload = await apiClient.get('/reconciliation/cross-check');
+                safeSetText('a7-cross-check', JSON.stringify(payload, null, 2));
+            } catch (err) {
+                safeSetText('a7-cross-check', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
 
         async function loadNormativeChanges() {
             try {
