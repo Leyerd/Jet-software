@@ -322,6 +322,14 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       message: 'No hay ventas netas tributarias en el año, pero sí costos/gastos. Verifica clasificación de movimientos y año activo.'
     });
   }
+  if (rli < 0 && Number(rliComponents?.importacionesNetas || 0) > 0 && ventasNetas > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-010',
+      severity: 'warning',
+      reason: 'INVENTORY_RECOGNITION_APPLIED',
+      message: 'Se detectan importaciones/compras de inventario en el año. En RLI se excluyen de gasto y se reconoce CMV solo en ventas.'
+    });
+  }
 
   if (!['14D8', '14D3'].includes(String(cfg?.regime || ''))) {
     diagnostics.push({
@@ -348,7 +356,8 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       rli: Math.round(rli),
       ventasNetas: Math.round(ventasNetas),
       costos: Math.round(costos),
-      gastos: Math.round(gastos)
+      gastos: Math.round(gastos),
+      importacionesNetas: Math.round(Number(rliComponents?.importacionesNetas || 0))
     }
   };
 }
@@ -396,11 +405,23 @@ function computeMonthlyF29(movs, config, catalog) {
 }
 
 function computeYearlyRli(movs, catalog) {
-  const ventasNetas = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
-  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
-  const gastos = movs
-    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+  const accepted = movs.filter(isAcceptedForTax);
+  const ventas = accepted.filter((m) => getTaxTipo(m) === 'VENTA');
+  const ventasNetas = ventas.reduce((a, b) => a + getTaxNeto(b, 'VENTA'), 0);
+
+  // CMV: solo se reconoce por ventas efectivamente realizadas (costoMercaderia en movimientos de VENTA).
+  const costos = ventas.reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
+
+  // Bajo esquema con control de inventario, IMPORTACION/COMPRA de inventario no se lleva directo a gasto,
+  // sino a costo vía CMV al vender. Evita doble castigo de RLI.
+  const gastos = accepted
+    .filter((m) => ['GASTO_LOCAL', 'HONORARIOS', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)))
     .reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
+
+  const importacionesNetas = accepted
+    .filter((m) => getTaxTipo(m) === 'IMPORTACION')
+    .reduce((a, b) => a + getTaxNeto(b, 'IMPORTACION'), 0);
+
   const rli = ventasNetas - costos - gastos;
 
   return {
@@ -408,6 +429,7 @@ function computeYearlyRli(movs, catalog) {
       ventasNetas: Math.round(ventasNetas),
       costos: Math.round(costos),
       gastos: Math.round(gastos),
+      importacionesNetas: Math.round(importacionesNetas),
       rli: Math.round(rli)
     },
     ddjjBase: {
