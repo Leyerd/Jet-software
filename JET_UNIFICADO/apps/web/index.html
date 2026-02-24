@@ -999,6 +999,19 @@
                 </div>
                 <div class="card p-8">
                     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Propuesta fiscal anual (empresa + dueño) - Meta A6</h3>
+                        <div class="flex gap-2">
+                            <select id="exec-regime" class="border-2 border-slate-100 dark:border-slate-800 p-2 rounded-xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="14D3">14D3</option>
+                                <option value="14D8">14D8</option>
+                            </select>
+                            <button onclick="loadFiscalProposal()" class="btn-jet bg-teal-700 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Generar propuesta</button>
+                        </div>
+                    </div>
+                    <pre id="exec-fiscal-proposal" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                </div>
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Automatización recurrente (Meta A5)</h3>
                         <div class="flex gap-2">
                             <button onclick="runA5RecurringCycle()" class="btn-jet bg-indigo-600 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Ejecutar ciclo A5</button>
@@ -2184,11 +2197,23 @@
                 });
                 safeSetHTML('exec-today', prRows.join(''));
                 safeSetText('exec-risk', JSON.stringify(payload, null, 2));
+                await loadFiscalProposal();
             } catch (err) {
                 safeSetHTML('exec-cards', obsMetricCard('Ejecutivo', 'No disponible', 'text-red-500'));
                 safeSetHTML('exec-summary', '<div class="text-red-500 font-bold">No disponible</div>');
                 safeSetHTML('exec-today', `<div class="text-red-500 font-bold">${err.message}</div>`);
                 safeSetText('exec-risk', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+        async function loadFiscalProposal() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const regime = String(document.getElementById('exec-regime')?.value || '14D3');
+                const payload = await apiClient.get(`/executive/fiscal-proposal?year=${year}&regime=${encodeURIComponent(regime)}`);
+                safeSetText('exec-fiscal-proposal', JSON.stringify(payload.proposal || {}, null, 2));
+            } catch (err) {
+                safeSetText('exec-fiscal-proposal', JSON.stringify({ error: err.message }, null, 2));
             }
         }
 

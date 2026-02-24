@@ -42,7 +42,7 @@ const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
 const { getCalendar, getSemaphore, getComplianceChecklist, getComplianceBlockers, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
-const { getAuditPackage, getRiskSimulation, getExecutiveDashboard } = require('./modules/eirlExecutive');
+const { getAuditPackage, getRiskSimulation, getExecutiveDashboard, getFiscalProposal } = require('./modules/eirlExecutive');
 const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
 
 const modulesList = [
@@ -211,6 +211,7 @@ function route(req, res) {
   if (path === '/executive/audit-package' && req.method === 'GET') return handle(getAuditPackage(req, res), res);
   if (path === '/executive/risk-simulation' && req.method === 'GET') return handle(getRiskSimulation(req, res), res);
   if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
+  if (path === '/executive/fiscal-proposal' && req.method === 'GET') return handle(getFiscalProposal(req, res), res);
 
   if (path === '/normative/changes') {
     if (req.method === 'GET') return handle(listChanges(req, res), res);

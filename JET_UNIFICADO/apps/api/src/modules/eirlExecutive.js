@@ -146,6 +146,71 @@ function parseYearMonth(req) {
   return { year, month };
 }
 
+function buildAnnualFiscalProposal(state, year, regime = '14D3') {
+  const movsYear = (state.movimientos || []).filter((m) => {
+    const d = new Date(m.fecha);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === year;
+  });
+  const salesNet = movsYear
+    .filter((m) => String(m.tipo || '').toUpperCase() === 'VENTA')
+    .reduce((s, m) => s + Number(m.neto || m.total || 0), 0);
+  const expenseNet = movsYear
+    .filter((m) => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMPRA'].includes(String(m.tipo || '').toUpperCase()))
+    .reduce((s, m) => s + Number(m.neto || m.total || 0), 0);
+
+  const taxableBase = Math.max(0, salesNet - expenseNet);
+  const rate = regime === '14D8' ? 0.0 : 0.25;
+  const companyEstimate = Math.round(taxableBase * rate);
+  const ownerEstimate = Math.round(Math.max(0, taxableBase * (regime === '14D8' ? 0.15 : 0.12)));
+
+  const docs = (state.documentosFiscales || []).filter((d) => {
+    const issued = new Date(d.fechaEmision || d.fecha || `${year}-01-01`);
+    return !Number.isNaN(issued.getTime()) && issued.getFullYear() === year;
+  });
+  const sourceCoverage = {
+    rcvVentasCount: docs.filter((d) => String(d.tipoDte || '').includes('VENTA')).length,
+    rcvComprasCount: docs.filter((d) => String(d.tipoDte || '').includes('COMPRA')).length,
+    movementCount: movsYear.length,
+    evidenceCount: (state.complianceEvidence || []).filter((e) => String(e.createdAt || '').startsWith(String(year))).length
+  };
+
+  const ownerEvidence = (state.complianceObligations || []).filter((o) => String(o.period || '').startsWith(String(year)) && o.ownerScope === 'dueno');
+  const companyEvidence = (state.complianceObligations || []).filter((o) => String(o.period || '').startsWith(String(year)) && o.ownerScope !== 'dueno');
+  const summarizeAck = (list) => ({
+    total: list.length,
+    withAck: list.filter((x) => String(x.lifecycleStatus || '').toLowerCase() === 'acuse').length,
+    pending: list.filter((x) => String(x.lifecycleStatus || '').toLowerCase() !== 'acuse').map((x) => ({ key: x.key, code: x.code, dueDate: x.dueDate }))
+  });
+
+  return {
+    generatedAt: new Date().toISOString(),
+    year,
+    regime,
+    proposal: {
+      company: {
+        taxableBase,
+        annualTaxEstimate: companyEstimate,
+        creditSupport: {
+          source: 'rcv+movements',
+          detail: sourceCoverage
+        }
+      },
+      owner: {
+        annualTaxEstimate: ownerEstimate,
+        sourceTrace: {
+          basedOnCompanyBase: taxableBase,
+          regime,
+          method: regime === '14D8' ? 'flujo-transparente-estimado' : 'distribucion-estimada'
+        }
+      }
+    },
+    declarationEvidence: {
+      empresa: summarizeAck(companyEvidence),
+      dueno: summarizeAck(ownerEvidence)
+    }
+  };
+}
+
 async function getAuditPackage(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
@@ -173,11 +238,24 @@ async function getExecutiveDashboard(req, res) {
   return sendJson(res, 200, { ok: true, dashboard, risk: { totalExpectedRisk: simulation.totalExpectedRisk, highRiskCount: simulation.highRiskCount } });
 }
 
+async function getFiscalProposal(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const year = Number(query.get('year') || new Date().getFullYear());
+  const regime = String(query.get('regime') || query.get('regimen') || '14D3').toUpperCase();
+  const state = await readStore();
+  const proposal = buildAnnualFiscalProposal(state, year, regime);
+  return sendJson(res, 200, { ok: true, proposal });
+}
+
 module.exports = {
   getAuditPackage,
   getRiskSimulation,
   getExecutiveDashboard,
+  getFiscalProposal,
   buildAuditPackage,
   runRiskSimulation,
-  buildExecutiveDashboard
+  buildExecutiveDashboard,
+  buildAnnualFiscalProposal
 };
