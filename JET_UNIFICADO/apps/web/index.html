@@ -472,6 +472,7 @@
                         <b>[89] A Pagar:</b> (Débito - Crédito - Remanente) + Retenciones + PPM.
                     </p>
                 </div>
+                <div id="tax-diagnostics-f29" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="card overflow-hidden transition-colors border-none shadow-2xl">
                     <table class="w-full text-sm">
                         <thead class="bg-slate-950 text-white font-black text-[9px] uppercase tracking-[0.2em]">
@@ -543,6 +544,7 @@
                         Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados; en 14D8 la utilidad se atribuye al dueño y no genera IDPC en la empresa.
                     </p>
                 </div>
+                <div id="tax-diagnostics-f22" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
                     <div class="text-center pb-12 border-b-2 border-slate-100 dark:border-slate-800">
                         <h3 class="text-3xl font-black text-slate-950 dark:text-white tracking-tighter">Base Imponible Tributaria</h3>
@@ -605,6 +607,7 @@
                     <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">¿Cuándo, dónde y cómo declarar?</h4>
                     <p class="text-[11px] text-slate-600 dark:text-slate-300">Módulo profesional para estimar carga tributaria del dueño según régimen (<b id="owner-regime-chip">14D8</b>), consolidar créditos y preparar la declaración en SII.</p>
                 </div>
+                <div id="tax-diagnostics-owner" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="card p-6 border-l-4 border-sky-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Base tributable dueño</p><h3 id="owner-tax-base" class="text-2xl font-black text-sky-600">$ 0</h3></div>
                     <div class="card p-6 border-l-4 border-amber-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">IGC determinado</p><h3 id="owner-tax-gross" class="text-2xl font-black text-amber-600">$ 0</h3></div>
@@ -1585,6 +1588,13 @@
             return tokenBootstrapPromise;
         }
 
+        function createClientError(code, message, meta = {}) {
+            const err = new Error(message || code);
+            err.code = code;
+            err.meta = meta;
+            return err;
+        }
+
         const apiClient = {
             async request(path, options = {}) {
                 if (!db.config?.apiToken) await ensureApiTokenFromBackend();
@@ -1592,10 +1602,15 @@
 
                 const doFetch = async () => {
                     const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
-                    const response = await fetch(target, {
-                        headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
-                        ...options
-                    });
+                    let response;
+                    try {
+                        response = await fetch(target, {
+                            headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
+                            ...options
+                        });
+                    } catch (fetchErr) {
+                        throw createClientError('TAX-UI-API-001', `No se pudo conectar al backend (${target}).`, { path, cause: fetchErr?.message || 'fetch_failed' });
+                    }
                     let payload = null;
                     try { payload = await response.json(); } catch (e) { payload = null; }
                     return { response, payload };
@@ -1610,8 +1625,9 @@
                 }
 
                 if (!response.ok || (payload && payload.ok === false)) {
+                    const backendCode = payload?.code || payload?.errorCode || payload?.dataHealth?.diagnostics?.[0]?.code || `HTTP-${response.status}`;
                     const msg = (payload && (payload.message || payload.error)) || `HTTP ${response.status}`;
-                    throw new Error(msg);
+                    throw createClientError(`TAX-UI-API-${backendCode}`, msg, { status: response.status, path });
                 }
                 return payload;
             },
@@ -2705,10 +2721,40 @@ calculateReports(yearMovs);
 
         const taxSummaryCache = new Map();
 
+        function renderTaxDiagnostics(health) {
+            const targets = ['tax-diagnostics-f29', 'tax-diagnostics-f22', 'tax-diagnostics-owner'];
+            const diagnostics = Array.isArray(health?.diagnostics) ? health.diagnostics : [];
+            const status = health?.status || 'ok';
+            const visible = diagnostics.length > 0;
+            const css = status === 'error'
+                ? 'border-red-300 bg-red-50 text-red-700'
+                : status === 'warning'
+                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            const message = visible
+                ? diagnostics.map(d => `<div><b>${d.code}</b> · ${d.message}</div>`).join('')
+                : '<div><b>TAX-DIAG-000</b> · Integración tributaria OK para el período consultado.</div>';
+            targets.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.className = `text-xs font-bold rounded-2xl border px-4 py-3 ${css}`;
+                el.innerHTML = message;
+            });
+        }
+
+        function renderTaxDiagnosticsFromError(err) {
+            const code = err?.code || 'TAX-UI-UNK-000';
+            renderTaxDiagnostics({
+                status: 'error',
+                diagnostics: [{ code, message: err?.message || 'Error no identificado consumiendo API tributaria.' }]
+            });
+        }
+
         async function getTaxSummaryFromApi(year, month) {
             const key = `${year}-${month}`;
             if (taxSummaryCache.has(key)) return taxSummaryCache.get(key);
             const payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+            renderTaxDiagnostics(payload?.dataHealth);
             taxSummaryCache.set(key, payload);
             return payload;
         }
@@ -2780,6 +2826,7 @@ calculateReports(yearMovs);
             }).catch((err) => {
                 safeSetText('owner-tax-net', `$ 0`);
                 safeSetText('owner-how', `No disponible: ${err.message}`);
+                renderTaxDiagnosticsFromError(err);
             });
         }
 
@@ -2802,7 +2849,10 @@ calculateReports(yearMovs);
                     const ivaEst = Number(taxSummary?.f29?.totals?.totalToPay || 0);
                     safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString('es-CL')}`);
                 })
-                .catch(() => safeSetText('proj-iva-est', '$ 0'));
+                .catch((err) => {
+                    safeSetText('proj-iva-est', '$ 0');
+                    renderTaxDiagnosticsFromError(err);
+                });
             // Calcular utilidad mensual proyectada y crecimiento interanual
             // Costo de mercaderías vendidas este mes
             const currentMonthCost = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
@@ -2899,7 +2949,9 @@ calculateReports(yearMovs);
 
                 renderDDJJTables(yearMovs, totalPPM, totalRet);
             })().catch((err) => {
-                safeSetHTML('table-f29', `<tr><td colspan="6" class="px-4 py-3 text-red-500 font-bold">${err.message}</td></tr>`);
+                const code = err?.code || 'TAX-UI-UNK-000';
+                safeSetHTML('table-f29', `<tr><td colspan="6" class="px-4 py-3 text-red-500 font-bold">[${code}] ${err.message}</td></tr>`);
+                renderTaxDiagnosticsFromError(err);
             });
         }
 

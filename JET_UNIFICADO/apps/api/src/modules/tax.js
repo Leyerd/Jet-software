@@ -183,6 +183,90 @@ function isAcceptedForTax(movement) {
   return !['false', '0', 'no', 'rechazado'].includes(normalized);
 }
 
+function parseMovementDate(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const native = new Date(raw);
+  if (!Number.isNaN(native.getTime())) return native;
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, d, m, y] = slashMatch;
+    const fallback = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  return null;
+}
+
+function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount }) {
+  const diagnostics = [];
+  const hasYearData = yearMovs.length > 0;
+  const hasMonthData = monthMovs.length > 0;
+
+  if (invalidDateCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-003',
+      severity: 'critical',
+      reason: 'MOVEMENT_DATE_PARSE_ERROR',
+      message: `Hay ${invalidDateCount} movimientos con fecha inválida y no entran en F29/F22.`
+    });
+  }
+
+  if (!hasYearData) {
+    diagnostics.push({
+      code: 'TAX-DIAG-001',
+      severity: 'critical',
+      reason: 'NO_MOVEMENTS_FOR_YEAR',
+      message: `No existen movimientos tributarios para el año ${year}.`
+    });
+  }
+
+  if (hasYearData && !hasMonthData) {
+    diagnostics.push({
+      code: 'TAX-DIAG-002',
+      severity: 'warning',
+      reason: 'NO_MOVEMENTS_FOR_MONTH',
+      message: `No existen movimientos para el mes ${month} del año ${year}.`
+    });
+  }
+
+  if (Number(cfg?.year || year) !== Number(year)) {
+    diagnostics.push({
+      code: 'TAX-DIAG-004',
+      severity: 'warning',
+      reason: 'CONFIG_YEAR_MISMATCH',
+      message: `La configuración tributaria está en ${cfg?.year}, pero el resumen se pidió para ${year}.`
+    });
+  }
+
+  if (!['14D8', '14D3'].includes(String(cfg?.regime || ''))) {
+    diagnostics.push({
+      code: 'TAX-DIAG-005',
+      severity: 'critical',
+      reason: 'INVALID_REGIME_CONFIG',
+      message: `Régimen inválido detectado (${cfg?.regime || 'N/D'}).`
+    });
+  }
+
+  return {
+    status: diagnostics.some((d) => d.severity === 'critical') ? 'error' : diagnostics.length ? 'warning' : 'ok',
+    diagnostics,
+    stats: {
+      requestedYear: year,
+      requestedMonth: month,
+      configuredYear: Number(cfg?.year || year),
+      configuredRegime: cfg?.regime || '14D8',
+      movementsInYear: yearMovs.length,
+      movementsInMonth: monthMovs.length,
+      invalidDateCount
+    }
+  };
+}
+
 function computeMonthlyF29(movs, config, catalog) {
   const debit = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxIva(b, getTaxTipo(b)), 0);
   const credit = movs
@@ -402,6 +486,7 @@ async function getTaxSummary(req, res) {
 
   let cfg;
   let yearMovs;
+  let invalidDateCount = 0;
 
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
@@ -434,11 +519,23 @@ async function getTaxSummary(req, res) {
   } else {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
-    yearMovs = (state.movimientos || []).filter(m => new Date(m.fecha).getFullYear() === year);
+    const baseMovs = Array.isArray(state.movimientos) ? state.movimientos : [];
+    yearMovs = baseMovs.filter((m) => {
+      const movementDate = parseMovementDate(m?.fecha);
+      if (!movementDate) {
+        invalidDateCount += 1;
+        return false;
+      }
+      return movementDate.getFullYear() === year;
+    });
   }
 
   const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
-  const monthMovs = yearMovs.filter(m => (new Date(m.fecha).getMonth() + 1) === month);
+  const monthMovs = yearMovs.filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    return movementDate && (movementDate.getMonth() + 1) === month;
+  });
+  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount });
 
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
@@ -459,6 +556,7 @@ async function getTaxSummary(req, res) {
       normativeLegalBasis: catalog.legalBasis,
       normativeCertification: catalog.certification
     },
+    dataHealth,
     f29,
     f22: {
       rli,
