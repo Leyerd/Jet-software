@@ -6,7 +6,21 @@ const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgre
 const NORMATIVE_CATALOG = {
   2026: {
     version: 'cl-tax-2026.1',
-    source: 'SII+LIR (modelo interno referencial)',
+    source: 'Servicio de Impuestos Internos (SII) + Ley sobre Impuesto a la Renta (LIR, texto legal vigente)',
+    legalBasis: [
+      {
+        label: 'SII · Portal de formularios e instrucciones tributarias',
+        url: 'https://www.sii.cl'
+      },
+      {
+        label: 'BCN · Ley sobre Impuesto a la Renta (LIR)',
+        url: 'https://www.bcn.cl/leychile/navegar?idNorma=6368'
+      }
+    ],
+    certification: {
+      legalExternalCertification: false,
+      note: 'El motor automatiza reglas con trazabilidad de fuente, pero no reemplaza certificación legal externa oficial.'
+    },
     regimes: {
       '14D8': {
         default: true,
@@ -50,9 +64,30 @@ const NORMATIVE_CATALOG = {
   }
 };
 
+
+function buildCertificationProfile(baseCertification) {
+  const envCertified = String(process.env.TAX_LEGAL_CERTIFIED || '').trim().toLowerCase();
+  const legalExternalCertification = ['1', 'true', 'yes', 'si'].includes(envCertified)
+    ? true
+    : Boolean(baseCertification?.legalExternalCertification);
+
+  return {
+    legalExternalCertification,
+    authority: process.env.TAX_LEGAL_CERT_AUTHORITY || baseCertification?.authority || null,
+    certificateId: process.env.TAX_LEGAL_CERT_ID || baseCertification?.certificateId || null,
+    issuedAt: process.env.TAX_LEGAL_CERT_ISSUED_AT || baseCertification?.issuedAt || null,
+    expiresAt: process.env.TAX_LEGAL_CERT_EXPIRES_AT || baseCertification?.expiresAt || null,
+    verificationUrl: process.env.TAX_LEGAL_CERT_VERIFICATION_URL || baseCertification?.verificationUrl || null,
+    status: legalExternalCertification ? 'certified' : 'not_certified',
+    note: legalExternalCertification
+      ? (process.env.TAX_LEGAL_CERT_NOTE || baseCertification?.note || 'Certificación legal externa registrada por configuración.')
+      : (process.env.TAX_LEGAL_CERT_NOTE || baseCertification?.note || 'El motor automatiza reglas con trazabilidad de fuente, pero no reemplaza certificación legal externa oficial.')
+  };
+}
+
 const NORMATIVE_CHANGELOG = [
-  { version: 'cl-tax-2026.1', effectiveFrom: '2026-01-01', scope: ['F29', 'F22', 'DDJJ'], notes: 'Versión base referencial 2026 para 14D8/14D3.', sourceRef: 'SII+LIR interno' },
-  { version: 'cl-tax-2026.2', effectiveFrom: '2026-07-01', scope: ['F29', 'F22'], notes: 'Ajuste de trazabilidad y explicación por casilla sin alterar estructura de casillas.', sourceRef: 'SII+LIR interno' }
+  { version: 'cl-tax-2026.1', effectiveFrom: '2026-01-01', scope: ['F29', 'F22', 'DDJJ'], notes: 'Versión base 2026 para 14D8/14D3 con referencia explícita a fuentes legales públicas.', sourceRef: 'SII + LIR (BCN)' },
+  { version: 'cl-tax-2026.2', effectiveFrom: '2026-07-01', scope: ['F29', 'F22'], notes: 'Ajuste de trazabilidad y explicación por casilla sin alterar estructura de casillas.', sourceRef: 'SII + LIR (BCN)' }
 ];
 
 function compareDateIso(a, b) {
@@ -81,6 +116,8 @@ function getCatalog(year, regime) {
     regime: rg,
     version: y.version,
     source: y.source,
+    legalBasis: y.legalBasis || [],
+    certification: buildCertificationProfile(y.certification),
     normative: resolveNormativeVersion(`${selectedYear}-01-01`, y.version),
     ...y.regimes[rg]
   };
@@ -97,6 +134,47 @@ function ensureTaxConfig(state) {
   return state.taxConfig;
 }
 
+
+function getTaxTipo(movement) {
+  const raw = String(movement?.tipo || '').trim().toUpperCase();
+  const category = String(movement?.categoria || '').trim().toUpperCase();
+  const desc = String(movement?.descripcion || movement?.desc || '').trim().toUpperCase();
+  const signature = `${raw} ${category} ${desc}`;
+
+  if (['VENTA', 'GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE', 'RETIRO'].includes(raw)) return raw;
+
+  if (signature.includes('RETIRO')) return 'RETIRO';
+  if (signature.includes('HONOR')) return 'HONORARIOS';
+  if (signature.includes('IMPORT')) return 'IMPORTACION';
+  if (signature.includes('COMISION') || signature.includes('COMISIÓN')) return 'COMISION_MARKETPLACE';
+  if (signature.includes('VENTA') || signature.includes('INGRESO') || signature.includes('BOLETA') || signature.includes('FACTURA')) return 'VENTA';
+  if (signature.includes('GASTO') || signature.includes('EGRESO') || signature.includes('COMPRA') || signature.includes('PAGO')) return 'GASTO_LOCAL';
+
+  return raw;
+}
+
+function getTaxNeto(movement, tipoNormalized) {
+  const declaredNeto = Number(movement?.neto || 0);
+  if (!Number.isNaN(declaredNeto) && declaredNeto > 0) return declaredNeto;
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(tipoNormalized)) return Math.round(total / 1.19);
+  if (tipoNormalized === 'HONORARIOS') return Math.max(0, total - Number(movement?.retention || 0));
+  return total;
+}
+
+function getTaxIva(movement, tipoNormalized) {
+  const declaredIva = Number(movement?.iva || 0);
+  if (!Number.isNaN(declaredIva) && declaredIva > 0) return declaredIva;
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  if (!Number.isFinite(total) || total <= 0) return 0;
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(tipoNormalized)) {
+    const neto = getTaxNeto(movement, tipoNormalized);
+    return Math.max(0, Math.round(total - neto));
+  }
+  return 0;
+}
+
 function isAcceptedForTax(movement) {
   if (!movement || movement.accepted === undefined || movement.accepted === null) return true;
   if (typeof movement.accepted === 'boolean') return movement.accepted;
@@ -106,13 +184,13 @@ function isAcceptedForTax(movement) {
 }
 
 function computeMonthlyF29(movs, config, catalog) {
-  const debit = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.iva || 0), 0);
+  const debit = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxIva(b, getTaxTipo(b)), 0);
   const credit = movs
-    .filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
-    .reduce((a, b) => a + Number(b.iva || 0), 0);
-  const netSales = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
+    .filter(m => ['GASTO_LOCAL', 'IMPORTACION'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxIva(b, getTaxTipo(b)), 0);
+  const netSales = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
   const retention = movs
-    .filter(m => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m))
+    .filter(m => getTaxTipo(m) === 'HONORARIOS' && isAcceptedForTax(m))
     .reduce((a, b) => a + Number(b.retention || 0), 0);
   const ppm = Math.round(netSales * (Number(config.ppmRate || 0) / 100));
   const ivaToPay = Math.max(0, Math.round(debit - credit));
@@ -140,17 +218,19 @@ function computeMonthlyF29(movs, config, catalog) {
       rulesApplied: catalog.rules.f29,
       version: catalog.normative?.version || catalog.version,
       effectiveFrom: catalog.normative?.effectiveFrom,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
 
 function computeYearlyRli(movs, catalog) {
-  const ventasNetas = movs.filter(m => String(m.tipo).toUpperCase() === 'VENTA').reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
-  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
+  const ventasNetas = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
+  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
   const gastos = movs
-    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
-    .reduce((a, b) => a + Number(b.neto || b.total || 0), 0);
+    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
   const rli = ventasNetas - costos - gastos;
 
   return {
@@ -167,7 +247,9 @@ function computeYearlyRli(movs, catalog) {
     trace: {
       rulesApplied: catalog.rules.f22.filter(r => r.id === 'F22-RLI'),
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
@@ -193,7 +275,9 @@ function computeF22ByRegime(rli, regime, catalog) {
     trace: {
       rulesApplied: catalog.rules.f22,
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
@@ -240,14 +324,14 @@ async function getTaxConfig(req, res) {
     const year = new Date().getFullYear();
     const taxConfig = await loadTaxConfigFromDb(year);
     const catalog = getCatalog(taxConfig.year, taxConfig.regime);
-    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, rules: catalog.rules } });
+    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification, rules: catalog.rules } });
   }
 
   const state = await readStore();
   const taxConfig = ensureTaxConfig(state);
   await writeStore(state);
   const catalog = getCatalog(taxConfig.year, taxConfig.regime);
-  return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, rules: catalog.rules } });
+  return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification, rules: catalog.rules } });
 }
 
 async function updateTaxConfig(req, res) {
@@ -284,7 +368,7 @@ async function updateTaxConfig(req, res) {
     });
 
     await appendAuditLog('tax.config.update', { ...taxConfig, catalogVersion: catalog.version }, auth.user.email);
-    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source } });
+    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification } });
   }
 
   const state = await readStore();
@@ -305,7 +389,7 @@ async function updateTaxConfig(req, res) {
 
   await writeStore(state);
   await appendAudit('tax.config.update', { ...state.taxConfig, catalogVersion: catalog.version }, auth.user.email);
-  return sendJson(res, 200, { ok: true, taxConfig: state.taxConfig, catalog: { version: catalog.version, source: catalog.source } });
+  return sendJson(res, 200, { ok: true, taxConfig: state.taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification } });
 }
 
 async function getTaxSummary(req, res) {
@@ -327,15 +411,22 @@ async function getTaxSummary(req, res) {
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS monto NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS categoria TEXT');
       const rs = await client.query(
-        `SELECT fecha, tipo, total, neto, iva,
+        `SELECT fecha, tipo,
+                COALESCE(total, monto, 0) AS total,
+                COALESCE(neto, 0) AS neto,
+                COALESCE(iva, 0) AS iva,
+                COALESCE(monto, total, 0) AS monto,
+                COALESCE(categoria, '') AS categoria,
                 COALESCE(retention, 0) AS retention,
                 COALESCE(comision, 0) AS comision,
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
         [year]
       );
       return rs.rows;
@@ -364,7 +455,9 @@ async function getTaxSummary(req, res) {
       month,
       normativeVersion: catalog.normative?.version || catalog.version,
       normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
-      normativeSource: catalog.source
+      normativeSource: catalog.source,
+      normativeLegalBasis: catalog.legalBasis,
+      normativeCertification: catalog.certification
     },
     f29,
     f22: {
@@ -375,7 +468,9 @@ async function getTaxSummary(req, res) {
     trace: {
       appliedRules: [...catalog.rules.f29, ...catalog.rules.f22],
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   });
 }
@@ -395,15 +490,22 @@ async function getTaxExplainability(req, res) {
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
     yearMovs = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS monto NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS categoria TEXT');
       const rs = await client.query(
-        `SELECT fecha, tipo, total, neto, iva,
+        `SELECT fecha, tipo,
+                COALESCE(total, monto, 0) AS total,
+                COALESCE(neto, 0) AS neto,
+                COALESCE(iva, 0) AS iva,
+                COALESCE(monto, total, 0) AS monto,
+                COALESCE(categoria, '') AS categoria,
                 COALESCE(retention, 0) AS retention,
                 COALESCE(comision, 0) AS comision,
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
          FROM movimientos
-         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
         [year]
       );
       return rs.rows;
@@ -426,17 +528,17 @@ async function getTaxExplainability(req, res) {
       casilla_538_debitoFiscal: {
         amount: f29.casillas.casilla_538_debitoFiscal,
         formula: 'SUM(iva) para VENTA',
-        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'VENTA').length
+        evidenceCount: monthMovs.filter((m) => getTaxTipo(m) === 'VENTA').length
       },
       casilla_511_creditoFiscal: {
         amount: f29.casillas.casilla_511_creditoFiscal,
         formula: 'SUM(iva) para GASTO_LOCAL/IMPORTACION con accepted=true',
-        evidenceCount: monthMovs.filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m)).length
+        evidenceCount: monthMovs.filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(getTaxTipo(m)) && isAcceptedForTax(m)).length
       },
       casilla_151_retHonorarios: {
         amount: f29.casillas.casilla_151_retHonorarios,
         formula: 'SUM(retention) para HONORARIOS con accepted=true',
-        evidenceCount: monthMovs.filter((m) => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m)).length
+        evidenceCount: monthMovs.filter((m) => getTaxTipo(m) === 'HONORARIOS' && isAcceptedForTax(m)).length
       },
       casilla_062_ppm: {
         amount: f29.casillas.casilla_062_ppm,
@@ -453,6 +555,8 @@ async function getTaxExplainability(req, res) {
       normativeVersion: catalog.normative?.version || catalog.version,
       normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
       normativeSource: catalog.source,
+      normativeLegalBasis: catalog.legalBasis,
+      normativeCertification: catalog.certification,
       rules: {
         f29: catalog.rules.f29,
         f22: catalog.rules.f22,
@@ -483,7 +587,7 @@ async function getNormativeVersions(req, res) {
     ok: true,
     selected: { year, month, regime, version: resolved.version, effectiveFrom: resolved.effectiveFrom },
     timeline: NORMATIVE_CHANGELOG,
-    baseCatalog: { version: baseCatalog.version, source: baseCatalog.source }
+    baseCatalog: { version: baseCatalog.version, source: baseCatalog.source, legalBasis: baseCatalog.legalBasis, certification: baseCatalog.certification }
   });
 }
 
