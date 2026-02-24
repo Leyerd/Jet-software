@@ -6,7 +6,21 @@ const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgre
 const NORMATIVE_CATALOG = {
   2026: {
     version: 'cl-tax-2026.1',
-    source: 'SII+LIR (modelo interno referencial)',
+    source: 'Servicio de Impuestos Internos (SII) + Ley sobre Impuesto a la Renta (LIR, texto legal vigente)',
+    legalBasis: [
+      {
+        label: 'SII · Portal de formularios e instrucciones tributarias',
+        url: 'https://www.sii.cl'
+      },
+      {
+        label: 'BCN · Ley sobre Impuesto a la Renta (LIR)',
+        url: 'https://www.bcn.cl/leychile/navegar?idNorma=6368'
+      }
+    ],
+    certification: {
+      legalExternalCertification: false,
+      note: 'El motor automatiza reglas con trazabilidad de fuente, pero no reemplaza certificación legal externa oficial.'
+    },
     regimes: {
       '14D8': {
         default: true,
@@ -50,9 +64,30 @@ const NORMATIVE_CATALOG = {
   }
 };
 
+
+function buildCertificationProfile(baseCertification) {
+  const envCertified = String(process.env.TAX_LEGAL_CERTIFIED || '').trim().toLowerCase();
+  const legalExternalCertification = ['1', 'true', 'yes', 'si'].includes(envCertified)
+    ? true
+    : Boolean(baseCertification?.legalExternalCertification);
+
+  return {
+    legalExternalCertification,
+    authority: process.env.TAX_LEGAL_CERT_AUTHORITY || baseCertification?.authority || null,
+    certificateId: process.env.TAX_LEGAL_CERT_ID || baseCertification?.certificateId || null,
+    issuedAt: process.env.TAX_LEGAL_CERT_ISSUED_AT || baseCertification?.issuedAt || null,
+    expiresAt: process.env.TAX_LEGAL_CERT_EXPIRES_AT || baseCertification?.expiresAt || null,
+    verificationUrl: process.env.TAX_LEGAL_CERT_VERIFICATION_URL || baseCertification?.verificationUrl || null,
+    status: legalExternalCertification ? 'certified' : 'not_certified',
+    note: legalExternalCertification
+      ? (process.env.TAX_LEGAL_CERT_NOTE || baseCertification?.note || 'Certificación legal externa registrada por configuración.')
+      : (process.env.TAX_LEGAL_CERT_NOTE || baseCertification?.note || 'El motor automatiza reglas con trazabilidad de fuente, pero no reemplaza certificación legal externa oficial.')
+  };
+}
+
 const NORMATIVE_CHANGELOG = [
-  { version: 'cl-tax-2026.1', effectiveFrom: '2026-01-01', scope: ['F29', 'F22', 'DDJJ'], notes: 'Versión base referencial 2026 para 14D8/14D3.', sourceRef: 'SII+LIR interno' },
-  { version: 'cl-tax-2026.2', effectiveFrom: '2026-07-01', scope: ['F29', 'F22'], notes: 'Ajuste de trazabilidad y explicación por casilla sin alterar estructura de casillas.', sourceRef: 'SII+LIR interno' }
+  { version: 'cl-tax-2026.1', effectiveFrom: '2026-01-01', scope: ['F29', 'F22', 'DDJJ'], notes: 'Versión base 2026 para 14D8/14D3 con referencia explícita a fuentes legales públicas.', sourceRef: 'SII + LIR (BCN)' },
+  { version: 'cl-tax-2026.2', effectiveFrom: '2026-07-01', scope: ['F29', 'F22'], notes: 'Ajuste de trazabilidad y explicación por casilla sin alterar estructura de casillas.', sourceRef: 'SII + LIR (BCN)' }
 ];
 
 function compareDateIso(a, b) {
@@ -81,6 +116,8 @@ function getCatalog(year, regime) {
     regime: rg,
     version: y.version,
     source: y.source,
+    legalBasis: y.legalBasis || [],
+    certification: buildCertificationProfile(y.certification),
     normative: resolveNormativeVersion(`${selectedYear}-01-01`, y.version),
     ...y.regimes[rg]
   };
@@ -140,7 +177,9 @@ function computeMonthlyF29(movs, config, catalog) {
       rulesApplied: catalog.rules.f29,
       version: catalog.normative?.version || catalog.version,
       effectiveFrom: catalog.normative?.effectiveFrom,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
@@ -167,7 +206,9 @@ function computeYearlyRli(movs, catalog) {
     trace: {
       rulesApplied: catalog.rules.f22.filter(r => r.id === 'F22-RLI'),
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
@@ -193,7 +234,9 @@ function computeF22ByRegime(rli, regime, catalog) {
     trace: {
       rulesApplied: catalog.rules.f22,
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   };
 }
@@ -240,14 +283,14 @@ async function getTaxConfig(req, res) {
     const year = new Date().getFullYear();
     const taxConfig = await loadTaxConfigFromDb(year);
     const catalog = getCatalog(taxConfig.year, taxConfig.regime);
-    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, rules: catalog.rules } });
+    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification, rules: catalog.rules } });
   }
 
   const state = await readStore();
   const taxConfig = ensureTaxConfig(state);
   await writeStore(state);
   const catalog = getCatalog(taxConfig.year, taxConfig.regime);
-  return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, rules: catalog.rules } });
+  return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification, rules: catalog.rules } });
 }
 
 async function updateTaxConfig(req, res) {
@@ -284,7 +327,7 @@ async function updateTaxConfig(req, res) {
     });
 
     await appendAuditLog('tax.config.update', { ...taxConfig, catalogVersion: catalog.version }, auth.user.email);
-    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source } });
+    return sendJson(res, 200, { ok: true, taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification } });
   }
 
   const state = await readStore();
@@ -305,7 +348,7 @@ async function updateTaxConfig(req, res) {
 
   await writeStore(state);
   await appendAudit('tax.config.update', { ...state.taxConfig, catalogVersion: catalog.version }, auth.user.email);
-  return sendJson(res, 200, { ok: true, taxConfig: state.taxConfig, catalog: { version: catalog.version, source: catalog.source } });
+  return sendJson(res, 200, { ok: true, taxConfig: state.taxConfig, catalog: { version: catalog.version, source: catalog.source, legalBasis: catalog.legalBasis, certification: catalog.certification } });
 }
 
 async function getTaxSummary(req, res) {
@@ -364,7 +407,9 @@ async function getTaxSummary(req, res) {
       month,
       normativeVersion: catalog.normative?.version || catalog.version,
       normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
-      normativeSource: catalog.source
+      normativeSource: catalog.source,
+      normativeLegalBasis: catalog.legalBasis,
+      normativeCertification: catalog.certification
     },
     f29,
     f22: {
@@ -375,7 +420,9 @@ async function getTaxSummary(req, res) {
     trace: {
       appliedRules: [...catalog.rules.f29, ...catalog.rules.f22],
       version: catalog.version,
-      source: catalog.source
+      source: catalog.source,
+      legalBasis: catalog.legalBasis,
+      certification: catalog.certification
     }
   });
 }
@@ -453,6 +500,8 @@ async function getTaxExplainability(req, res) {
       normativeVersion: catalog.normative?.version || catalog.version,
       normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
       normativeSource: catalog.source,
+      normativeLegalBasis: catalog.legalBasis,
+      normativeCertification: catalog.certification,
       rules: {
         f29: catalog.rules.f29,
         f22: catalog.rules.f22,
@@ -483,7 +532,7 @@ async function getNormativeVersions(req, res) {
     ok: true,
     selected: { year, month, regime, version: resolved.version, effectiveFrom: resolved.effectiveFrom },
     timeline: NORMATIVE_CHANGELOG,
-    baseCatalog: { version: baseCatalog.version, source: baseCatalog.source }
+    baseCatalog: { version: baseCatalog.version, source: baseCatalog.source, legalBasis: baseCatalog.legalBasis, certification: baseCatalog.certification }
   });
 }
 

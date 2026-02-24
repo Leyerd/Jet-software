@@ -6,6 +6,14 @@ const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgre
 const { createAutoEntryForMovement } = require('./journal');
 const { evaluateComplianceBlockers } = require('./compliance');
 
+function parseAccepted(value) {
+  if (value === undefined || value === null) return true;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
+  const normalized = String(value).trim().toLowerCase();
+  return !['false', '0', 'no', 'rechazado'].includes(normalized);
+}
+
 async function createMovement(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin', 'operador']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
@@ -19,7 +27,7 @@ async function createMovement(req, res) {
   const retention = Number(body.retention || 0);
   const comision = Number(body.comision || 0);
   const costoMercaderia = Number(body.costoMercaderia || 0);
-  const accepted = body.accepted === undefined ? true : Boolean(body.accepted);
+  const accepted = parseAccepted(body.accepted);
   const documentRef = body.documentRef || null;
   const desc = body.descripcion || '';
 

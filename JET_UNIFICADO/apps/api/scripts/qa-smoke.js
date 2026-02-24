@@ -4,6 +4,10 @@ const http = require('http');
 const BASE_URL = process.env.QA_BASE_URL || 'http://localhost:4000';
 const U = new URL(BASE_URL);
 
+function assertEq(name, actual, expected) {
+  if (actual !== expected) throw new Error(`${name} esperado=${expected} actual=${actual}`);
+}
+
 function req(method, path, body, token) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
@@ -63,8 +67,57 @@ function req(method, path, body, token) {
   const taxCfgSet = await req('POST', '/tax/config', { regime: '14D8', ppmRate: 0.2 }, token);
   if (!taxCfgSet.data.ok) throw new Error('No se pudo fijar 14D8 para QA');
 
-  const taxSummary = await req('GET', '/tax/summary', null, token);
-  if (!taxSummary.data.ok || !taxSummary.data.f22) throw new Error('Tax summary falló');
+  const ventaQa = await req('POST', '/movements', {
+    fecha: '2026-02-12',
+    tipo: 'VENTA',
+    descripcion: 'Venta QA tributaria',
+    total: 119000,
+    neto: 100000,
+    iva: 19000,
+    costoMercaderia: 30000,
+    accepted: true,
+    documentRef: 'QA-VENTA'
+  }, token);
+  if (!ventaQa.data.ok) throw new Error('Movimiento VENTA QA falló');
+
+  const gastoQa = await req('POST', '/movements', {
+    fecha: '2026-02-12',
+    tipo: 'GASTO_LOCAL',
+    descripcion: 'Gasto QA tributario',
+    total: 59500,
+    neto: 50000,
+    iva: 9500,
+    accepted: true,
+    documentRef: 'QA-GASTO'
+  }, token);
+  if (!gastoQa.data.ok) throw new Error('Movimiento GASTO_LOCAL QA falló');
+
+  const honorarioQa = await req('POST', '/movements', {
+    fecha: '2026-02-12',
+    tipo: 'HONORARIOS',
+    descripcion: 'Honorario QA rechazado',
+    total: 50000,
+    neto: 42750,
+    iva: 0,
+    retention: 7250,
+    accepted: false,
+    documentRef: 'QA-HON-RECH'
+  }, token);
+  if (!honorarioQa.data.ok) throw new Error('Movimiento HONORARIOS QA falló');
+
+  const taxSummary = await req('GET', '/tax/summary?year=2026&month=2', null, token);
+  if (!taxSummary.data.ok || !taxSummary.data.f22 || !taxSummary.data.f29) throw new Error('Tax summary falló');
+
+  assertEq('F29 casilla 538 débito', taxSummary.data.f29.casillas.casilla_538_debitoFiscal, 19000);
+  assertEq('F29 casilla 511 crédito', taxSummary.data.f29.casillas.casilla_511_creditoFiscal, 9500);
+  assertEq('F29 casilla 151 retención (rechazado excluido)', taxSummary.data.f29.casillas.casilla_151_retHonorarios, 0);
+  assertEq('F29 casilla 062 PPM', taxSummary.data.f29.casillas.casilla_062_ppm, 200);
+  assertEq('F29 casilla 089 IVA determinado', taxSummary.data.f29.casillas.casilla_089_ivaDeterminado, 9500);
+  assertEq('F29 casilla 091 total a pagar', taxSummary.data.f29.casillas.casilla_091_totalAPagar, 9700);
+  assertEq('F22 RLI ventas netas', taxSummary.data.f22.rli.components.ventasNetas, 100000);
+  assertEq('F22 RLI costos', taxSummary.data.f22.rli.components.costos, 30000);
+  assertEq('F22 RLI gastos', taxSummary.data.f22.rli.components.gastos, 50000);
+  assertEq('F22 RLI', taxSummary.data.f22.rli.components.rli, 20000);
 
   const importCartola = await req('POST', '/reconciliation/import/cartola', { rows: [{ fecha: '2026-02-10', tipoMovimiento: 'INGRESO', monto: 100000 }] }, token);
   if (!importCartola.data.ok) throw new Error('Import cartola falló');
