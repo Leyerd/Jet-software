@@ -228,6 +228,39 @@ async function loadDemoData(_req, res) {
   });
 }
 
+
+async function resetRuntimeData(_req, res) {
+  if (isPostgresMode()) {
+    await withPgClient(async (client) => {
+      await client.query('CREATE TABLE IF NOT EXISTS movimientos (id BIGSERIAL PRIMARY KEY, fecha TEXT, tipo TEXT, descripcion TEXT, total NUMERIC(18,2) DEFAULT 0, neto NUMERIC(18,2) DEFAULT 0, iva NUMERIC(18,2) DEFAULT 0)');
+      await client.query('CREATE TABLE IF NOT EXISTS productos (id BIGSERIAL PRIMARY KEY, sku TEXT, nombre TEXT, categoria TEXT, costo_promedio NUMERIC(18,2) DEFAULT 0, stock NUMERIC(18,2) DEFAULT 0)');
+      await client.query('CREATE TABLE IF NOT EXISTS terceros (id BIGSERIAL PRIMARY KEY, rut TEXT, nombre TEXT, tipo TEXT)');
+      await client.query('CREATE TABLE IF NOT EXISTS cuentas (id BIGSERIAL PRIMARY KEY, codigo TEXT, nombre TEXT, tipo TEXT, saldo NUMERIC(18,2) DEFAULT 0)');
+      await client.query('TRUNCATE TABLE movimientos RESTART IDENTITY');
+      await client.query('TRUNCATE TABLE productos RESTART IDENTITY');
+      await client.query('TRUNCATE TABLE terceros RESTART IDENTITY');
+      await client.query('TRUNCATE TABLE cuentas RESTART IDENTITY');
+      await client.query("DELETE FROM runtime_fragments WHERE key IN ('movimientos','productos','terceros','cuentas','flujoCaja','asientos','asientoLineas','auditLog','source','migratedAt')");
+      await client.query("INSERT INTO runtime_fragments (key, value, updated_at) VALUES ('movimientos','[]'::jsonb,NOW()),('productos','[]'::jsonb,NOW()),('terceros','[]'::jsonb,NOW()),('cuentas','[]'::jsonb,NOW()),('flujoCaja','[]'::jsonb,NOW()),('asientos','[]'::jsonb,NOW()),('asientoLineas','[]'::jsonb,NOW()),('auditLog','[]'::jsonb,NOW()),('source','null'::jsonb,NOW()),('migratedAt','null'::jsonb,NOW()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()");
+    });
+    return sendJson(res, 200, { ok: true, message: 'Runtime backend reiniciado en limpio (Postgres).' });
+  }
+
+  const state = await readStore();
+  state.productos = [];
+  state.movimientos = [];
+  state.cuentas = [];
+  state.terceros = [];
+  state.flujoCaja = [];
+  state.asientos = [];
+  state.asientoLineas = [];
+  state.auditLog = [];
+  state.source = null;
+  state.migratedAt = null;
+  await writeStore(state);
+  return sendJson(res, 200, { ok: true, message: 'Runtime backend reiniciado en limpio (file-store).' });
+}
+
 async function shutdownSystem(_req, res) {
   sendJson(res, 200, { ok: true, message: 'Apagado solicitado. Cerrando proceso JET...' });
   setTimeout(() => {
@@ -235,4 +268,4 @@ async function shutdownSystem(_req, res) {
   }, 120);
 }
 
-module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem };
+module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, resetRuntimeData, shutdownSystem };

@@ -5,7 +5,7 @@ const { importJson, getSummary, syncFrontendMovements } = require('./modules/mig
 const { closePeriod, reopenPeriod, listPeriods, getCloseChecklist } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
-const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem } = require('./modules/system');
+const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, resetRuntimeData, shutdownSystem } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
@@ -110,6 +110,9 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
   if (req.method === 'POST' && path === '/system/shutdown') return handle(shutdownSystem(req, res), res);
   if (req.method === 'GET' && path === '/system/demo-backup') return handle(getDemoBackup(req, res), res);
+  if (path === '/system/reset-runtime-data') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(resetRuntimeData(req, res), res);
+  }
   if (path === '/system/load-demo-data') {
     if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
     return methodNotAllowed(res);

@@ -1638,8 +1638,24 @@
         async function bootstrapFromBackend() {
             try {
                 const data = await apiClient.get('/system/frontend-state');
-                const state = data && data.state ? data.state : null;
+                let state = data && data.state ? data.state : null;
                 if (!state) return;
+
+                const suspiciousGhostData = Array.isArray(state.movements) && state.movements.length > 0
+                    && (!Array.isArray(state.products) || state.products.length === 0)
+                    && (!Array.isArray(state.thirdParties) || state.thirdParties.length === 0)
+                    && !(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1');
+
+                if (suspiciousGhostData) {
+                    try {
+                        await apiClient.post('/system/reset-runtime-data', {});
+                        if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-autoclean-done', '1');
+                        const cleanData = await apiClient.get('/system/frontend-state');
+                        state = cleanData && cleanData.state ? cleanData.state : state;
+                    } catch (resetErr) {
+                        console.warn('No se pudo limpiar runtime backend automáticamente.', resetErr?.message || resetErr);
+                    }
+                }
                 db.productos = Array.isArray(state.products) ? state.products : db.productos;
                 db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
                 db.cuentas = Array.isArray(state.accounts) && state.accounts.length ? state.accounts : db.cuentas;
