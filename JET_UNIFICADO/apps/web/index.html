@@ -2532,47 +2532,26 @@
             save();
         }
 
-        // Calculate IVA payable for a given set of movements (dynamic PPM & retention)
-        function calculateIVAPagar(movs) {
-            // Calcula el IVA a pagar para el mes seleccionado, considerando el remanente de meses anteriores
-            const yearMovs = movs.filter(x => new Date(x.fecha).getFullYear() === db.config.year);
-            let rem = 0;
-            let toPay = 0;
-            for (let idx = 0; idx <= db.config.selectedMonth; idx++) {
-                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
-                const debit = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
-                // El crédito fiscal se compone sólo de gastos aceptados
-                const credit = m.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'IMPORTACION') && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
-                // Las retenciones siempre se suman al total a pagar (no dependen de aceptación)
-                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
-                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-                const ppm = netoSales * (db.config.ppmRate / 100);
-                let neto = debit - credit - rem;
-                if (neto < 0) { rem = Math.abs(neto); neto = 0; } else { rem = 0; }
-                if (idx === db.config.selectedMonth) {
-                    toPay = neto + retHon + ppm;
+        async function syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal) {
+            try {
+                let accumulated = 0;
+                let selected = null;
+                for (let month = 1; month <= selectedMonth; month++) {
+                    const summary = await getTaxSummaryFromApi(year, month);
+                    const totalToPay = Number(summary?.f29?.totals?.totalToPay || 0);
+                    accumulated += totalToPay;
+                    if (month === selectedMonth) selected = summary;
                 }
-            }
-            return toPay;
-        }
 
-        // Tax panel calculation across year
-        function calculateTaxState(yearMovs) {
-            let rem = 0; let totalIva = 0;
-            for (let idx = 0; idx < 12; idx++) {
-                const m = yearMovs.filter(x => new Date(x.fecha).getMonth() === idx);
-                const debit = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.iva, 0);
-                // IVA crédito sólo considera gastos aceptados
-                const credit = m.filter(x => (x.tipo === 'GASTO_LOCAL' || x.tipo === 'IMPORTACION') && (x.accepted !== false)).reduce((a, b) => a + b.iva, 0);
-                // Las retenciones siempre aplican (honorarios)
-                const retHon = m.filter(x => x.tipo === 'HONORARIOS').reduce((a, b) => a + (b.retention || 0), 0);
-                const netoSales = m.filter(x => x.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0);
-                const ppm = netoSales * (db.config.ppmRate / 100);
-                let neto = debit - credit - rem;
-                if (neto < 0) { rem = Math.abs(neto); neto = 0; } else { rem = 0; }
-                totalIva += neto + retHon + ppm;
+                const ivaPagar = Number(selected?.f29?.totals?.totalToPay || 0);
+                safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString('es-CL')}`);
+                safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString('es-CL')}`);
+                renderTaxPanelFromApi(accumulated);
+            } catch (_) {
+                safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
+                safeSetText('dash-iva-pagar', '$ 0');
+                renderTaxPanelFromApi(0);
             }
-            return totalIva;
         }
 
         // Render dashboard & others
@@ -2581,10 +2560,11 @@
             const monthMovs = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
             // Dashboard summary
             const cajaTotal = db.cuentas.reduce((a, c) => a + c.saldo, 0);
-            const ivaPagar = calculateIVAPagar(yearMovs);
-            safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString('es-CL')}`);
+            const year = Number(db.config.year || new Date().getFullYear());
+            const selectedMonth = Number((db.config.selectedMonth || 0) + 1);
+            safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
             safeSetText('dash-ventas', `$ ${yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0).toLocaleString('es-CL')}`);
-            safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString('es-CL')}`);
+            safeSetText('dash-iva-pagar', '$ 0');
             safeSetText('dash-stock', `$ ${db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0).toLocaleString('es-CL')}`);
             // Treasury cards
             safeSetHTML('treasury-cards', db.cuentas.map(c => `
@@ -2620,7 +2600,8 @@
                     </tr>`).join('');
             }
             // Update tax panel and calendar
-            renderTaxPanel(yearMovs); renderFiscalCalendar();
+            syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal);
+            renderFiscalCalendar();
             safeCreateIcons();
             // Inventory grid
             safeSetHTML('grid-inventario', db.productos.map(p => `
@@ -2684,8 +2665,7 @@ calculateReports(yearMovs);
         }
 
         // Tax panel & calendar
-        function renderTaxPanel(yearMovs) {
-            const accumulated = calculateTaxState(yearMovs);
+        function renderTaxPanelFromApi(accumulated) {
             let status = 'verde'; if (accumulated > 0 && accumulated < 500000) status = 'amarillo'; if (accumulated >= 500000) status = 'rojo';
             const color = status === 'verde' ? 'text-emerald-600' : status === 'amarillo' ? 'text-orange-500' : 'text-red-600';
             safeSetHTML('tax-panel', `<div class="flex items-center gap-3">
@@ -2799,8 +2779,15 @@ calculateReports(yearMovs);
             const br = calculateBurnRate(); const cash = db.cuentas.reduce((a, c) => a + c.saldo, 0); const runway = br > 0 ? (cash / br).toFixed(1) : '∞';
             safeSetText('proj-burn-rate', `$ ${br.toLocaleString('es-CL')}`);
             safeSetText('proj-runway', `${runway} Meses`);
-            const ivaEst = calculateIVAPagar(db.movimientos);
-            safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString('es-CL')}`);
+            safeSetText('proj-iva-est', '$ 0');
+            const year = Number(db.config.year || new Date().getFullYear());
+            const selectedMonth = Number((db.config.selectedMonth || 0) + 1);
+            getTaxSummaryFromApi(year, selectedMonth)
+                .then((taxSummary) => {
+                    const ivaEst = Number(taxSummary?.f29?.totals?.totalToPay || 0);
+                    safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString('es-CL')}`);
+                })
+                .catch(() => safeSetText('proj-iva-est', '$ 0'));
             // Calcular utilidad mensual proyectada y crecimiento interanual
             // Costo de mercaderías vendidas este mes
             const currentMonthCost = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
