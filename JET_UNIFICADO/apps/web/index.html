@@ -100,7 +100,7 @@
         </div>
         <div class="sidebar-scroll-wrap">
         <nav id="sidebar-nav" class="flex-1 p-4 space-y-1 sidebar-scroll">
-            <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operativa</div>
+            <div class="px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Operación diaria</div>
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="sidebar-link active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all">
                 <i data-lucide="layout-grid" class="w-4 h-4"></i> Dashboard
             </button>
@@ -116,7 +116,8 @@
             <button onclick="switchTab('terceros')" id="btn-terceros" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-orange-400">
                 <i data-lucide="users" class="w-4 h-4"></i> Directorio RUTs
             </button>
-            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Inteligencia SII</div>
+
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Impuestos y cierre</div>
             <button onclick="switchTab('proyecciones')" id="btn-proyecciones" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-purple-400">
                 <i data-lucide="radar" class="w-4 h-4"></i> Proyecciones
             </button>
@@ -133,6 +134,8 @@
             <button onclick="switchTab('dueno-sii')" id="btn-dueno-sii" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-sky-400">
                 <i data-lucide="user-round" class="w-4 h-4"></i> SII Dueño
             </button>
+
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Control y análisis</div>
             <button onclick="switchTab('kpi')" id="btn-kpi" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-pink-400">
                 <i data-lucide="trending-up" class="w-4 h-4"></i> Indicadores
             </button>
@@ -150,6 +153,8 @@
             <button onclick="switchTab('observabilidad')" id="btn-observabilidad" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-lime-400">
                 <i data-lucide="siren" class="w-4 h-4"></i> Observabilidad
             </button>
+
+            <div class="pt-6 px-4 py-3 text-[10px] font-bold text-slate-600 uppercase tracking-widest">Dirección y gobierno</div>
             <button onclick="switchTab('cumplimiento')" id="btn-cumplimiento" class="sidebar-link w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all text-fuchsia-400">
                 <i data-lucide="calendar-check-2" class="w-4 h-4"></i> Cumplimiento
             </button>
@@ -856,7 +861,12 @@
                 </div>
                 <div class="card p-8">
                     <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-4">Resumen de generación</h3>
-                    <div id="reports-meta" class="text-xs text-slate-500">Sin consultas aún.</div>
+                    <div id="reports-meta" class="text-xs text-slate-500">
+                        <div class="rounded-xl border border-cyan-100 bg-cyan-50 px-4 py-3 text-cyan-800">
+                            <p class="font-black uppercase text-[10px] tracking-widest mb-1">Inicio guiado</p>
+                            <p>1) Elige año/mes. 2) Haz clic en <span class="font-black">Consultar</span>. 3) Exporta Diario/Mayor/Balance para respaldo tributario.</p>
+                        </div>
+                    </div>
                     <pre id="reports-preview" class="mt-4 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-80">{}</pre>
                 </div>
             </div>
@@ -884,7 +894,12 @@
                 <div id="comp-summary" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
                 <div class="card p-8">
                     <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Obligaciones del período</h3>
-                    <div id="comp-obligations" class="space-y-2 text-xs">Sin datos.</div>
+                    <div id="comp-obligations" class="space-y-2 text-xs">
+                        <div class="rounded-xl border border-fuchsia-100 bg-fuchsia-50 px-4 py-3 text-fuchsia-800">
+                            <p class="font-black uppercase text-[10px] tracking-widest mb-1">Inicio guiado</p>
+                            <p>1) Selecciona año/mes. 2) Presiona <span class="font-black">Actualizar</span>. 3) Si hay obligación crítica, registra evidencia con acuse para desbloquear operación.</p>
+                        </div>
+                    </div>
                 </div>
                 <div class="card p-8">
                     <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Registrar evidencia</h3>
@@ -1031,7 +1046,12 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="card p-6">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Alertas activas</h3>
-                        <div id="obs-alerts" class="space-y-2 text-xs">Sin datos.</div>
+                        <div id="obs-alerts" class="space-y-2 text-xs">
+                            <div class="rounded-xl border border-lime-100 bg-lime-50 px-4 py-3 text-lime-800">
+                                <p class="font-black uppercase text-[10px] tracking-widest mb-1">Inicio guiado</p>
+                                <p>1) Pulsa <span class="font-black">Actualizar</span>. 2) Revisa alertas activas y eventos recientes. 3) Corrige primero severidad crítica y luego alta.</p>
+                            </div>
+                        </div>
                     </div>
                     <div class="card p-6">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Últimos eventos app</h3>
@@ -1943,7 +1963,7 @@
 
                 const alerts = payload.dashboard?.alerts || [];
                 if (!alerts.length) {
-                    safeSetHTML('obs-alerts', '<div class="text-emerald-600 font-bold">Sin alertas activas.</div>');
+                    safeSetHTML('obs-alerts', '<div class="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-emerald-700"><p class="font-black uppercase text-[10px] tracking-widest mb-1">Estado saludable</p><p>Sin alertas activas. Próximo paso: revisar el panel de eventos para confirmar que el último lote de procesos terminó sin rechazos.</p></div>');
                 } else {
                     safeSetHTML('obs-alerts', alerts.map(a => `<div class="rounded-xl px-3 py-2 ${a.severity === 'critical' ? 'bg-red-100 text-red-700' : a.severity === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'}"><span class="font-black uppercase">${a.key}</span>: ${a.message} (valor: ${a.value})</div>`).join(''));
                 }
@@ -1973,7 +1993,7 @@
                     const tone = ob.risk?.color === 'rojo' ? 'bg-red-100 text-red-700' : ob.risk?.color === 'amarillo' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
                     return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2"><div><span class="font-black">${ob.code}</span> · ${ob.name}<br><span class="text-slate-500">Vence: ${ob.dueDate} · Estado: ${ob.lifecycleStatus}</span><br><span class="text-[10px] text-slate-400">Key: ${ob.key}</span></div><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${ob.risk?.color || 'verde'}</span></div>`;
                 });
-                safeSetHTML('comp-obligations', rows.length ? rows.join('') : 'Sin obligaciones para el período.');
+                safeSetHTML('comp-obligations', rows.length ? rows.join('') : '<div class="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-700"><p class="font-black uppercase text-[10px] tracking-widest mb-1">Periodo al día</p><p>No hay obligaciones activas para este período. Recomendado: revisar el período siguiente y dejar evidencia preventiva.</p></div>');
             } catch (err) {
                 safeSetHTML('comp-summary', obsMetricCard('Cumplimiento', 'No disponible', 'text-red-500'));
                 safeSetHTML('comp-obligations', `<span class="text-red-500 font-bold">${err.message}</span>`);
