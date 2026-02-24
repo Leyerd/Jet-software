@@ -2720,6 +2720,8 @@ calculateReports(yearMovs);
         }
 
         const taxSummaryCache = new Map();
+        let backendSyncInFlight = false;
+        const backendAutoSyncedYears = new Set();
 
 
         function movementSignature(m) {
@@ -2730,11 +2732,14 @@ calculateReports(yearMovs);
             return `${fecha}|${tipo}|${Math.round(total)}|${Math.round(neto)}`;
         }
 
-        async function syncFrontendMovementsToBackend() {
+        async function syncFrontendMovementsToBackend(options = {}) {
+            const { silent = true, refresh = false, yearOverride = null } = options;
+            if (backendSyncInFlight) return { imported: 0, skipped: 0, inFlight: true };
+            backendSyncInFlight = true;
             try {
                 const backend = await apiClient.get('/movements');
                 const backendSet = new Set((backend?.movements || []).map(movementSignature));
-                const year = Number(db.config.year || new Date().getFullYear());
+                const year = Number(yearOverride || db.config.year || new Date().getFullYear());
                 const candidates = (db.movimientos || []).filter((m) => {
                     const dt = new Date(m?.fecha);
                     return !Number.isNaN(dt.getTime()) && dt.getFullYear() === year;
@@ -2762,14 +2767,19 @@ calculateReports(yearMovs);
                     imported += 1;
                 }
 
-                taxSummaryCache.clear();
-                await getTaxSummaryFromApi(year, Number((db.config.selectedMonth || 0) + 1));
-                calculateReports(db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year));
-                renderOwnerTaxModule();
-                alert(`Sincronización completada. Importados: ${imported}. Omitidos: ${skipped}.`);
+                if (refresh) {
+                    taxSummaryCache.clear();
+                    calculateReports(db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year));
+                    renderOwnerTaxModule();
+                }
+                if (!silent) alert(`Sincronización completada. Importados: ${imported}. Omitidos: ${skipped}.`);
+                return { imported, skipped, year };
             } catch (err) {
-                alert(`No se pudo sincronizar al backend: ${err.message}`);
+                if (!silent) alert(`No se pudo sincronizar al backend: ${err.message}`);
                 renderTaxDiagnosticsFromError(err);
+                return { imported: 0, skipped: 0, error: err };
+            } finally {
+                backendSyncInFlight = false;
             }
         }
 
@@ -2783,18 +2793,14 @@ calculateReports(yearMovs);
                 : status === 'warning'
                     ? 'border-amber-300 bg-amber-50 text-amber-700'
                     : 'border-emerald-300 bg-emerald-50 text-emerald-700';
-            const hasFrontendDrift = diagnostics.some(d => d.code === 'TAX-UI-DIAG-101');
             const message = visible
                 ? diagnostics.map(d => `<div><b>${d.code}</b> · ${d.message}</div>`).join('')
                 : '<div><b>TAX-DIAG-000</b> · Integración tributaria OK para el período consultado.</div>';
-            const action = hasFrontendDrift
-                ? `<div class="mt-3"><button onclick="syncFrontendMovementsToBackend()" class="btn-jet bg-slate-900 text-white px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest">Sincronizar movimientos locales al backend</button></div>`
-                : '';
             targets.forEach((id) => {
                 const el = document.getElementById(id);
                 if (!el) return;
                 el.className = `text-xs font-bold rounded-2xl border px-4 py-3 ${css}`;
-                el.innerHTML = message + action;
+                el.innerHTML = message;
             });
         }
 
@@ -2835,8 +2841,24 @@ calculateReports(yearMovs);
         async function getTaxSummaryFromApi(year, month) {
             const key = `${year}-${month}`;
             if (taxSummaryCache.has(key)) return taxSummaryCache.get(key);
-            const payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
-            const health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+
+            if (!backendAutoSyncedYears.has(Number(year))) {
+                await syncFrontendMovementsToBackend({ silent: true, yearOverride: year });
+                backendAutoSyncedYears.add(Number(year));
+            }
+
+            let payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+            let health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+
+            const hasDrift = (health?.diagnostics || []).some((d) => d.code === 'TAX-UI-DIAG-101');
+            if (hasDrift) {
+                const syncResult = await syncFrontendMovementsToBackend({ silent: true, yearOverride: year });
+                if ((syncResult?.imported || 0) > 0) {
+                    payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+                    health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year);
+                }
+            }
+
             renderTaxDiagnostics(health);
             payload.dataHealth = health;
             taxSummaryCache.set(key, payload);
