@@ -1054,6 +1054,16 @@
                     </div>
                     <pre id="a5-recurring" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
                 </div>
+
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Certificación interna de operación total (Meta A10)</h3>
+                        <button onclick="loadA10Certification()" class="btn-jet bg-emerald-700 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Evaluar A10</button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Auditoría interna final (fiscal/contable/operativo), KPIs finales y acta de operación autónoma del dueño.</p>
+                    <pre id="exec-a10-cert" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="card p-6">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Riesgo esperado</h3>
@@ -1092,6 +1102,16 @@
                     </div>
                     <div id="norm-result" class="text-xs mt-3 text-slate-500"></div>
                 </div>
+
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Certificación interna de operación total (Meta A10)</h3>
+                        <button onclick="loadA10Certification()" class="btn-jet bg-emerald-700 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Evaluar A10</button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Auditoría interna final (fiscal/contable/operativo), KPIs finales y acta de operación autónoma del dueño.</p>
+                    <pre id="exec-a10-cert" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Cambios normativos</h3><pre id="norm-changes" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
                     <div class="card p-6"><h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Corridas de regresión</h3><pre id="norm-runs" class="bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">[]</pre></div>
@@ -1130,6 +1150,16 @@
                     </div>
                 </div>
                 <div id="obs-metrics" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <h3 class="text-xs font-black uppercase tracking-widest text-slate-500">Certificación interna de operación total (Meta A10)</h3>
+                        <button onclick="loadA10Certification()" class="btn-jet bg-emerald-700 text-white px-4 py-2 rounded-2xl text-[11px] font-black uppercase tracking-widest">Evaluar A10</button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">Auditoría interna final (fiscal/contable/operativo), KPIs finales y acta de operación autónoma del dueño.</p>
+                    <pre id="exec-a10-cert" class="mt-3 bg-slate-900 text-slate-100 rounded-2xl p-4 text-[11px] overflow-auto max-h-72">{}</pre>
+                </div>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="card p-6">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Alertas activas</h3>
@@ -2287,6 +2317,7 @@
                 safeSetText('exec-risk', JSON.stringify(payload, null, 2));
                 await loadFiscalProposal();
                 await loadA9Pilot();
+                await loadA10Certification();
             } catch (err) {
                 safeSetHTML('exec-cards', obsMetricCard('Ejecutivo', 'No disponible', 'text-red-500'));
                 safeSetHTML('exec-summary', '<div class="text-red-500 font-bold">No disponible</div>');
@@ -2314,6 +2345,17 @@
                 safeSetText('exec-a9-pilot', JSON.stringify(payload.pilot || {}, null, 2));
             } catch (err) {
                 safeSetText('exec-a9-pilot', JSON.stringify({ error: err.message }, null, 2));
+            }
+        }
+
+        async function loadA10Certification() {
+            try {
+                const year = Number(document.getElementById('exec-year')?.value || db.config.year || new Date().getFullYear());
+                const month = Number(document.getElementById('exec-month')?.value || (new Date().getMonth() + 1));
+                const payload = await apiClient.get(`/executive/operation-autonomy-certification?year=${year}&month=${month}`);
+                safeSetText('exec-a10-cert', JSON.stringify(payload.certification || {}, null, 2));
+            } catch (err) {
+                safeSetText('exec-a10-cert', JSON.stringify({ error: err.message }, null, 2));
             }
         }
 

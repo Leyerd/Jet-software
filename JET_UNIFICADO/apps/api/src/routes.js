@@ -43,7 +43,7 @@ const { getReports, exportReport } = require('./modules/reports');
 const { getDashboard } = require('./modules/observability');
 const { getCalendar, getSemaphore, getComplianceChecklist, getComplianceBlockers, registerEvidence, updateComplianceConfig } = require('./modules/compliance');
 const { getChart, updateChart, getRules, updateRules, runConsistencyCheck, createApprovalRequest, approveRequest } = require('./modules/accountingGovernance');
-const { getAuditPackage, getRiskSimulation, getExecutiveDashboard, getFiscalProposal, getAccountantReplacementPilot } = require('./modules/eirlExecutive');
+const { getAuditPackage, getRiskSimulation, getExecutiveDashboard, getFiscalProposal, getAccountantReplacementPilot, getOperationAutonomyCertification } = require('./modules/eirlExecutive');
 const { listChanges, registerChange, runRegression } = require('./modules/normativeGovernance');
 const { getGuidedFlow, completeGuidedStep, getRunbooks } = require('./modules/operationsGuided');
 
@@ -82,7 +82,8 @@ const modulesList = [
   'meta15-audit-package-risk-simulator-executive-dashboard',
   'meta16-normative-governance-regression',
   'metaA8-guided-operations-blocking-checklists-runbooks',
-  'metaA9-pilot-3-closing-cycles'
+  'metaA9-pilot-3-closing-cycles',
+  'metaA10-internal-certification-autonomous-operation'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -218,6 +219,7 @@ function route(req, res) {
   if (path === '/executive/dashboard' && req.method === 'GET') return handle(getExecutiveDashboard(req, res), res);
   if (path === '/executive/fiscal-proposal' && req.method === 'GET') return handle(getFiscalProposal(req, res), res);
   if (path === '/executive/accountant-replacement-pilot' && req.method === 'GET') return handle(getAccountantReplacementPilot(req, res), res);
+  if (path === '/executive/operation-autonomy-certification' && req.method === 'GET') return handle(getOperationAutonomyCertification(req, res), res);
 
 
   if (path === '/operations/guided-flow' && req.method === 'GET') return handle(getGuidedFlow(req, res), res);

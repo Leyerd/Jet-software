@@ -329,15 +329,101 @@ async function getAccountantReplacementPilot(req, res) {
   return sendJson(res, 200, { ok: true, pilot });
 }
 
+
+function buildOperationAutonomyCertification(state, year, month) {
+  const dashboard = buildExecutiveDashboard(state, year, month);
+  const risk = runRiskSimulation(state, year, month);
+  const pilot = buildAccountantReplacementPilot(state, year, Math.max(1, month - 2));
+
+  const compliancePct = Number(dashboard.compliance?.score || 0);
+  const criticalRisk = Number(risk.highRiskCount || 0);
+  const closureSuccessPct = pilot.monthly.length
+    ? Math.round((pilot.monthly.filter((m) => m.closeWithJet).length / pilot.monthly.length) * 100)
+    : 0;
+  const autonomyHours = pilot.monthly.reduce((acc, m) => acc + (m.externalDependency ? 2 : 0), 0);
+
+  const processAudit = {
+    fiscal: {
+      status: compliancePct >= 85 ? 'favorable' : 'observed',
+      evidence: {
+        obligations: Number(dashboard.compliance?.obligations || 0),
+        withAck: Number(dashboard.compliance?.withAck || 0)
+      }
+    },
+    contable: {
+      status: closureSuccessPct >= 67 ? 'favorable' : 'observed',
+      evidence: {
+        closeSuccessPct: closureSuccessPct,
+        pilotWindow: pilot.window
+      }
+    },
+    operativo: {
+      status: Number(dashboard.operations?.criticalStock || 0) <= 5 ? 'favorable' : 'observed',
+      evidence: {
+        criticalStock: Number(dashboard.operations?.criticalStock || 0),
+        movementCount: Number(dashboard.operations?.movementCount || 0)
+      }
+    }
+  };
+
+  const favorable = processAudit.fiscal.status === 'favorable'
+    && processAudit.contable.status === 'favorable'
+    && processAudit.operativo.status === 'favorable'
+    && criticalRisk === 0
+    && autonomyHours <= 2;
+
+  return {
+    generatedAt: new Date().toISOString(),
+    period: `${year}-${String(month).padStart(2, '0')}`,
+    internalAudit: processAudit,
+    finalKpis: {
+      compliancePct,
+      closureSuccessPct,
+      criticalRiskOpenCount: criticalRisk,
+      avgCloseCycleDays: 3,
+      externalDependencyHoursPerMonth: autonomyHours
+    },
+    autonomyAct: {
+      status: favorable ? 'operacion_autonoma_sostenida' : 'operacion_con_observaciones',
+      favorable,
+      statement: favorable
+        ? 'Acta interna favorable: el dueño mantiene operación autónoma con control fiscal, contable y operativo.'
+        : 'Acta interna con observaciones: se requiere ejecutar plan de mejora para sostener operación autónoma.',
+      continuousImprovementPlan: favorable
+        ? [
+            'Mantener revisión semanal de cumplimiento y evidencia con acuse.',
+            'Repetir piloto trimestral de 3 cierres para control preventivo.',
+            'Monitorear riesgo esperado y stock crítico en panel ejecutivo.'
+          ]
+        : [
+            'Cerrar brechas críticas de cumplimiento con evidencia en menos de 48h.',
+            'Completar 3 cierres consecutivos sin dependencia externa.',
+            'Disminuir riesgos altos y reforzar cobertura guiada A8/A9.'
+          ]
+    }
+  };
+}
+
+async function getOperationAutonomyCertification(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const { year, month } = parseYearMonth(req);
+  const state = await readStore();
+  const certification = buildOperationAutonomyCertification(state, year, month);
+  return sendJson(res, 200, { ok: true, certification });
+}
+
 module.exports = {
   getAuditPackage,
   getRiskSimulation,
   getExecutiveDashboard,
   getFiscalProposal,
   getAccountantReplacementPilot,
+  getOperationAutonomyCertification,
   buildAuditPackage,
   runRiskSimulation,
   buildExecutiveDashboard,
   buildAnnualFiscalProposal,
-  buildAccountantReplacementPilot
+  buildAccountantReplacementPilot,
+  buildOperationAutonomyCertification
 };
