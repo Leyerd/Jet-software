@@ -75,6 +75,42 @@ function buildExecutiveDashboard(state, year, month) {
   const compliance = (state.complianceObligations || []).filter((o) => o.period === `${year}-${String(month).padStart(2, '0')}`);
   const complianceScore = compliance.length ? Math.round((compliance.filter((x) => x.lifecycleStatus === 'acuse').length / compliance.length) * 100) : 100;
 
+  const priorities = [];
+  const periodKey = `${year}-${String(month).padStart(2, '0')}`;
+  const overdueCritical = compliance.filter((o) => o.severity === 'critical' && String(o.lifecycleStatus || '').toLowerCase() !== 'acuse' && new Date(`${o.dueDate}T00:00:00Z`) < new Date());
+  if (overdueCritical.length) {
+    priorities.push({
+      priority: 'alta',
+      area: 'Cumplimiento fiscal',
+      action: `Regularizar ${overdueCritical.length} obligación(es) crítica(s) vencida(s) y cargar acuse.`,
+      reason: 'Hay riesgo de multa por obligaciones críticas sin acuse.'
+    });
+  }
+  if (cash < 0) {
+    priorities.push({
+      priority: 'alta',
+      area: 'Caja',
+      action: 'Ajustar egresos de la semana y priorizar cobranza de ventas pendientes.',
+      reason: 'La caja disponible está negativa.'
+    });
+  }
+  if (criticalStock > 0) {
+    priorities.push({
+      priority: 'media',
+      area: 'Operación',
+      action: `Reponer ${criticalStock} producto(s) en stock crítico para no frenar ventas.`,
+      reason: 'Riesgo de quiebre de stock en operación diaria.'
+    });
+  }
+  if (!priorities.length) {
+    priorities.push({
+      priority: 'normal',
+      area: 'Seguimiento',
+      action: `Mantener control semanal de ${periodKey} y generar reporte ejecutivo para revisión de dueño.`,
+      reason: 'No se detectan brechas críticas hoy.'
+    });
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     financial: {
@@ -89,11 +125,17 @@ function buildExecutiveDashboard(state, year, month) {
       movementCount: movsYear.length
     },
     compliance: {
-      period: `${year}-${String(month).padStart(2, '0')}`,
+      period: periodKey,
       score: complianceScore,
       obligations: compliance.length,
       withAck: compliance.filter((x) => x.lifecycleStatus === 'acuse').length
-    }
+    },
+    ownerSummary: {
+      cashStatus: cash >= 0 ? 'Caja saludable para operar' : 'Caja en riesgo, requiere ajuste inmediato',
+      taxStatus: complianceScore >= 85 ? 'Cumplimiento fiscal controlado' : 'Cumplimiento fiscal con riesgo relevante',
+      businessStatus: (sales - expenses) >= 0 ? 'Operación rentable en el período' : 'Operación con margen presionado'
+    },
+    todayPriorities: priorities
   };
 }
 

@@ -987,6 +987,16 @@
                     </div>
                 </div>
                 <div id="exec-cards" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Resumen ejecutivo en lenguaje simple</h3>
+                    <div id="exec-summary" class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs"></div>
+                </div>
+                <div class="card p-8">
+                    <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Qué hacer hoy (prioridades)</h3>
+                    <div id="exec-today" class="space-y-2 text-xs">
+                        <div class="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-teal-800">Pulsa <span class="font-black">Actualizar</span> para generar prioridades accionables del dueño.</div>
+                    </div>
+                </div>
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="card p-6">
                         <h3 class="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Riesgo esperado</h3>
@@ -2144,14 +2154,30 @@
                 const d = payload.dashboard || {};
                 const risk = payload.risk || {};
                 safeSetHTML('exec-cards', [
-                    obsMetricCard('Caja', `$ ${Number(d.financial?.cash || 0).toLocaleString('es-CL')}`),
-                    obsMetricCard('Margen', `$ ${Number(d.financial?.margin || 0).toLocaleString('es-CL')}`, 'text-emerald-500'),
-                    obsMetricCard('Cumplimiento', `${Number(d.compliance?.score || 0)}%`, 'text-blue-500'),
+                    obsMetricCard('Caja', `$ ${Number(d.financial?.cash || 0).toLocaleString('es-CL')}`, Number(d.financial?.cash || 0) >= 0 ? 'text-emerald-600' : 'text-red-500'),
+                    obsMetricCard('Margen', `$ ${Number(d.financial?.margin || 0).toLocaleString('es-CL')}`, Number(d.financial?.margin || 0) >= 0 ? 'text-blue-500' : 'text-red-500'),
+                    obsMetricCard('Cumplimiento', `${Number(d.compliance?.score || 0)}%`, Number(d.compliance?.score || 0) >= 85 ? 'text-emerald-600' : 'text-amber-500'),
                     obsMetricCard('Riesgo Esperado', `$ ${Number(risk.totalExpectedRisk || 0).toLocaleString('es-CL')}`, 'text-red-500')
                 ].join(''));
+
+                const summary = d.ownerSummary || {};
+                safeSetHTML('exec-summary', [
+                    `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3"><p class="font-black uppercase text-[10px] tracking-widest text-slate-500 mb-1">Caja</p><p>${summary.cashStatus || '-'}</p></div>`,
+                    `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3"><p class="font-black uppercase text-[10px] tracking-widest text-slate-500 mb-1">Fiscal</p><p>${summary.taxStatus || '-'}</p></div>`,
+                    `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3"><p class="font-black uppercase text-[10px] tracking-widest text-slate-500 mb-1">Negocio</p><p>${summary.businessStatus || '-'}</p></div>`
+                ].join(''));
+
+                const priorities = Array.isArray(d.todayPriorities) ? d.todayPriorities : [];
+                const prRows = priorities.map((pr) => {
+                    const tone = pr.priority === 'alta' ? 'bg-red-100 text-red-700' : pr.priority === 'media' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+                    return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3"><div class="flex items-center justify-between gap-2"><span class="font-black">${pr.area || 'General'}</span><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${pr.priority || 'normal'}</span></div><p class="mt-2">${pr.action || '-'}</p><p class="mt-1 text-slate-500">Motivo: ${pr.reason || '-'}</p></div>`;
+                });
+                safeSetHTML('exec-today', prRows.join(''));
                 safeSetText('exec-risk', JSON.stringify(payload, null, 2));
             } catch (err) {
                 safeSetHTML('exec-cards', obsMetricCard('Ejecutivo', 'No disponible', 'text-red-500'));
+                safeSetHTML('exec-summary', '<div class="text-red-500 font-bold">No disponible</div>');
+                safeSetHTML('exec-today', `<div class="text-red-500 font-bold">${err.message}</div>`);
                 safeSetText('exec-risk', JSON.stringify({ error: err.message }, null, 2));
             }
         }
