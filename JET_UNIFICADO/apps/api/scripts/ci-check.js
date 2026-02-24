@@ -10,6 +10,7 @@ try {
   run("find . -name '*.js' -print | sort | xargs -I{} node --check {}");
   run('node scripts/qa-runner.js');
   run('node scripts/tax-regression.js');
+  run('node scripts/tax-edge-regression.js');
   console.log('\n[CI] OK: quality gate passed');
 } catch (err) {
   console.error('\n[CI] FAIL: quality gate failed');
