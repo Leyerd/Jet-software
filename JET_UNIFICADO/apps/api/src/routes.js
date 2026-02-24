@@ -2,7 +2,7 @@ const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
 const { register, login, me, logout, revokeSession, mfaSetup, mfaEnable, mfaDisable } = require('./modules/auth');
 const { importJson, getSummary } = require('./modules/migration');
-const { closePeriod, reopenPeriod, listPeriods } = require('./modules/accountingClose');
+const { closePeriod, reopenPeriod, listPeriods, getCloseChecklist } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
 const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem } = require('./modules/system');
@@ -165,6 +165,7 @@ function route(req, res) {
   if (path === '/periods/close') return req.method === 'POST' ? handle(closePeriod(req, res), res) : methodNotAllowed(res);
   if (path === '/periods/reopen') return req.method === 'POST' ? handle(reopenPeriod(req, res), res) : methodNotAllowed(res);
   if (path === '/periods') return req.method === 'GET' ? handle(listPeriods(req, res), res) : methodNotAllowed(res);
+  if (path === '/periods/close-checklist') return req.method === 'GET' ? handle(getCloseChecklist(req, res), res) : methodNotAllowed(res);
 
   if (path === '/movements') {
     if (req.method === 'GET') return handle(listMovements(req, res), res);

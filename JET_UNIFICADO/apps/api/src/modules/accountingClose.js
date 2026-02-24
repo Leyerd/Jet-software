@@ -121,6 +121,98 @@ function buildCloseSnapshotInFile(state, anio, mes) {
   };
 }
 
+function buildTaxCloseChecklist(state, anio, mes) {
+  const period = key(anio, mes);
+  const obligations = (state.complianceObligations || []).filter((x) => x.period === period);
+  const byCode = new Map(obligations.map((x) => [x.code, x]));
+  const required = ['F29', 'DDJJ', 'F22_EMPRESA', 'F22_DUENO'];
+  return required.map((code) => {
+    const applies = !(code === 'F22_EMPRESA' || code === 'F22_DUENO') || mes === 4;
+    const current = byCode.get(code);
+    const lifecycle = String(current?.lifecycleStatus || (applies ? 'pendiente' : 'no_aplica_mes')).toLowerCase();
+    return {
+      code,
+      appliesThisMonth: applies,
+      obligationKey: current?.key || `${code}-${period}`,
+      lifecycleStatus: lifecycle,
+      completed: applies ? lifecycle === 'acuse' : true
+    };
+  });
+}
+
+async function getCloseChecklist(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const anio = Number(query.get('anio') || query.get('year') || new Date().getFullYear());
+  const mes = Number(query.get('mes') || query.get('month') || (new Date().getMonth() + 1));
+  try {
+    assertAnioMes(anio, mes);
+  } catch (err) {
+    return sendJson(res, 400, { ok: false, message: err.message });
+  }
+
+  const state = await readStore();
+  const periodKey = key(anio, mes);
+  const snapshot = buildCloseSnapshotInFile(state, anio, mes);
+  const journalDebe = Number(snapshot.journal.debe || 0);
+  const journalHaber = Number(snapshot.journal.haber || 0);
+  const diff = Math.round((journalDebe - journalHaber) * 100) / 100;
+  const accountingConsistent = Math.abs(diff) < 0.01;
+  const taxItems = buildTaxCloseChecklist(state, anio, mes);
+  const taxComplete = taxItems.every((x) => x.completed);
+
+  const ruleTypes = new Set(['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMPRA', 'HONORARIOS', 'COMISION_MARKETPLACE']);
+  const periodMovements = (state.movimientos || []).filter((m) => {
+    const d = new Date(m.fecha);
+    return !Number.isNaN(d.getTime()) && d.getFullYear() === anio && (d.getMonth() + 1) === mes;
+  });
+  const frequentOps = periodMovements.filter((m) => ruleTypes.has(String(m.tipo || '').toUpperCase()));
+  const autoPosted = frequentOps.filter((m) => m.autoJournalCreated || m.autoJournalEntryId).length;
+
+  const periodRecord = (state.periodos || []).find((x) => x.key === periodKey);
+  const checklist = [
+    {
+      id: 'tax.checklist',
+      title: 'Checklist tributario mensual (empresa + dueño)',
+      status: taxComplete ? 'done' : 'pending',
+      trace: taxItems.map((x) => ({ code: x.code, obligationKey: x.obligationKey, lifecycleStatus: x.lifecycleStatus, appliesThisMonth: x.appliesThisMonth }))
+    },
+    {
+      id: 'accounting.consistency',
+      title: 'Consistencia Diario/Mayor/Balance',
+      status: accountingConsistent ? 'done' : 'pending',
+      trace: { debe: journalDebe, haber: journalHaber, diff }
+    },
+    {
+      id: 'journal.autoPosting',
+      title: 'Asientos automáticos por operación frecuente',
+      status: frequentOps.length === 0 || autoPosted === frequentOps.length ? 'done' : 'pending',
+      trace: { frequentOps: frequentOps.length, autoPosted }
+    },
+    {
+      id: 'period.close.state',
+      title: 'Estado de cierre del período',
+      status: periodRecord?.estado === 'cerrado' ? 'done' : 'pending',
+      trace: periodRecord || { key: periodKey, estado: 'abierto' }
+    }
+  ];
+
+  const traceId = `close-checklist-${periodKey}-${Date.now()}`;
+  await appendAudit('period.close.checklist.viewed', { period: periodKey, traceId }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('period.close.checklist.viewed', { period: periodKey, traceId }, auth.user.email);
+
+  return sendJson(res, 200, {
+    ok: true,
+    period: periodKey,
+    checklist,
+    summary: { completed: checklist.filter((x) => x.status === 'done').length, total: checklist.length },
+    traceId,
+    generatedAt: new Date().toISOString()
+  });
+}
+
 async function closePeriod(req, res) {
   const auth = await requireRoles(req, ['dueno', 'contador_admin']);
   if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
@@ -271,4 +363,4 @@ async function listPeriods(req, res) {
   return sendJson(res, 200, { ok: true, periods: state.periodos });
 }
 
-module.exports = { closePeriod, reopenPeriod, listPeriods, isPeriodClosed, isPeriodClosedInDb, assertPeriodOpenForDate };
+module.exports = { closePeriod, reopenPeriod, listPeriods, getCloseChecklist, isPeriodClosed, isPeriodClosedInDb, assertPeriodOpenForDate };

@@ -34,10 +34,12 @@ async function createMovement(req, res) {
     }
 
     const movement = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_created BOOLEAN DEFAULT FALSE');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_id TEXT');
       const rs = await client.query(
         `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, creado_en)
          VALUES ($1::date, $2, $3, $4, $5, $6, NOW())
-         RETURNING id, fecha, tipo, descripcion, total, neto, iva`,
+         RETURNING id, fecha, tipo, descripcion, total, neto, iva, auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId"`,
         [fecha, tipo, desc, total, neto, iva]
       );
       return { ...rs.rows[0], retention, comision };
@@ -45,6 +47,11 @@ async function createMovement(req, res) {
 
     await appendAuditLog('movement.create', movement, auth.user.email);
     const autoJournal = await createAutoEntryForMovement(movement, auth.user.email);
+    movement.autoJournalCreated = Boolean(autoJournal?.created);
+    movement.autoJournalEntryId = autoJournal?.entryId || null;
+    await withPgClient(async (client) => {
+      await client.query('UPDATE movimientos SET auto_entry_created = $2, auto_entry_id = $3 WHERE id = $1', [movement.id, movement.autoJournalCreated, movement.autoJournalEntryId]);
+    });
     return sendJson(res, 201, { ok: true, movement, autoJournal });
   }
 
@@ -56,11 +63,14 @@ async function createMovement(req, res) {
     return sendJson(res, 409, { ok: false, message: compliance.reason, blockers: compliance.blockers, code: 'COMPLIANCE_BLOCK' });
   }
 
-  const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total, neto, iva, retention, comision };
+  const movement = { id: `MOV-${Date.now()}-${Math.floor(Math.random() * 1000)}`, fecha, tipo, descripcion: desc, total, neto, iva, retention, comision, autoJournalCreated: false, autoJournalEntryId: null };
   state.movimientos.push(movement);
   await writeStore(state);
   await appendAudit('movement.create', movement, auth.user.email);
   const autoJournal = await createAutoEntryForMovement(movement, auth.user.email);
+  movement.autoJournalCreated = Boolean(autoJournal?.created);
+  movement.autoJournalEntryId = autoJournal?.entryId || null;
+  await writeStore(state);
 
   return sendJson(res, 201, { ok: true, movement, autoJournal });
 }
@@ -72,7 +82,7 @@ async function listMovements(req, res) {
   if (isPostgresMode()) {
     const movements = await withPgClient(async (client) => {
       const rs = await client.query(
-        'SELECT id, fecha, tipo, descripcion, total, neto, iva FROM movimientos ORDER BY fecha ASC, id ASC'
+        'SELECT id, fecha, tipo, descripcion, total, neto, iva, auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId" FROM movimientos ORDER BY fecha ASC, id ASC'
       );
       return rs.rows;
     });

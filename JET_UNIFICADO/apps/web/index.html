@@ -728,6 +728,26 @@
             <!-- Tab de Contabilidad Formal -->
             <div id="tab-contabilidad" class="tab-content hidden space-y-6">
                 <h2 class="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter">Contabilidad Formal</h2>
+                <div class="card p-8">
+                    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                        <div>
+                            <h4 class="font-black text-slate-900 dark:text-white text-xs uppercase tracking-widest mb-2">Checklist de Cierre Mensual (Meta A3)</h4>
+                            <p class="text-xs text-slate-500">Verifica cierre tributario + consistencia contable + cobertura de asientos automáticos por período.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-2 w-full lg:w-auto">
+                            <input id="close-year" type="number" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white" placeholder="Año">
+                            <select id="close-month" class="border-2 border-slate-100 dark:border-slate-800 p-3 rounded-2xl text-xs bg-transparent font-bold dark:text-white">
+                                <option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option>
+                                <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
+                                <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
+                            </select>
+                            <button onclick="loadCloseChecklist()" class="btn-jet bg-slate-900 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Validar cierre</button>
+                            <button onclick="loadModuleDemo('cierre')" class="btn-jet bg-slate-100 text-slate-800 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Demo módulo</button>
+                        </div>
+                    </div>
+                    <div id="close-checklist-meta" class="text-xs text-slate-500 mt-4"></div>
+                    <div id="close-checklist-items" class="space-y-2 mt-3 text-xs"></div>
+                </div>
                 <!-- Filtros de mes independientes para cada libro contable -->
                 <!-- Los selectores de mes se ubican junto a cada sección -->
                 <!-- Plan de Cuentas -->
@@ -1692,6 +1712,15 @@
                 observabilidad: async () => {
                     await loadObservabilityDashboard();
                     switchTab('observabilidad');
+                },
+                cierre: async () => {
+                    const now = new Date();
+                    const yearInput = document.getElementById('close-year');
+                    const monthInput = document.getElementById('close-month');
+                    if (yearInput && !yearInput.value) yearInput.value = String(db.config.year || now.getFullYear());
+                    if (monthInput && !monthInput.value) monthInput.value = String(now.getMonth() + 1);
+                    await loadCloseChecklist();
+                    switchTab('contabilidad');
                 }
             };
 
@@ -1705,6 +1734,27 @@
                 if (!shouldSeed) return;
                 await loadDemoDataFromJson();
                 await runScenario();
+            }
+        }
+
+        async function loadCloseChecklist() {
+            try {
+                const now = new Date();
+                const year = Number(document.getElementById('close-year')?.value || db.config.year || now.getFullYear());
+                const month = Number(document.getElementById('close-month')?.value || (now.getMonth() + 1));
+                const payload = await apiClient.get(`/periods/close-checklist?anio=${year}&mes=${month}`);
+                const summary = payload.summary || { completed: 0, total: 0 };
+                safeSetHTML('close-checklist-meta', `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-3 py-2"><span class="font-black">Período:</span> ${payload.period || '-'} · <span class="font-black">Completado:</span> ${summary.completed}/${summary.total} · <span class="font-black">Trace:</span> ${payload.traceId || '-'}</div>`);
+
+                const rows = (payload.checklist || []).map((item) => {
+                    const ok = item.status === 'done';
+                    const tone = ok ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700';
+                    return `<div class="rounded-xl border border-slate-100 dark:border-slate-800 px-4 py-3 flex flex-col gap-2"><div class="flex items-center justify-between gap-2"><span class="font-black">${item.title}</span><span class="px-2 py-1 rounded-lg text-[10px] uppercase font-black ${tone}">${ok ? 'OK' : 'Pendiente'}</span></div><pre class="bg-slate-900 text-slate-100 rounded-xl p-3 text-[10px] overflow-auto max-h-40">${JSON.stringify(item.trace || {}, null, 2)}</pre></div>`;
+                });
+                safeSetHTML('close-checklist-items', rows.join(''));
+            } catch (err) {
+                safeSetHTML('close-checklist-meta', `<span class="text-red-500 font-bold">${err.message}</span>`);
+                safeSetHTML('close-checklist-items', '');
             }
         }
 
