@@ -5,10 +5,11 @@ const { requireRoles } = require('./auth');
 const { appendAuditLog } = require('../lib/postgresRepo');
 
 const OBLIGATION_TEMPLATES = [
-  { code: 'F29', name: 'Formulario 29', day: 20, severity: 'critical' },
-  { code: 'DDJJ', name: 'Declaraciones Juradas', day: 25, severity: 'high' },
-  { code: 'F22', name: 'Formulario 22', annual: true, month: 4, day: 30, severity: 'critical' },
-  { code: 'PATENTE', name: 'Patente Comercial', annual: true, month: 7, day: 31, severity: 'medium' }
+  { code: 'F29', name: 'Formulario 29 (Empresa)', day: 20, severity: 'critical', ownerScope: 'empresa' },
+  { code: 'DDJJ', name: 'Declaraciones Juradas (Empresa)', day: 25, severity: 'high', ownerScope: 'empresa' },
+  { code: 'F22_EMPRESA', name: 'Formulario 22 Empresa', annual: true, month: 4, day: 30, severity: 'critical', ownerScope: 'empresa' },
+  { code: 'F22_DUENO', name: 'Formulario 22 Dueño', annual: true, month: 4, day: 30, severity: 'critical', ownerScope: 'dueno' },
+  { code: 'PATENTE', name: 'Patente Comercial', annual: true, month: 7, day: 31, severity: 'medium', ownerScope: 'empresa' }
 ];
 
 function ensureComplianceStructures(state) {
@@ -50,7 +51,8 @@ function buildPeriodObligations(year, month) {
       name: tpl.name,
       period: `${year}-${String(month).padStart(2, '0')}`,
       dueDate: toIsoDate(due),
-      severity: tpl.severity
+      severity: tpl.severity,
+      ownerScope: tpl.ownerScope || 'empresa'
     };
   });
 }
@@ -137,6 +139,35 @@ async function getComplianceBlockers(req, res) {
   const state = await readStore();
   const result = evaluateComplianceBlockers(state);
   return sendJson(res, 200, { ok: true, ...result, generatedAt: new Date().toISOString() });
+}
+
+
+function buildMonthlyChecklist(obligations) {
+  const required = obligations.filter((o) => ['F29', 'DDJJ', 'F22_EMPRESA', 'F22_DUENO'].includes(o.code));
+  const items = required.map((ob) => ({
+    obligationKey: ob.key,
+    code: ob.code,
+    ownerScope: ob.ownerScope || 'empresa',
+    dueDate: ob.dueDate,
+    lifecycleStatus: ob.lifecycleStatus,
+    completed: String(ob.lifecycleStatus || '').toLowerCase() === 'acuse'
+  }));
+  const complete = items.every((i) => i.completed);
+  return { items, complete, total: items.length, completed: items.filter((i) => i.completed).length };
+}
+
+async function getComplianceChecklist(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const year = Number(query.get('year') || new Date().getFullYear());
+  const month = Number(query.get('month') || (new Date().getMonth() + 1));
+  const state = await loadOrCreateObligations(year, month);
+  const period = `${year}-${String(month).padStart(2, '0')}`;
+  const obligations = state.complianceObligations.filter((x) => x.period === period);
+  const checklist = buildMonthlyChecklist(obligations);
+  const blockers = evaluateComplianceBlockers(state);
+  return sendJson(res, 200, { ok: true, period, checklist, blockers, generatedAt: new Date().toISOString() });
 }
 
 async function getCalendar(req, res) {
@@ -249,6 +280,7 @@ async function updateComplianceConfig(req, res) {
 module.exports = {
   getCalendar,
   getSemaphore,
+  getComplianceChecklist,
   getComplianceBlockers,
   registerEvidence,
   updateComplianceConfig,
