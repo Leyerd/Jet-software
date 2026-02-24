@@ -843,7 +843,7 @@
                                 <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
                                 <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                             </select>
-                            <button onclick="loadAuditableReports()" class="btn-jet bg-cyan-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Consultar</button>
+                            <div class="flex gap-2"><button onclick="loadAuditableReports()" class="btn-jet bg-cyan-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Consultar</button><button onclick="loadModuleDemo('reporteria')" class="btn-jet bg-cyan-100 text-cyan-800 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Demo módulo</button></div>
                         </div>
                     </div>
                     <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -887,7 +887,7 @@
                                 <option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option>
                                 <option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option>
                             </select>
-                            <button onclick="loadComplianceStatus()" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                            <div class="flex gap-2"><button onclick="loadComplianceStatus()" class="btn-jet bg-fuchsia-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button><button onclick="loadModuleDemo('cumplimiento')" class="btn-jet bg-fuchsia-100 text-fuchsia-800 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Demo módulo</button></div>
                         </div>
                     </div>
                 </div>
@@ -1039,7 +1039,7 @@
                             <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Observabilidad Operativa</h2>
                             <p class="text-xs text-slate-500 mt-2">Monitorea errores, latencia, rechazos de validación y alertas activas del backend.</p>
                         </div>
-                        <button onclick="loadObservabilityDashboard()" class="btn-jet bg-lime-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button>
+                        <div class="flex gap-2"><button onclick="loadObservabilityDashboard()" class="btn-jet bg-lime-600 text-white px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Actualizar</button><button onclick="loadModuleDemo('observabilidad')" class="btn-jet bg-lime-100 text-lime-800 px-4 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest">Demo módulo</button></div>
                     </div>
                 </div>
                 <div id="obs-metrics" class="grid grid-cols-1 md:grid-cols-4 gap-4"></div>
@@ -1668,6 +1668,43 @@
             } catch (err) {
                 console.warn('Fallo carga JSON demo, se intentará endpoint runtime.', err.message);
                 await loadDemoDataFromBackend();
+            }
+        }
+
+        async function loadModuleDemo(moduleKey) {
+            const scenarios = {
+                reporteria: async () => {
+                    const yearInput = document.getElementById('report-year');
+                    const monthInput = document.getElementById('report-month');
+                    if (yearInput && !yearInput.value) yearInput.value = String(db.config.year || new Date().getFullYear());
+                    if (monthInput && !monthInput.value) monthInput.value = String(new Date().getMonth() + 1);
+                    await loadAuditableReports();
+                    switchTab('reporteria');
+                },
+                cumplimiento: async () => {
+                    const yearInput = document.getElementById('comp-year');
+                    const monthInput = document.getElementById('comp-month');
+                    if (yearInput && !yearInput.value) yearInput.value = String(db.config.year || new Date().getFullYear());
+                    if (monthInput && !monthInput.value) monthInput.value = String(new Date().getMonth() + 1);
+                    await loadComplianceStatus();
+                    switchTab('cumplimiento');
+                },
+                observabilidad: async () => {
+                    await loadObservabilityDashboard();
+                    switchTab('observabilidad');
+                }
+            };
+
+            const runScenario = scenarios[moduleKey];
+            if (!runScenario) return;
+
+            try {
+                await runScenario();
+            } catch (err) {
+                const shouldSeed = confirm(`No se pudo cargar la demo contextual de ${moduleKey}. ¿Deseas cargar la base demo completa 2024-2026 y reintentar?`);
+                if (!shouldSeed) return;
+                await loadDemoDataFromJson();
+                await runScenario();
             }
         }
 
