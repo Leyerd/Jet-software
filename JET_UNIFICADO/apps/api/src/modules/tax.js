@@ -413,8 +413,15 @@ async function getTaxSummary(req, res) {
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS monto NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS categoria TEXT');
       const rs = await client.query(
-        `SELECT fecha, tipo, total, neto, iva,
+        `SELECT fecha, tipo,
+                COALESCE(total, monto, 0) AS total,
+                COALESCE(neto, 0) AS neto,
+                COALESCE(iva, 0) AS iva,
+                COALESCE(monto, total, 0) AS monto,
+                COALESCE(categoria, '') AS categoria,
                 COALESCE(retention, 0) AS retention,
                 COALESCE(comision, 0) AS comision,
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
@@ -485,8 +492,15 @@ async function getTaxExplainability(req, res) {
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
     yearMovs = await withPgClient(async (client) => {
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS monto NUMERIC(18,2) DEFAULT 0');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS categoria TEXT');
       const rs = await client.query(
-        `SELECT fecha, tipo, total, neto, iva,
+        `SELECT fecha, tipo,
+                COALESCE(total, monto, 0) AS total,
+                COALESCE(neto, 0) AS neto,
+                COALESCE(iva, 0) AS iva,
+                COALESCE(monto, total, 0) AS monto,
+                COALESCE(categoria, '') AS categoria,
                 COALESCE(retention, 0) AS retention,
                 COALESCE(comision, 0) AS comision,
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
