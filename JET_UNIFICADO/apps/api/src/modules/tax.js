@@ -50,6 +50,28 @@ const NORMATIVE_CATALOG = {
   }
 };
 
+const NORMATIVE_CHANGELOG = [
+  { version: 'cl-tax-2026.1', effectiveFrom: '2026-01-01', scope: ['F29', 'F22', 'DDJJ'], notes: 'Versión base referencial 2026 para 14D8/14D3.', sourceRef: 'SII+LIR interno' },
+  { version: 'cl-tax-2026.2', effectiveFrom: '2026-07-01', scope: ['F29', 'F22'], notes: 'Ajuste de trazabilidad y explicación por casilla sin alterar estructura de casillas.', sourceRef: 'SII+LIR interno' }
+];
+
+function compareDateIso(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+function resolveNormativeVersion(dateLike, preferredVersion) {
+  const iso = new Date(dateLike).toISOString().slice(0, 10);
+  if (preferredVersion) {
+    const hit = NORMATIVE_CHANGELOG.find((x) => x.version === preferredVersion);
+    if (hit) return hit;
+  }
+  const applicable = NORMATIVE_CHANGELOG
+    .filter((x) => compareDateIso(x.effectiveFrom, iso) <= 0)
+    .sort((a, b) => compareDateIso(a.effectiveFrom, b.effectiveFrom));
+  return applicable[applicable.length - 1] || NORMATIVE_CHANGELOG[0];
+}
+
 function getCatalog(year, regime) {
   const selectedYear = NORMATIVE_CATALOG[year] ? year : 2026;
   const y = NORMATIVE_CATALOG[selectedYear];
@@ -59,6 +81,7 @@ function getCatalog(year, regime) {
     regime: rg,
     version: y.version,
     source: y.source,
+    normative: resolveNormativeVersion(`${selectedYear}-01-01`, y.version),
     ...y.regimes[rg]
   };
 }
@@ -115,7 +138,8 @@ function computeMonthlyF29(movs, config, catalog) {
     },
     trace: {
       rulesApplied: catalog.rules.f29,
-      version: catalog.version,
+      version: catalog.normative?.version || catalog.version,
+      effectiveFrom: catalog.normative?.effectiveFrom,
       source: catalog.source
     }
   };
@@ -338,7 +362,8 @@ async function getTaxSummary(req, res) {
       eirlMode: 'empresa_individual_responsabilidad_limitada',
       year,
       month,
-      normativeVersion: catalog.version,
+      normativeVersion: catalog.normative?.version || catalog.version,
+      normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
       normativeSource: catalog.source
     },
     f29,
@@ -425,7 +450,8 @@ async function getTaxExplainability(req, res) {
       ddjjBase: rli.ddjjBase
     },
     trace: {
-      normativeVersion: catalog.version,
+      normativeVersion: catalog.normative?.version || catalog.version,
+      normativeEffectiveFrom: catalog.normative?.effectiveFrom || `${year}-01-01`,
       normativeSource: catalog.source,
       rules: {
         f29: catalog.rules.f29,
@@ -441,14 +467,36 @@ async function getTaxExplainability(req, res) {
   return sendJson(res, 200, { ok: true, explainability });
 }
 
+
+async function getNormativeVersions(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const year = Number(query.get('year') || new Date().getFullYear());
+  const regime = query.get('regime') || '14D8';
+  const month = Number(query.get('month') || 1);
+  const baseCatalog = getCatalog(year, regime);
+  const resolved = resolveNormativeVersion(`${year}-${String(month).padStart(2, '0')}-01`, baseCatalog.version);
+
+  return sendJson(res, 200, {
+    ok: true,
+    selected: { year, month, regime, version: resolved.version, effectiveFrom: resolved.effectiveFrom },
+    timeline: NORMATIVE_CHANGELOG,
+    baseCatalog: { version: baseCatalog.version, source: baseCatalog.source }
+  });
+}
+
 module.exports = {
   getTaxConfig,
   updateTaxConfig,
   getTaxSummary,
   getTaxCatalog,
   getTaxExplainability,
+  getNormativeVersions,
   ensureTaxConfig,
   getCatalog,
+  resolveNormativeVersion,
   computeMonthlyF29,
   computeYearlyRli,
   computeF22ByRegime,

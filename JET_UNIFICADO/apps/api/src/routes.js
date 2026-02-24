@@ -19,7 +19,7 @@ const {
   listReconciliationDocuments,
   updateReconciliationStatus
 } = require('./modules/reconciliation');
-const { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog, getTaxExplainability } = require('./modules/tax');
+const { getTaxConfig, updateTaxConfig, getTaxSummary, getTaxCatalog, getTaxExplainability, getNormativeVersions } = require('./modules/tax');
 const {
   updateIntegrationConfig,
   getIntegrationsStatus,
@@ -86,7 +86,8 @@ const modulesList = [
   'metaA9-pilot-3-closing-cycles',
   'metaA10-internal-certification-autonomous-operation',
   'metaB5-tax-ledger-auto-reconciliation',
-  'metaB6-tax-explainability-audit'
+  'metaB6-tax-explainability-audit',
+  'metaB7-normative-version-timeline'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -141,6 +142,7 @@ function route(req, res) {
   if (path === '/tax/catalog' && req.method === 'GET') return handle(getTaxCatalog(req, res), res);
   if (path === '/tax/summary' && req.method === 'GET') return handle(getTaxSummary(req, res), res);
   if (path === '/tax/explainability' && req.method === 'GET') return handle(getTaxExplainability(req, res), res);
+  if (path === '/tax/normative-versions' && req.method === 'GET') return handle(getNormativeVersions(req, res), res);
 
 
   if (path === '/integrations/config') return req.method === 'POST' ? handle(updateIntegrationConfig(req, res), res) : methodNotAllowed(res);
