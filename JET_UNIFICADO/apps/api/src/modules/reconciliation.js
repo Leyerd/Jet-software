@@ -4,6 +4,7 @@ const { readStore, writeStore, appendAudit } = require('../lib/store');
 const { requireRoles } = require('./auth');
 const { isPostgresMode, withPgClient, appendAuditLog } = require('../lib/postgresRepo');
 const { assertPeriodOpenForDate } = require('./accountingClose');
+const { ensureTaxConfig, getCatalog, computeMonthlyF29, computeYearlyRli, computeF22ByRegime, isAcceptedForTax } = require('./tax');
 
 const ALLOWED_RECONCILIATION_STATUS = ['pendiente', 'conciliado', 'observado', 'resuelto'];
 
@@ -553,9 +554,111 @@ async function getCrossValidationReport(req, res) {
   });
 }
 
+
+async function getTaxAccountingReconciliation(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin', 'auditor']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+
+  const query = req.url.includes('?') ? new URL(req.url, 'http://localhost').searchParams : new URLSearchParams();
+  const year = Number(query.get('year') || new Date().getFullYear());
+  const month = Number(query.get('month') || (new Date().getMonth() + 1));
+
+  let cfg; let yearMovs;
+  if (isPostgresMode()) {
+    cfg = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate"
+         FROM tax_config
+         WHERE anio = $1
+         ORDER BY id DESC
+         LIMIT 1`,
+        [year]
+      );
+      if (rs.rows.length) return rs.rows[0];
+      const cat = getCatalog(year, '14D8');
+      return { year, regime: '14D8', ppmRate: cat.ppmRate, ivaRate: cat.ivaRate, retentionRate: cat.retentionRate };
+    });
+
+    yearMovs = await withPgClient(async (client) => {
+      const rs = await client.query(
+        `SELECT fecha, tipo, total, neto, iva,
+                COALESCE(retention, 0) AS retention,
+                COALESCE(comision, 0) AS comision,
+                COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
+                COALESCE(accepted, TRUE) AS accepted,
+                document_ref AS "documentRef"
+         FROM movimientos
+         WHERE EXTRACT(YEAR FROM fecha) = $1`,
+        [year]
+      );
+      return rs.rows;
+    });
+  } else {
+    const state = await readStore();
+    cfg = ensureTaxConfig(state);
+    yearMovs = (state.movimientos || []).filter((m) => new Date(m.fecha).getFullYear() === year);
+  }
+
+  const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
+  const monthMovs = yearMovs.filter((m) => (new Date(m.fecha).getMonth() + 1) === month);
+
+  const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
+  const rli = computeYearlyRli(yearMovs, catalog);
+  const f22 = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
+
+  const ledger = {
+    ivaDebitoVentas: Math.round(monthMovs
+      .filter((m) => String(m.tipo).toUpperCase() === 'VENTA')
+      .reduce((a, b) => a + Number(b.iva || 0), 0)),
+    ivaCreditoCompras: Math.round(monthMovs
+      .filter((m) => ['GASTO_LOCAL', 'IMPORTACION'].includes(String(m.tipo).toUpperCase()) && isAcceptedForTax(m))
+      .reduce((a, b) => a + Number(b.iva || 0), 0)),
+    retencionHonorarios: Math.round(monthMovs
+      .filter((m) => String(m.tipo).toUpperCase() === 'HONORARIOS' && isAcceptedForTax(m))
+      .reduce((a, b) => a + Number(b.retention || 0), 0)),
+    rliAnual: Math.round(rli.components.rli),
+    ddjjBase: Math.round(rli.ddjjBase.provisionalBase)
+  };
+
+  const checks = [
+    { key: 'ledger_vs_f29_debito', expected: ledger.ivaDebitoVentas, actual: f29.casillas.casilla_538_debitoFiscal },
+    { key: 'ledger_vs_f29_credito', expected: ledger.ivaCreditoCompras, actual: f29.casillas.casilla_511_creditoFiscal },
+    { key: 'ledger_vs_f29_retencion', expected: ledger.retencionHonorarios, actual: f29.casillas.casilla_151_retHonorarios },
+    { key: 'rli_vs_f22', expected: ledger.rliAnual, actual: rli.components.rli },
+    { key: 'ddjj_base_vs_rli_non_negative', expected: Math.max(0, ledger.rliAnual), actual: ledger.ddjjBase }
+  ].map((it) => {
+    const delta = Math.round(Number(it.expected || 0) - Number(it.actual || 0));
+    return { ...it, delta, status: Math.abs(delta) <= 1 ? 'ok' : 'observed' };
+  });
+
+  const summary = {
+    total: checks.length,
+    ok: checks.filter((c) => c.status === 'ok').length,
+    observed: checks.filter((c) => c.status === 'observed').length,
+    metaB5Reached: checks.every((c) => c.status === 'ok')
+  };
+
+  await appendAudit('reconciliation.tax_ledger', { year, month, observed: summary.observed }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('reconciliation.tax_ledger', { year, month, observed: summary.observed }, auth.user.email);
+
+  return sendJson(res, 200, {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    year,
+    month,
+    regime: cfg.regime,
+    normativeVersion: catalog.version,
+    ledger,
+    tax: { f29, f22: { rli, selectedRegime: f22 } },
+    checks,
+    summary
+  });
+}
+
 module.exports = {
   getReconciliationSummary,
   getCrossValidationReport,
+  getTaxAccountingReconciliation,
   importCartola,
   importRCVVentas,
   importMarketplaceOrders,

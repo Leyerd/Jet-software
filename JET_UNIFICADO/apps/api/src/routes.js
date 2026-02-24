@@ -12,6 +12,7 @@ const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./
 const {
   getReconciliationSummary,
   getCrossValidationReport,
+  getTaxAccountingReconciliation,
   importCartola,
   importRCVVentas,
   importMarketplaceOrders,
@@ -83,7 +84,8 @@ const modulesList = [
   'meta16-normative-governance-regression',
   'metaA8-guided-operations-blocking-checklists-runbooks',
   'metaA9-pilot-3-closing-cycles',
-  'metaA10-internal-certification-autonomous-operation'
+  'metaA10-internal-certification-autonomous-operation',
+  'metaB5-tax-ledger-auto-reconciliation'
 ];
 
 function handle(promiseLike, res, status = 400) {
@@ -123,6 +125,7 @@ function route(req, res) {
 
   if (req.method === 'GET' && path === '/reconciliation/summary') return handle(getReconciliationSummary(req, res), res);
   if (req.method === 'GET' && path === '/reconciliation/cross-check') return handle(getCrossValidationReport(req, res), res);
+  if (req.method === 'GET' && path === '/reconciliation/tax-ledger') return handle(getTaxAccountingReconciliation(req, res), res);
   if (req.method === 'GET' && path === '/reconciliation/documents') return handle(listReconciliationDocuments(req, res), res);
   if (path === '/reconciliation/import/cartola') return req.method === 'POST' ? handle(importCartola(req, res), res) : methodNotAllowed(res);
   if (path === '/reconciliation/import/rcv-ventas') return req.method === 'POST' ? handle(importRCVVentas(req, res), res) : methodNotAllowed(res);
