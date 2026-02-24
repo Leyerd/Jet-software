@@ -138,20 +138,18 @@ function ensureTaxConfig(state) {
 function getTaxTipo(movement) {
   const raw = String(movement?.tipo || '').trim().toUpperCase();
   const category = String(movement?.categoria || '').trim().toUpperCase();
+  const desc = String(movement?.descripcion || movement?.desc || '').trim().toUpperCase();
+  const signature = `${raw} ${category} ${desc}`;
+
   if (['VENTA', 'GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE', 'RETIRO'].includes(raw)) return raw;
-  if (['INGRESO', 'VENTA_MARKETPLACE', 'VENTA_ML'].includes(raw)) return 'VENTA';
-  if (['COMISION', 'COMISION_ML', 'COMISIÓN', 'COMISIÓN_ML'].includes(raw)) return 'COMISION_MARKETPLACE';
-  if (['EGRESO', 'GASTO', 'COMPRA'].includes(raw)) {
-    if (category.includes('HONOR')) return 'HONORARIOS';
-    if (category.includes('IMPORT')) return 'IMPORTACION';
-    if (category.includes('COMISION')) return 'COMISION_MARKETPLACE';
-    return 'GASTO_LOCAL';
-  }
-  if (category.includes('VENTA')) return 'VENTA';
-  if (category.includes('HONOR')) return 'HONORARIOS';
-  if (category.includes('IMPORT')) return 'IMPORTACION';
-  if (category.includes('COMISION')) return 'COMISION_MARKETPLACE';
-  if (category.includes('GASTO')) return 'GASTO_LOCAL';
+
+  if (signature.includes('RETIRO')) return 'RETIRO';
+  if (signature.includes('HONOR')) return 'HONORARIOS';
+  if (signature.includes('IMPORT')) return 'IMPORTACION';
+  if (signature.includes('COMISION') || signature.includes('COMISIÓN')) return 'COMISION_MARKETPLACE';
+  if (signature.includes('VENTA') || signature.includes('INGRESO') || signature.includes('BOLETA') || signature.includes('FACTURA')) return 'VENTA';
+  if (signature.includes('GASTO') || signature.includes('EGRESO') || signature.includes('COMPRA') || signature.includes('PAGO')) return 'GASTO_LOCAL';
+
   return raw;
 }
 

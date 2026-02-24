@@ -42,6 +42,16 @@ function run() {
   const rliLegacy = computeYearlyRli(legacyMonth, cat14D8);
   assertEq('Legacy RLI', rliLegacy.components.rli, 50000);
 
+
+  // Escenario: tipos no canónicos con keyword (VENTA/GASTO) deben mapear para F29
+  const keywordTipoMonth = [
+    { fecha: '2026-11-01', tipo: 'venta_operacional', total: 238164, neto: 200138, iva: 38026, accepted: true },
+    { fecha: '2026-11-02', tipo: 'gasto_operacional', total: 139944, neto: 117600, iva: 22344, accepted: true }
+  ];
+  const f29Keyword = computeMonthlyF29(keywordTipoMonth, { ppmRate: 0.2 }, cat14D8);
+  assertEq('Keyword tipo debito', f29Keyword.totals.debit, 38026);
+  assertEq('Keyword tipo credito', f29Keyword.totals.credit, 22344);
+
   // Escenario: diferencia por régimen para mismo RLI
   const yearly = [
     { fecha: '2026-01-01', tipo: 'VENTA', neto: 2000000, iva: 380000, costoMercaderia: 700000, accepted: true },
@@ -58,7 +68,7 @@ function run() {
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
-    scenarios: ['carry-credit-floor', 'rejected-fees-excluded', 'legacy-ingreso-egreso-mapping', 'regime-delta-14d8-vs-14d3']
+    scenarios: ['carry-credit-floor', 'rejected-fees-excluded', 'legacy-ingreso-egreso-mapping', 'keyword-tipo-mapping', 'regime-delta-14d8-vs-14d3']
   };
 }
 
