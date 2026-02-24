@@ -17,6 +17,13 @@ function ensureIntegrationStructures(state) {
   }
   if (!Array.isArray(state.integrationSyncLog)) state.integrationSyncLog = [];
   if (!Array.isArray(state.integrationDeadLetter)) state.integrationDeadLetter = [];
+  if (!Array.isArray(state.integrationRecurringTasks)) {
+    state.integrationRecurringTasks = [
+      { key: 'sync.mercadolibre.daily', enabled: true, frequency: 'daily', lastRunAt: null, lastResult: null },
+      { key: 'sync.sii.daily', enabled: true, frequency: 'daily', lastRunAt: null, lastResult: null },
+      { key: 'close.reminder.monthly', enabled: true, frequency: 'monthly', lastRunAt: null, lastResult: null }
+    ];
+  }
 }
 
 function nowIso() {
@@ -223,7 +230,7 @@ async function getIntegrationsStatus(req, res) {
       const d = await client.query('SELECT id, provider, job_id AS "jobId", error, retries, created_at AS "createdAt" FROM integration_dead_letter ORDER BY created_at DESC LIMIT 20');
       const providers = { alibaba: { enabled: false, lastSyncAt: null }, mercadolibre: { enabled: false, lastSyncAt: null }, sii: { enabled: false, lastSyncAt: null } };
       for (const row of p.rows) providers[row.provider] = row;
-      return { providers, syncLogCount: l.rows.length, latestSyncEvents: l.rows, deadLetterCount: d.rows.length, deadLetter: d.rows };
+      return { providers, syncLogCount: l.rows.length, latestSyncEvents: l.rows, deadLetterCount: d.rows.length, deadLetter: d.rows, recurringTasks: [] };
     });
     return sendJson(res, 200, { ok: true, ...out });
   }
@@ -236,8 +243,66 @@ async function getIntegrationsStatus(req, res) {
     syncLogCount: state.integrationSyncLog.length,
     latestSyncEvents: state.integrationSyncLog.slice(-20),
     deadLetterCount: (state.integrationDeadLetter || []).length,
-    deadLetter: (state.integrationDeadLetter || []).slice(-20)
+    deadLetter: (state.integrationDeadLetter || []).slice(-20),
+    recurringTasks: state.integrationRecurringTasks || []
   });
+}
+
+async function updateRecurringAutomation(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const body = await parseBody(req);
+  const key = String(body.key || '').trim();
+  if (!key) return sendJson(res, 400, { ok: false, message: 'key es requerido' });
+
+  const state = await readStore();
+  ensureIntegrationStructures(state);
+  const task = state.integrationRecurringTasks.find((t) => t.key === key);
+  if (!task) return sendJson(res, 404, { ok: false, message: 'tarea recurrente no encontrada' });
+  if (body.enabled !== undefined) task.enabled = Boolean(body.enabled);
+  if (body.frequency) task.frequency = String(body.frequency);
+  await writeStore(state);
+  await appendAudit('integrations.recurring.update', { key: task.key, enabled: task.enabled, frequency: task.frequency }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('integrations.recurring.update', { key: task.key, enabled: task.enabled, frequency: task.frequency }, auth.user.email);
+  return sendJson(res, 200, { ok: true, task });
+}
+
+async function runRecurringAutomations(req, res) {
+  const auth = await requireRoles(req, ['dueno', 'contador_admin']);
+  if (!auth.ok) return sendJson(res, auth.status, { ok: false, message: auth.message });
+  const state = await readStore();
+  ensureIntegrationStructures(state);
+  const tasks = state.integrationRecurringTasks.filter((t) => t.enabled);
+  const results = [];
+
+  for (const task of tasks) {
+    if (task.key === 'sync.mercadolibre.daily') {
+      const out = await runSyncWithRetry('mercadolibre', { provider: 'mercadolibre', maxAttempts: 2 }, auth.user.email);
+      task.lastRunAt = nowIso();
+      task.lastResult = out.ok ? 'ok' : `error: ${out.error}`;
+      results.push({ key: task.key, ok: out.ok, result: out });
+      continue;
+    }
+    if (task.key === 'sync.sii.daily') {
+      const out = await runSyncWithRetry('sii', { provider: 'sii', maxAttempts: 2, kind: 'ventas' }, auth.user.email);
+      task.lastRunAt = nowIso();
+      task.lastResult = out.ok ? 'ok' : `error: ${out.error}`;
+      results.push({ key: task.key, ok: out.ok, result: out });
+      continue;
+    }
+    if (task.key === 'close.reminder.monthly') {
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      task.lastRunAt = nowIso();
+      task.lastResult = `recordatorio generado para ${period}`;
+      results.push({ key: task.key, ok: true, result: { reminder: `Revisar checklist de cierre del período ${period} y ejecutar /periods/close-checklist.` } });
+    }
+  }
+
+  await writeStore(state);
+  await appendAudit('integrations.recurring.run', { executed: results.map((r) => ({ key: r.key, ok: r.ok })) }, auth.user.email);
+  if (isPostgresMode()) await appendAuditLog('integrations.recurring.run', { executed: results.map((r) => ({ key: r.key, ok: r.ok })) }, auth.user.email);
+  return sendJson(res, 200, { ok: true, executed: results.length, results, tasks: state.integrationRecurringTasks });
 }
 
 async function logSyncEvent(provider, result, importedAt) {
@@ -654,5 +719,7 @@ module.exports = {
   importMercadoLibre,
   importSii,
   runScheduledSync,
-  listDeadLetter
+  listDeadLetter,
+  updateRecurringAutomation,
+  runRecurringAutomations
 };

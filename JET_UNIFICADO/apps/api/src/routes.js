@@ -25,7 +25,9 @@ const {
   importMercadoLibre,
   importSii,
   runScheduledSync,
-  listDeadLetter
+  listDeadLetter,
+  updateRecurringAutomation,
+  runRecurringAutomations
 } = require('./modules/integrations');
 const {
   getBackupPolicy,
@@ -137,6 +139,8 @@ function route(req, res) {
   if (path === '/integrations/sii/import-rcv') return req.method === 'POST' ? handle(importSii(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/sync/run') return req.method === 'POST' ? handle(runScheduledSync(req, res), res) : methodNotAllowed(res);
   if (path === '/integrations/dead-letter' && req.method === 'GET') return handle(listDeadLetter(req, res), res);
+  if (path === '/integrations/recurring/config' && req.method === 'POST') return handle(updateRecurringAutomation(req, res), res);
+  if (path === '/integrations/recurring/run' && req.method === 'POST') return handle(runRecurringAutomations(req, res), res);
 
 
   if (path === '/backup/policy') {
