@@ -1631,6 +1631,21 @@
                 if (!db.config) db.config = {};
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
+                const movementYears = Array.from(new Set((db.movimientos || [])
+                    .map(m => new Date(m.fecha).getFullYear())
+                    .filter(y => Number.isFinite(y) && y > 2000))).sort((a, b) => a - b);
+                if (movementYears.length) {
+                    const hasDataForConfiguredYear = (db.movimientos || []).some(m => new Date(m.fecha).getFullYear() === Number(db.config.year));
+                    if (!hasDataForConfiguredYear) {
+                        const latestYear = movementYears[movementYears.length - 1];
+                        db.config.year = latestYear;
+                        const latestMonthMovs = (db.movimientos || [])
+                            .filter(m => new Date(m.fecha).getFullYear() === latestYear)
+                            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
+                        const latestMonth = latestMonthMovs.length ? new Date(latestMonthMovs[latestMonthMovs.length - 1].fecha).getMonth() : 0;
+                        db.config.selectedMonth = latestMonth;
+                    }
+                }
                 if (state.demoAuthToken) db.config.apiToken = state.demoAuthToken;
                 if (state.defaults && state.defaults.ppmRate !== undefined) db.config.ppmRate = state.defaults.ppmRate;
                 if (state.defaults && state.defaults.retentionRate !== undefined) db.config.retRate = state.defaults.retentionRate;
