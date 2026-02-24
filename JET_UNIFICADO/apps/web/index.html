@@ -1790,6 +1790,9 @@
             updateRetRate();
             applyTheme();
             updateUSD();
+            if (typeof taxSummaryCache !== 'undefined' && taxSummaryCache?.clear) taxSummaryCache.clear();
+            if (typeof backendAutoSyncedYears !== 'undefined' && backendAutoSyncedYears?.clear) backendAutoSyncedYears.clear();
+            if (typeof backendSyncDiagnostics !== 'undefined' && backendSyncDiagnostics?.clear) backendSyncDiagnostics.clear();
             save();
         }
 
@@ -1809,16 +1812,9 @@
             reader.readAsText(file);
         }
         async function loadDemoDataFromJson() {
-            try {
-                const payload = await apiClient.get('/system/demo-backup');
-                if (!payload || !payload.backup) throw new Error('Respuesta demo-backup inválida');
-                applyBackupObject(payload.backup);
-                alert(`Base demo JSON cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
-                return;
-            } catch (err) {
-                console.warn('Fallo carga JSON demo, se intentará endpoint runtime.', err.message);
-                await loadDemoDataFromBackend();
-            }
+            // En backend-first, la demo debe cargarse en backend para que F29/F22/SII cambien realmente.
+            // El endpoint demo-backup sólo muta estado local de UI y provoca desalineación.
+            await loadDemoDataFromBackend();
         }
 
         async function loadModuleDemo(moduleKey) {
@@ -1910,6 +1906,9 @@
                 return;
             }
             await bootstrapFromBackend();
+            taxSummaryCache.clear();
+            backendAutoSyncedYears.clear();
+            backendSyncDiagnostics.clear();
             save();
             alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
         }
