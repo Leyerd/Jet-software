@@ -2909,6 +2909,20 @@ calculateReports(yearMovs);
                 });
             }
 
+            if (String(health?.stats?.backendSource || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-108',
+                    message: `Origen backend detectado: ${health.stats.backendSource}. Cargado en: ${health.stats.backendMigratedAt || 'fecha no registrada'}.`
+                });
+            }
+
+            if (String(health?.stats?.backendSource || '').toLowerCase().includes('demo')) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-109',
+                    message: 'Se detectó fuente demo en backend. Esto explica valores precargados en 2026.'
+                });
+            }
+
             const syncDiag = backendSyncDiagnostics.get(Number(year));
             if (syncDiag && Number(syncDiag.failed || 0) > 0) {
                 const firstErr = syncDiag.errors && syncDiag.errors.length ? syncDiag.errors[0] : { code: 'TAX-UI-SYNC-UNK', message: 'sync_failed' };
