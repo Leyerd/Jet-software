@@ -1652,21 +1652,23 @@
                 const demoAllowed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-demo-enabled') === '1';
                 const preserveExisting = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-preserve-existing-data') === '1';
                 const alreadyAutocleaned = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1';
+                const enforceEmptyStartup = !demoAllowed && !preserveExisting;
                 const suspiciousGhostData = movementCount > 0 && (
                     (productCapital <= 0 && nonZeroAccounts === 0 && thirdParties.length === 0)
                     || (isDemoSource && !demoAllowed)
-                    || (!demoAllowed && !preserveExisting)
+                    || enforceEmptyStartup
                 ) && !alreadyAutocleaned;
 
                 if (suspiciousGhostData) {
                     try {
                         console.warn(`[JET] Detectado backend precargado al iniciar (movimientos=${movementCount}, source=${backendSource || 'N/D'}). Ejecutando auto-limpieza.`);
                         await apiClient.post('/system/reset-runtime-data', {});
-                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString() };
+                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString(), mode: 'auto_reset_startup' };
                         if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-autoclean-done', '1');
                         const cleanData = await apiClient.get('/system/frontend-state');
                         state = cleanData && cleanData.state ? cleanData.state : state;
                     } catch (resetErr) {
+                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString(), mode: 'auto_reset_failed', error: resetErr?.message || 'reset_failed' };
                         console.warn('No se pudo limpiar runtime backend automáticamente.', resetErr?.message || resetErr);
                     }
                 }
@@ -2941,6 +2943,19 @@ calculateReports(yearMovs);
                 diagnostics.push({
                     code: 'TAX-UI-DIAG-112',
                     message: `Se ejecutó auto-limpieza al iniciar: ${bootstrapAutoCleanInfo.detectedMovements} movimientos detectados en backend (${bootstrapAutoCleanInfo.backendSource || 'source desconocido'}).`
+                });
+            }
+
+            if (bootstrapAutoCleanInfo?.mode === 'auto_reset_startup') {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-113',
+                    message: 'Arranque en modo base vacía: se forzó reset runtime backend antes de mostrar módulos tributarios.'
+                });
+            }
+            if (bootstrapAutoCleanInfo?.mode === 'auto_reset_failed') {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-114',
+                    message: `Falló auto-reset de arranque: ${bootstrapAutoCleanInfo.error || 'error desconocido'}.`
                 });
             }
 
