@@ -1949,8 +1949,19 @@
             }
         }
 
-        function resetApp() {
-            if (confirm('¿Reiniciar todo? Se perderán datos.')) {
+        async function resetApp() {
+            if (!confirm('¿Reiniciar todo? Se perderán datos.')) return;
+            try {
+                await apiClient.post('/system/reset-runtime-data', {});
+                if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('jet-autoclean-done');
+                taxSummaryCache.clear();
+                backendAutoSyncedYears.clear();
+                backendSyncDiagnostics.clear();
+                await bootstrapFromBackend();
+                save();
+                alert('Base reiniciada en backend y frontend.');
+            } catch (err) {
+                alert(`No se pudo reiniciar backend automáticamente: ${err?.message || err}. Se recargará la interfaz.`);
                 location.reload();
             }
         }
