@@ -175,12 +175,329 @@ function getTaxIva(movement, tipoNormalized) {
   return 0;
 }
 
+function hasTaxRelevantAmount(movement, tipoNormalized = getTaxTipo(movement)) {
+  const total = Number(movement?.total ?? movement?.monto ?? 0);
+  const neto = Number(movement?.neto || 0);
+  const iva = Number(movement?.iva || 0);
+  const retention = Number(movement?.retention || 0);
+
+  if (['VENTA', 'GASTO_LOCAL', 'IMPORTACION', 'COMISION_MARKETPLACE', 'HONORARIOS'].includes(tipoNormalized)) {
+    return [total, neto, iva, retention].some((v) => Number.isFinite(v) && v > 0);
+  }
+  if (tipoNormalized === 'RETIRO') return Number.isFinite(total) && total > 0;
+  return [total, neto, iva, retention].some((v) => Number.isFinite(v) && v > 0);
+}
+
 function isAcceptedForTax(movement) {
-  if (!movement || movement.accepted === undefined || movement.accepted === null) return true;
+  if (!movement) return false;
+  const tipoNormalized = getTaxTipo(movement);
+  if (!hasTaxRelevantAmount(movement, tipoNormalized)) return false;
+  if (movement.accepted === undefined || movement.accepted === null) return true;
   if (typeof movement.accepted === 'boolean') return movement.accepted;
   if (typeof movement.accepted === 'number') return movement.accepted !== 0;
   const normalized = String(movement.accepted).trim().toLowerCase();
   return !['false', '0', 'no', 'rechazado'].includes(normalized);
+}
+
+function parseMovementDate(value) {
+  if (!value) return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const native = new Date(raw);
+  if (!Number.isNaN(native.getTime())) return native;
+
+  const slashMatch = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashMatch) {
+    const [, d, m, y] = slashMatch;
+    const fallback = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  const dashMatch = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dashMatch) {
+    const [, d, m, y] = dashMatch;
+    const fallback = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  const compactMatch = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compactMatch) {
+    const [, y, m, d] = compactMatch;
+    const fallback = new Date(`${y}-${m}-${d}`);
+    if (!Number.isNaN(fallback.getTime())) return fallback;
+  }
+
+  return null;
+}
+
+function filterYearMovementsByDate(movements, year) {
+  let invalidDateCount = 0;
+  const yearMovs = (movements || []).filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    if (!movementDate) {
+      invalidDateCount += 1;
+      return false;
+    }
+    return movementDate.getFullYear() === Number(year);
+  });
+  return { yearMovs, invalidDateCount };
+}
+
+function extractAvailableYears(movements) {
+  const years = new Set();
+  (movements || []).forEach((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    if (movementDate) years.add(movementDate.getFullYear());
+  });
+  return Array.from(years).sort((a, b) => a - b);
+}
+
+async function loadRuntimeMetaFromDb() {
+  return withPgClient(async (client) => {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS runtime_fragments (
+        key TEXT PRIMARY KEY,
+        value JSONB NOT NULL,
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    const rs = await client.query("SELECT key, value FROM runtime_fragments WHERE key IN ('source','migratedAt')");
+    const meta = { source: null, migratedAt: null };
+    for (const row of rs.rows || []) {
+      if (row.key === 'source') meta.source = typeof row.value === 'string' ? row.value : (row.value ?? null);
+      if (row.key === 'migratedAt') meta.migratedAt = typeof row.value === 'string' ? row.value : (row.value ?? null);
+    }
+    return meta;
+  });
+}
+
+function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [], rliComponents = null, runtimeMeta = {}, allMovements = [] }) {
+  const diagnostics = [];
+  const hasYearData = yearMovs.length > 0;
+  const hasMonthData = monthMovs.length > 0;
+
+  if (invalidDateCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-003',
+      severity: 'critical',
+      reason: 'MOVEMENT_DATE_PARSE_ERROR',
+      message: `Hay ${invalidDateCount} movimientos con fecha inválida y no entran en F29/F22.`
+    });
+  }
+
+  if (!hasYearData) {
+    diagnostics.push({
+      code: 'TAX-DIAG-001',
+      severity: 'critical',
+      reason: 'NO_MOVEMENTS_FOR_YEAR',
+      message: `No existen movimientos tributarios para el año ${year}.`
+    });
+  }
+
+  if (!hasYearData && totalMovements === 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-006',
+      severity: 'critical',
+      reason: 'BACKEND_STORAGE_EMPTY',
+      message: 'No existen movimientos en el backend. Posible desfase por migración desde frontend local a backend.'
+    });
+  }
+
+  if (!hasYearData && totalMovements > 0 && Array.isArray(availableYears) && availableYears.length > 0) {
+    const minY = Math.min(...availableYears);
+    const maxY = Math.max(...availableYears);
+    diagnostics.push({
+      code: 'TAX-DIAG-007',
+      severity: 'warning',
+      reason: 'YEAR_WITHOUT_DATA_IN_BACKEND',
+      message: `El backend tiene movimientos, pero no para ${year}. Años disponibles: ${minY}-${maxY}.`
+    });
+  }
+
+  if (hasYearData && !hasMonthData) {
+    diagnostics.push({
+      code: 'TAX-DIAG-002',
+      severity: 'warning',
+      reason: 'NO_MOVEMENTS_FOR_MONTH',
+      message: `No existen movimientos para el mes ${month} del año ${year}.`
+    });
+  }
+
+  if (Number(cfg?.year || year) !== Number(year)) {
+    diagnostics.push({
+      code: 'TAX-DIAG-004',
+      severity: 'warning',
+      reason: 'CONFIG_YEAR_MISMATCH',
+      message: `La configuración tributaria está en ${cfg?.year}, pero el resumen se pidió para ${year}.`
+    });
+  }
+
+
+  const rli = Number(rliComponents?.rli || 0);
+  const ventasNetas = Number(rliComponents?.ventasNetas || 0);
+  const costos = Number(rliComponents?.costos || 0);
+  const gastos = Number(rliComponents?.gastos || 0);
+
+  if (rli < 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-008',
+      severity: 'warning',
+      reason: 'NEGATIVE_RLI_LOSS',
+      message: `La RLI anual está negativa (${Math.round(rli).toLocaleString('es-CL')}). Corresponde a pérdida tributaria del período.`
+    });
+  }
+
+  if (ventasNetas <= 0 && (costos > 0 || gastos > 0)) {
+    diagnostics.push({
+      code: 'TAX-DIAG-009',
+      severity: 'warning',
+      reason: 'NO_TAXABLE_SALES_WITH_EXPENSES',
+      message: 'No hay ventas netas tributarias en el año, pero sí costos/gastos. Verifica clasificación de movimientos y año activo.'
+    });
+  }
+  const importacionesNetas = Number(rliComponents?.importacionesNetas || 0);
+  const importacionesYearCount = yearMovs.filter((m) => getTaxTipo(m) === 'IMPORTACION' && isAcceptedForTax(m)).length;
+  const importacionesIvaCredito = Math.round(yearMovs
+    .filter((m) => getTaxTipo(m) === 'IMPORTACION' && isAcceptedForTax(m))
+    .reduce((a, b) => a + getTaxIva(b, 'IMPORTACION'), 0));
+
+  if (rli < 0 && importacionesNetas > 0 && ventasNetas > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-010',
+      severity: 'warning',
+      reason: 'INVENTORY_RECOGNITION_APPLIED',
+      message: 'Se detectan importaciones/compras de inventario en el año. En RLI se excluyen de gasto y se reconoce CMV solo en ventas.'
+    });
+  }
+
+  if (importacionesYearCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-011',
+      severity: 'warning',
+      reason: 'IMPORTS_TAX_TREATMENT_TRACE',
+      message: `Hay ${importacionesYearCount} importaciones aceptadas. Se usan para crédito IVA F29 (IVA ${importacionesIvaCredito.toLocaleString('es-CL')}) y no como gasto directo en RLI/F22.`
+    });
+  }
+
+  const zeroAmountAcceptedCount = yearMovs.filter((m) => {
+    const tipo = getTaxTipo(m);
+    if (tipo !== 'IMPORTACION') return false;
+    const acceptedFlag = m?.accepted === undefined || m?.accepted === null ? true : isAcceptedForTax(m);
+    return acceptedFlag && !hasTaxRelevantAmount(m, tipo);
+  }).length;
+  if (zeroAmountAcceptedCount > 0) {
+    diagnostics.push({
+      code: 'TAX-DIAG-013',
+      severity: 'warning',
+      reason: 'ZERO_AMOUNT_IMPORT_ROWS',
+      message: `Se detectaron ${zeroAmountAcceptedCount} importaciones con monto/neto/iva en 0. Se excluyen del cálculo tributario por posible dato fantasma o apertura incompleta.`
+    });
+  }
+
+  if (!hasYearData && totalMovements > 0 && Array.isArray(availableYears) && availableYears.length > 0) {
+    const nearestYear = availableYears.reduce((acc, y) => {
+      if (acc === null) return y;
+      return Math.abs(Number(y) - Number(year)) < Math.abs(Number(acc) - Number(year)) ? y : acc;
+    }, null);
+    diagnostics.push({
+      code: 'TAX-DIAG-012',
+      severity: 'warning',
+      reason: 'PERIOD_SELECTION_OUT_OF_RANGE',
+      message: `El período ${year} no tiene movimientos en backend. Año más cercano con datos: ${nearestYear}.`
+    });
+  }
+
+
+  const backendSource = runtimeMeta?.source || null;
+  const backendMigratedAt = runtimeMeta?.migratedAt || null;
+  const universe = Array.isArray(allMovements) && allMovements.length ? allMovements : yearMovs;
+  const typeBreakdown = universe.reduce((acc, m) => {
+    const t = getTaxTipo(m) || 'UNKNOWN';
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const knownDates = universe.map((m) => parseMovementDate(m?.fecha)).filter(Boolean);
+  const minMovementDate = knownDates.length ? knownDates.reduce((a, b) => (a < b ? a : b)).toISOString().slice(0, 10) : null;
+  const maxMovementDate = knownDates.length ? knownDates.reduce((a, b) => (a > b ? a : b)).toISOString().slice(0, 10) : null;
+  if (totalMovements > 0 && backendSource) {
+    diagnostics.push({
+      code: 'TAX-DIAG-014',
+      severity: 'warning',
+      reason: 'BACKEND_DATA_SOURCE_TRACE',
+      message: `El backend ya tenía ${totalMovements} movimientos cargados. Fuente registrada: ${backendSource}.`
+    });
+  }
+  if (totalMovements > 0 && String(backendSource || '').toLowerCase().includes('demo')) {
+    diagnostics.push({
+      code: 'TAX-DIAG-015',
+      severity: 'warning',
+      reason: 'DEMO_SEED_DETECTED',
+      message: 'Se detecta fuente de datos demo en backend. Si esperabas base vacía, ejecuta reset runtime.'
+    });
+  }
+
+  if (totalMovements > 0 && !backendSource) {
+    diagnostics.push({
+      code: 'TAX-DIAG-016',
+      severity: 'warning',
+      reason: 'BACKEND_MOVEMENTS_WITHOUT_SOURCE_META',
+      message: `El backend tiene ${totalMovements} movimientos sin metadata de origen (source=null). Posible carga operativa previa o importación histórica.`
+    });
+  }
+
+  if (totalMovements > 0) {
+    const topTypes = Object.entries(typeBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(', ');
+    diagnostics.push({
+      code: 'TAX-DIAG-017',
+      severity: 'warning',
+      reason: 'BACKEND_MOVEMENT_FOOTPRINT',
+      message: `Huella backend movimientos=${totalMovements}. Tipos: ${topTypes || 'N/D'}. Rango fechas: ${minMovementDate || 'N/D'}→${maxMovementDate || 'N/D'}.`
+    });
+  }
+
+  if (!['14D8', '14D3'].includes(String(cfg?.regime || ''))) {
+    diagnostics.push({
+      code: 'TAX-DIAG-005',
+      severity: 'critical',
+      reason: 'INVALID_REGIME_CONFIG',
+      message: `Régimen inválido detectado (${cfg?.regime || 'N/D'}).`
+    });
+  }
+
+  return {
+    status: diagnostics.some((d) => d.severity === 'critical') ? 'error' : diagnostics.length ? 'warning' : 'ok',
+    diagnostics,
+    stats: {
+      requestedYear: year,
+      requestedMonth: month,
+      configuredYear: Number(cfg?.year || year),
+      configuredRegime: cfg?.regime || '14D8',
+      movementsInYear: yearMovs.length,
+      movementsInMonth: monthMovs.length,
+      invalidDateCount,
+      totalMovements,
+      availableYears,
+      rli: Math.round(rli),
+      ventasNetas: Math.round(ventasNetas),
+      costos: Math.round(costos),
+      gastos: Math.round(gastos),
+      importacionesNetas: Math.round(importacionesNetas),
+      importacionesYearCount,
+      importacionesIvaCredito,
+      zeroAmountAcceptedCount,
+      backendSource,
+      backendMigratedAt,
+      movementTypeBreakdown: typeBreakdown,
+      minMovementDate,
+      maxMovementDate
+    }
+  };
 }
 
 function computeMonthlyF29(movs, config, catalog) {
@@ -226,11 +543,23 @@ function computeMonthlyF29(movs, config, catalog) {
 }
 
 function computeYearlyRli(movs, catalog) {
-  const ventasNetas = movs.filter(m => getTaxTipo(m) === 'VENTA').reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
-  const costos = movs.filter(isAcceptedForTax).reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
-  const gastos = movs
-    .filter(m => ['GASTO_LOCAL', 'HONORARIOS', 'IMPORTACION', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)) && isAcceptedForTax(m))
+  const accepted = movs.filter(isAcceptedForTax);
+  const ventas = accepted.filter((m) => getTaxTipo(m) === 'VENTA');
+  const ventasNetas = ventas.reduce((a, b) => a + getTaxNeto(b, 'VENTA'), 0);
+
+  // CMV: solo se reconoce por ventas efectivamente realizadas (costoMercaderia en movimientos de VENTA).
+  const costos = ventas.reduce((a, b) => a + Number(b.costoMercaderia || b.costo_mercaderia || 0), 0);
+
+  // Bajo esquema con control de inventario, IMPORTACION/COMPRA de inventario no se lleva directo a gasto,
+  // sino a costo vía CMV al vender. Evita doble castigo de RLI.
+  const gastos = accepted
+    .filter((m) => ['GASTO_LOCAL', 'HONORARIOS', 'COMISION_MARKETPLACE'].includes(getTaxTipo(m)))
     .reduce((a, b) => a + getTaxNeto(b, getTaxTipo(b)), 0);
+
+  const importacionesNetas = accepted
+    .filter((m) => getTaxTipo(m) === 'IMPORTACION')
+    .reduce((a, b) => a + getTaxNeto(b, 'IMPORTACION'), 0);
+
   const rli = ventasNetas - costos - gastos;
 
   return {
@@ -238,6 +567,7 @@ function computeYearlyRli(movs, catalog) {
       ventasNetas: Math.round(ventasNetas),
       costos: Math.round(costos),
       gastos: Math.round(gastos),
+      importacionesNetas: Math.round(importacionesNetas),
       rli: Math.round(rli)
     },
     ddjjBase: {
@@ -402,6 +732,11 @@ async function getTaxSummary(req, res) {
 
   let cfg;
   let yearMovs;
+  let invalidDateCount = 0;
+  let totalMovements = 0;
+  let availableYears = [];
+  let runtimeMeta = { source: null, migratedAt: null };
+  let allMovements = [];
 
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
@@ -425,23 +760,39 @@ async function getTaxSummary(req, res) {
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
-         FROM movimientos
-         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
-        [year]
+         FROM movimientos`
       );
       return rs.rows;
     });
+    allMovements = Array.isArray(yearMovs) ? [...yearMovs] : [];
+    totalMovements = Array.isArray(yearMovs) ? yearMovs.length : 0;
+    availableYears = extractAvailableYears(yearMovs);
+    runtimeMeta = await loadRuntimeMetaFromDb();
+    const filtered = filterYearMovementsByDate(yearMovs, year);
+    yearMovs = filtered.yearMovs;
+    invalidDateCount = filtered.invalidDateCount;
   } else {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
-    yearMovs = (state.movimientos || []).filter(m => new Date(m.fecha).getFullYear() === year);
+    const baseMovs = Array.isArray(state.movimientos) ? state.movimientos : [];
+    allMovements = [...baseMovs];
+    totalMovements = baseMovs.length;
+    availableYears = extractAvailableYears(baseMovs);
+    runtimeMeta = { source: state.source || null, migratedAt: state.migratedAt || null };
+    const filtered = filterYearMovementsByDate(baseMovs, year);
+    yearMovs = filtered.yearMovs;
+    invalidDateCount = filtered.invalidDateCount;
   }
 
   const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
-  const monthMovs = yearMovs.filter(m => (new Date(m.fecha).getMonth() + 1) === month);
+  const monthMovs = yearMovs.filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    return movementDate && (movementDate.getMonth() + 1) === month;
+  });
 
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
+  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears, rliComponents: rli.components, runtimeMeta, allMovements });
   const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
   const altCatalog = getCatalog(cfg.year || year, cfg.regime === '14D8' ? '14D3' : '14D8');
   const alternativeRegime = computeF22ByRegime(rli.components.rli, cfg.regime === '14D8' ? '14D3' : '14D8', altCatalog);
@@ -459,6 +810,7 @@ async function getTaxSummary(req, res) {
       normativeLegalBasis: catalog.legalBasis,
       normativeCertification: catalog.certification
     },
+    dataHealth,
     f29,
     f22: {
       rli,
@@ -504,20 +856,23 @@ async function getTaxExplainability(req, res) {
                 COALESCE(costo_mercaderia, 0) AS "costoMercaderia",
                 COALESCE(accepted, TRUE) AS accepted,
                 document_ref AS "documentRef"
-         FROM movimientos
-         WHERE (COALESCE(fecha::text, '') LIKE ($1::text || '%') OR COALESCE(fecha::text, '') ~ ('(^|[^0-9])' || $1::text || '([^0-9]|$)'))`,
-        [year]
+         FROM movimientos`
       );
       return rs.rows;
     });
+    const filtered = filterYearMovementsByDate(yearMovs, year);
+    yearMovs = filtered.yearMovs;
   } else {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
-    yearMovs = (state.movimientos || []).filter((m) => new Date(m.fecha).getFullYear() === year);
+    yearMovs = filterYearMovementsByDate(state.movimientos || [], year).yearMovs;
   }
 
   const catalog = getCatalog(cfg.year || year, cfg.regime || '14D8');
-  const monthMovs = yearMovs.filter((m) => (new Date(m.fecha).getMonth() + 1) === month);
+  const monthMovs = yearMovs.filter((m) => {
+    const movementDate = parseMovementDate(m?.fecha);
+    return movementDate && (movementDate.getMonth() + 1) === month;
+  });
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
   const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);

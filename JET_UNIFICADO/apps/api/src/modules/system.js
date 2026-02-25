@@ -126,19 +126,40 @@ async function getFrontendState(_req, res) {
     const state = await withPgClient(async (client) => {
       await client.query("CREATE TABLE IF NOT EXISTS usuarios (id BIGSERIAL PRIMARY KEY, nombre TEXT, email TEXT UNIQUE, rol TEXT, password_hash TEXT, creado_en TIMESTAMP DEFAULT NOW())");
       await client.query("CREATE TABLE IF NOT EXISTS sesiones (id BIGSERIAL PRIMARY KEY, usuario_id BIGINT, token TEXT UNIQUE, creado_en TIMESTAMP DEFAULT NOW(), expira_en TIMESTAMP, revocada BOOLEAN DEFAULT FALSE, revocada_en TIMESTAMP, revocada_por TEXT)");
-      const [productsRs, movementsRs, taxRs, sessionRs] = await Promise.all([
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS runtime_fragments (
+          key TEXT PRIMARY KEY,
+          value JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      const [productsRs, movementsRs, taxRs, sessionRs, metaRs] = await Promise.all([
         client.query('SELECT id, sku, nombre, categoria, costo_promedio AS "costoPromedio", stock FROM productos ORDER BY id ASC LIMIT 5000'),
         client.query('SELECT id, fecha, tipo, descripcion, total, neto, iva FROM movimientos ORDER BY fecha ASC, id ASC LIMIT 10000'),
         client.query('SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate" FROM tax_config ORDER BY id DESC LIMIT 1'),
-        client.query("SELECT s.token FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE u.email = 'dueno@demo.cl' AND s.revocada IS DISTINCT FROM TRUE ORDER BY s.creado_en DESC LIMIT 1")
+        client.query("SELECT s.token FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE u.email = 'dueno@demo.cl' AND s.revocada IS DISTINCT FROM TRUE ORDER BY s.creado_en DESC LIMIT 1"),
+        client.query("SELECT key, value FROM runtime_fragments WHERE key IN ('source','migratedAt','flujoCaja','cuentas')")
       ]);
       const taxConfig = taxRs.rows[0] || { year: new Date().getFullYear(), regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
       const catalog = getCatalog(taxConfig.year, taxConfig.regime);
+      const runtimeMeta = { source: null, migratedAt: null, cashflows: [], accounts: null };
+      for (const row of metaRs.rows || []) {
+        if (row.key === 'source') runtimeMeta.source = typeof row.value === 'string' ? row.value : (row.value ?? null);
+        if (row.key === 'migratedAt') runtimeMeta.migratedAt = typeof row.value === 'string' ? row.value : (row.value ?? null);
+        if (row.key === 'flujoCaja') runtimeMeta.cashflows = Array.isArray(row.value) ? row.value : [];
+        if (row.key === 'cuentas') runtimeMeta.accounts = Array.isArray(row.value) ? row.value : null;
+      }
+      const accountRows = runtimeMeta.accounts && runtimeMeta.accounts.length
+        ? runtimeMeta.accounts
+        : (await client.query('SELECT id, codigo, nombre, tipo, saldo FROM cuentas ORDER BY id ASC LIMIT 1000')).rows.map((c) => ({ id: c.codigo || String(c.id), nombre: c.nombre, tipo: c.tipo, saldo: Number(c.saldo || 0) }));
       return {
         backendFirst: true,
+        source: runtimeMeta.source,
+        migratedAt: runtimeMeta.migratedAt,
         products: productsRs.rows,
         movements: movementsRs.rows,
-        accounts: (await client.query('SELECT id, codigo, nombre, tipo, saldo FROM cuentas ORDER BY id ASC LIMIT 1000')).rows.map((c) => ({ id: c.codigo || String(c.id), nombre: c.nombre, tipo: c.tipo, saldo: Number(c.saldo || 0) })),
+        accounts: accountRows,
+        cashflows: runtimeMeta.cashflows,
         thirdParties: (await client.query('SELECT id, rut, nombre, tipo FROM terceros ORDER BY id ASC LIMIT 2000')).rows.map((t) => ({ id: t.rut || String(t.id), rut: t.rut, nombre: t.nombre, tipo: t.tipo })),
         taxConfig,
         defaults: {
@@ -161,10 +182,13 @@ async function getFrontendState(_req, res) {
     ok: true,
     state: {
       backendFirst: true,
+      source: store.source || null,
+      migratedAt: store.migratedAt || null,
       products: store.productos || [],
       movements: store.movimientos || [],
       accounts: store.cuentas || [],
       thirdParties: store.terceros || [],
+      cashflows: store.flujoCaja || [],
       taxConfig,
       defaults: {
         regime: '14D8',
@@ -213,6 +237,51 @@ async function loadDemoData(_req, res) {
   let demoAuthToken = null;
 
   if (isPostgresMode()) {
+    await withPgClient(async (client) => {
+      await client.query('BEGIN');
+      try {
+        await client.query('CREATE TABLE IF NOT EXISTS productos (id BIGSERIAL PRIMARY KEY, sku TEXT, nombre TEXT, categoria TEXT, costo_promedio NUMERIC(18,2) DEFAULT 0, stock NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS movimientos (id BIGSERIAL PRIMARY KEY, fecha TEXT, tipo TEXT, descripcion TEXT, total NUMERIC(18,2) DEFAULT 0, neto NUMERIC(18,2) DEFAULT 0, iva NUMERIC(18,2) DEFAULT 0, producto_id BIGINT, cantidad NUMERIC(18,2) DEFAULT 0, costo_mercaderia NUMERIC(18,2) DEFAULT 0, retention NUMERIC(18,2) DEFAULT 0, accepted BOOLEAN DEFAULT TRUE, cuenta_id TEXT, n_doc TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS terceros (id BIGSERIAL PRIMARY KEY, rut TEXT, nombre TEXT, tipo TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS cuentas (id BIGSERIAL PRIMARY KEY, codigo TEXT, nombre TEXT, tipo TEXT, saldo NUMERIC(18,2) DEFAULT 0)');
+        await client.query('TRUNCATE TABLE movimientos, productos, terceros, cuentas RESTART IDENTITY CASCADE');
+
+        for (const p of demo.state.productos || []) {
+          await client.query('INSERT INTO productos (sku, nombre, categoria, costo_promedio, stock) VALUES ($1,$2,$3,$4,$5)', [p.sku || null, p.nombre || null, p.categoria || null, Number(p.costoPromedio || p.costo_promedio || 0), Number(p.stock || 0)]);
+        }
+        for (const m of demo.state.movimientos || []) {
+          await client.query(
+            `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, producto_id, cantidad, costo_mercaderia, retention, accepted, cuenta_id, n_doc)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [
+              m.fecha || null,
+              m.tipo || null,
+              m.descripcion || m.desc || null,
+              Number(m.total || 0),
+              Number(m.neto || 0),
+              Number(m.iva || 0),
+              m.prodId ? Number(m.prodId) : null,
+              Number(m.cant || 0),
+              Number(m.costoMercaderia || 0),
+              Number(m.retention || 0),
+              m.accepted === false ? false : true,
+              m.cuentaId || null,
+              m.nDoc || null
+            ]
+          );
+        }
+        for (const t of demo.state.terceros || []) {
+          await client.query('INSERT INTO terceros (rut, nombre, tipo) VALUES ($1,$2,$3)', [t.rut || null, t.nombre || null, t.tipo || null]);
+        }
+        for (const c of demo.state.cuentas || []) {
+          await client.query('INSERT INTO cuentas (codigo, nombre, tipo, saldo) VALUES ($1,$2,$3,$4)', [c.id || c.codigo || null, c.nombre || null, c.tipo || null, Number(c.saldo || 0)]);
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    });
     await writeStore(demo.state);
     demoAuthToken = await ensureDemoSessionInPostgres();
   } else {
@@ -228,6 +297,46 @@ async function loadDemoData(_req, res) {
   });
 }
 
+
+async function resetRuntimeData(_req, res) {
+  try {
+    if (isPostgresMode()) {
+      await withPgClient(async (client) => {
+        await client.query('CREATE TABLE IF NOT EXISTS movimientos (id BIGSERIAL PRIMARY KEY, fecha TEXT, tipo TEXT, descripcion TEXT, total NUMERIC(18,2) DEFAULT 0, neto NUMERIC(18,2) DEFAULT 0, iva NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS productos (id BIGSERIAL PRIMARY KEY, sku TEXT, nombre TEXT, categoria TEXT, costo_promedio NUMERIC(18,2) DEFAULT 0, stock NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS terceros (id BIGSERIAL PRIMARY KEY, rut TEXT, nombre TEXT, tipo TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS cuentas (id BIGSERIAL PRIMARY KEY, codigo TEXT, nombre TEXT, tipo TEXT, saldo NUMERIC(18,2) DEFAULT 0)');
+        await client.query('TRUNCATE TABLE movimientos, productos, terceros, cuentas RESTART IDENTITY CASCADE');
+        await client.query("DELETE FROM runtime_fragments WHERE key IN ('movimientos','productos','terceros','cuentas','flujoCaja','asientos','asientoLineas','auditLog','source','migratedAt')");
+        await client.query("INSERT INTO runtime_fragments (key, value, updated_at) VALUES ('movimientos','[]'::jsonb,NOW()),('productos','[]'::jsonb,NOW()),('terceros','[]'::jsonb,NOW()),('cuentas','[]'::jsonb,NOW()),('flujoCaja','[]'::jsonb,NOW()),('asientos','[]'::jsonb,NOW()),('asientoLineas','[]'::jsonb,NOW()),('auditLog','[]'::jsonb,NOW()),('source','null'::jsonb,NOW()),('migratedAt','null'::jsonb,NOW()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()");
+      });
+      return sendJson(res, 200, { ok: true, code: 'TAX-RESET-000', message: 'Runtime backend reiniciado en limpio (Postgres).' });
+    }
+
+    const state = await readStore();
+    state.productos = [];
+    state.movimientos = [];
+    state.cuentas = [];
+    state.terceros = [];
+    state.flujoCaja = [];
+    state.asientos = [];
+    state.asientoLineas = [];
+    state.auditLog = [];
+    state.source = null;
+    state.migratedAt = null;
+    await writeStore(state);
+    return sendJson(res, 200, { ok: true, code: 'TAX-RESET-000', message: 'Runtime backend reiniciado en limpio (file-store).' });
+  } catch (err) {
+    return sendJson(res, 500, {
+      ok: false,
+      code: 'TAX-RESET-001',
+      message: `No se pudo reiniciar runtime backend: ${err?.message || 'reset_failed'}`,
+      detail: err?.code || null
+    });
+  }
+}
+
+
 async function shutdownSystem(_req, res) {
   sendJson(res, 200, { ok: true, message: 'Apagado solicitado. Cerrando proceso JET...' });
   setTimeout(() => {
@@ -235,4 +344,4 @@ async function shutdownSystem(_req, res) {
   }, 120);
 }
 
-module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem };
+module.exports = { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, resetRuntimeData, shutdownSystem };

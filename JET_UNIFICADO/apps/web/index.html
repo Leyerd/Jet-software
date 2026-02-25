@@ -472,6 +472,7 @@
                         <b>[89] A Pagar:</b> (Débito - Crédito - Remanente) + Retenciones + PPM.
                     </p>
                 </div>
+                <div id="tax-diagnostics-f29" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="card overflow-hidden transition-colors border-none shadow-2xl">
                     <table class="w-full text-sm">
                         <thead class="bg-slate-950 text-white font-black text-[9px] uppercase tracking-[0.2em]">
@@ -543,6 +544,7 @@
                         Esta tabla calcula tu utilidad tributaria bajo un esquema <b id="f22-regime-disclaimer">ProPyme Transparente (14 D8)</b> con control de inventario (CMV). Incluye PPM pagados; en 14D8 la utilidad se atribuye al dueño y no genera IDPC en la empresa.
                     </p>
                 </div>
+                <div id="tax-diagnostics-f22" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="max-w-3xl mx-auto card p-14 bg-white dark:bg-slate-900 border-2 border-slate-950 dark:border-blue-900 shadow-2xl">
                     <div class="text-center pb-12 border-b-2 border-slate-100 dark:border-slate-800">
                         <h3 class="text-3xl font-black text-slate-950 dark:text-white tracking-tighter">Base Imponible Tributaria</h3>
@@ -605,6 +607,7 @@
                     <h4 class="text-xs font-black text-blue-600 dark:text-blue-400 uppercase mb-1">¿Cuándo, dónde y cómo declarar?</h4>
                     <p class="text-[11px] text-slate-600 dark:text-slate-300">Módulo profesional para estimar carga tributaria del dueño según régimen (<b id="owner-regime-chip">14D8</b>), consolidar créditos y preparar la declaración en SII.</p>
                 </div>
+                <div id="tax-diagnostics-owner" class="hidden text-xs font-bold rounded-2xl border px-4 py-3"></div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div class="card p-6 border-l-4 border-sky-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Base tributable dueño</p><h3 id="owner-tax-base" class="text-2xl font-black text-sky-600">$ 0</h3></div>
                     <div class="card p-6 border-l-4 border-amber-500"><p class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">IGC determinado</p><h3 id="owner-tax-gross" class="text-2xl font-black text-amber-600">$ 0</h3></div>
@@ -1585,6 +1588,13 @@
             return tokenBootstrapPromise;
         }
 
+        function createClientError(code, message, meta = {}) {
+            const err = new Error(message || code);
+            err.code = code;
+            err.meta = meta;
+            return err;
+        }
+
         const apiClient = {
             async request(path, options = {}) {
                 if (!db.config?.apiToken) await ensureApiTokenFromBackend();
@@ -1592,10 +1602,15 @@
 
                 const doFetch = async () => {
                     const authHeader = db.config && db.config.apiToken ? { Authorization: `Bearer ${db.config.apiToken}` } : {};
-                    const response = await fetch(target, {
-                        headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
-                        ...options
-                    });
+                    let response;
+                    try {
+                        response = await fetch(target, {
+                            headers: { 'Content-Type': 'application/json', ...authHeader, ...(options.headers || {}) },
+                            ...options
+                        });
+                    } catch (fetchErr) {
+                        throw createClientError('TAX-UI-API-001', `No se pudo conectar al backend (${target}).`, { path, cause: fetchErr?.message || 'fetch_failed' });
+                    }
                     let payload = null;
                     try { payload = await response.json(); } catch (e) { payload = null; }
                     return { response, payload };
@@ -1610,8 +1625,9 @@
                 }
 
                 if (!response.ok || (payload && payload.ok === false)) {
+                    const backendCode = payload?.code || payload?.errorCode || payload?.dataHealth?.diagnostics?.[0]?.code || `HTTP-${response.status}`;
                     const msg = (payload && (payload.message || payload.error)) || `HTTP ${response.status}`;
-                    throw new Error(msg);
+                    throw createClientError(`TAX-UI-API-${backendCode}`, msg, { status: response.status, path });
                 }
                 return payload;
             },
@@ -1622,27 +1638,72 @@
         async function bootstrapFromBackend() {
             try {
                 const data = await apiClient.get('/system/frontend-state');
-                const state = data && data.state ? data.state : null;
+                let state = data && data.state ? data.state : null;
                 if (!state) return;
+
+                const movementCount = Array.isArray(state.movements) ? state.movements.length : 0;
+                const products = Array.isArray(state.products) ? state.products : [];
+                const thirdParties = Array.isArray(state.thirdParties) ? state.thirdParties : [];
+                const accounts = Array.isArray(state.accounts) ? state.accounts : [];
+                const productCapital = products.reduce((acc, p) => acc + (Number(p?.stock || 0) * Number(p?.costoPromedio || p?.costo_promedio || 0)), 0);
+                const nonZeroAccounts = accounts.filter((a) => Math.abs(Number(a?.saldo || 0)) > 0).length;
+                const backendSource = String(state?.source || '').toLowerCase();
+                const isDemoSource = backendSource.includes('seed-demo') || backendSource.includes('demo');
+                const demoAllowed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-demo-enabled') === '1';
+                const preserveExisting = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-preserve-existing-data') === '1';
+                const alreadyAutocleaned = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1';
+                const enforceEmptyStartup = !demoAllowed && !preserveExisting;
+                const suspiciousPattern = movementCount > 0 && (
+                    (productCapital <= 0 && nonZeroAccounts === 0 && thirdParties.length === 0)
+                    || (isDemoSource && !demoAllowed)
+                    || enforceEmptyStartup
+                );
+                // Si todavía hay movimientos en backend, reintentar limpieza aunque exista marca previa de auto-clean.
+                // Evita quedarse bloqueado por una marca stale en sessionStorage.
+                const suspiciousGhostData = suspiciousPattern && (!alreadyAutocleaned || movementCount > 0);
+
+                if (suspiciousGhostData) {
+                    try {
+                        console.warn(`[JET] Detectado backend precargado al iniciar (movimientos=${movementCount}, source=${backendSource || 'N/D'}). Ejecutando auto-limpieza.`);
+                        await apiClient.post('/system/reset-runtime-data', {});
+                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString(), mode: 'auto_reset_startup' };
+                        if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-autoclean-done', '1');
+                        const cleanData = await apiClient.get('/system/frontend-state');
+                        state = cleanData && cleanData.state ? cleanData.state : state;
+                    } catch (resetErr) {
+                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString(), mode: 'auto_reset_failed', error: resetErr?.message || 'reset_failed' };
+                        console.warn('No se pudo limpiar runtime backend automáticamente.', resetErr?.message || resetErr);
+                    }
+                }
                 db.productos = Array.isArray(state.products) ? state.products : db.productos;
                 db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
-                db.cuentas = Array.isArray(state.accounts) && state.accounts.length ? state.accounts : db.cuentas;
-                db.terceros = Array.isArray(state.thirdParties) && state.thirdParties.length ? state.thirdParties : db.terceros;
+                db.cuentas = Array.isArray(state.accounts) ? (state.accounts.length ? state.accounts : [
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 }
+                ]) : db.cuentas;
+                db.terceros = Array.isArray(state.thirdParties) ? state.thirdParties : db.terceros;
+                db.flujoCaja = Array.isArray(state.cashflows) ? state.cashflows : [];
+                if ((!db.flujoCaja || db.flujoCaja.length === 0) && Array.isArray(db.movimientos) && db.movimientos.length > 0) {
+                    rebuildOperationalLedgerFromMovements();
+                }
                 if (!db.config) db.config = {};
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
                 const movementYears = Array.from(new Set((db.movimientos || [])
-                    .map(m => new Date(m.fecha).getFullYear())
+                    .map(m => { const dt = parseMovementDateUi(m.fecha); return dt ? dt.getFullYear() : NaN; })
                     .filter(y => Number.isFinite(y) && y > 2000))).sort((a, b) => a - b);
                 if (movementYears.length) {
-                    const hasDataForConfiguredYear = (db.movimientos || []).some(m => new Date(m.fecha).getFullYear() === Number(db.config.year));
+                    const hasDataForConfiguredYear = (db.movimientos || []).some(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
                     if (!hasDataForConfiguredYear) {
                         const latestYear = movementYears[movementYears.length - 1];
                         db.config.year = latestYear;
                         const latestMonthMovs = (db.movimientos || [])
-                            .filter(m => new Date(m.fecha).getFullYear() === latestYear)
-                            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha));
-                        const latestMonth = latestMonthMovs.length ? new Date(latestMonthMovs[latestMonthMovs.length - 1].fecha).getMonth() : 0;
+                            .filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === latestYear; })
+                            .sort((a, b) => { const da = parseMovementDateUi(a.fecha); const dbb = parseMovementDateUi(b.fecha); return (da ? da.getTime() : 0) - (dbb ? dbb.getTime() : 0); });
+                        const latestDate = latestMonthMovs.length ? parseMovementDateUi(latestMonthMovs[latestMonthMovs.length - 1].fecha) : null;
+                        const latestMonth = latestDate ? latestDate.getMonth() : 0;
                         db.config.selectedMonth = latestMonth;
                     }
                 }
@@ -1659,6 +1720,39 @@
         function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
         function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
         function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
+
+        function rebuildOperationalLedgerFromMovements() {
+            if (!Array.isArray(db.cuentas) || db.cuentas.length === 0) {
+                db.cuentas = [
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 }
+                ];
+            }
+            db.cuentas.forEach((c) => { c.saldo = 0; });
+            const ordered = (db.movimientos || []).slice().sort((a, b) => {
+                const da = parseMovementDateUi(a?.fecha);
+                const dbb = parseMovementDateUi(b?.fecha);
+                return (da ? da.getTime() : 0) - (dbb ? dbb.getTime() : 0);
+            });
+            db.flujoCaja = [];
+            for (const m of ordered) {
+                const tipo = String(m?.tipo || '').toUpperCase();
+                const total = Number(m?.total || 0);
+                if (total <= 0) continue;
+                const cuentaId = m?.cuentaId || (tipo === 'VENTA' ? 'mp' : 'banco');
+                const cuenta = db.cuentas.find((c) => c.id === cuentaId);
+                if (!cuenta) continue;
+                if (tipo === 'VENTA') {
+                    cuenta.saldo += total;
+                    db.flujoCaja.push({ id: `AUTO-${m.id}-IN`, fecha: m.fecha, cuentaId, concepto: m.desc || m.descripcion || 'Venta', monto: total, tipoMovimiento: 'INGRESO', refId: m.id, saldoParcial: cuenta.saldo });
+                } else if (['IMPORTACION', 'GASTO_LOCAL', 'HONORARIOS', 'RETIRO', 'COMISION_MARKETPLACE'].includes(tipo)) {
+                    cuenta.saldo -= total;
+                    db.flujoCaja.push({ id: `AUTO-${m.id}-OUT`, fecha: m.fecha, cuentaId, concepto: m.desc || m.descripcion || tipo, monto: total, tipoMovimiento: 'EGRESO', refId: m.id, saldoParcial: cuenta.saldo });
+                }
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             // En modo backend-first, no se usa localStorage como fuente principal de datos.
@@ -1737,9 +1831,13 @@
         function save() {
             try {
                 if (typeof taxSummaryCache !== 'undefined' && taxSummaryCache?.clear) taxSummaryCache.clear();
+                if (typeof backendAutoSyncedYears !== 'undefined' && backendAutoSyncedYears?.clear) backendAutoSyncedYears.clear();
+                if (typeof backendSyncDiagnostics !== 'undefined' && backendSyncDiagnostics?.clear) backendSyncDiagnostics.clear();
                 // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
                 rebuildAsientos();
                 render();
+                persistRuntimeSnapshotToBackend({ silent: true }).catch(() => null);
+                syncFrontendMovementsToBackend({ silent: true, yearOverride: db.config.year }).catch(() => null);
             } catch (err) {
                 console.error('Error al refrescar UI después de guardar', err);
                 // No bloquear el flujo de usuario por fallos de renderizado puntual.
@@ -1773,6 +1871,9 @@
             updateRetRate();
             applyTheme();
             updateUSD();
+            if (typeof taxSummaryCache !== 'undefined' && taxSummaryCache?.clear) taxSummaryCache.clear();
+            if (typeof backendAutoSyncedYears !== 'undefined' && backendAutoSyncedYears?.clear) backendAutoSyncedYears.clear();
+            if (typeof backendSyncDiagnostics !== 'undefined' && backendSyncDiagnostics?.clear) backendSyncDiagnostics.clear();
             save();
         }
 
@@ -1792,16 +1893,9 @@
             reader.readAsText(file);
         }
         async function loadDemoDataFromJson() {
-            try {
-                const payload = await apiClient.get('/system/demo-backup');
-                if (!payload || !payload.backup) throw new Error('Respuesta demo-backup inválida');
-                applyBackupObject(payload.backup);
-                alert(`Base demo JSON cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
-                return;
-            } catch (err) {
-                console.warn('Fallo carga JSON demo, se intentará endpoint runtime.', err.message);
-                await loadDemoDataFromBackend();
-            }
+            // En backend-first, la demo debe cargarse en backend para que F29/F22/SII cambien realmente.
+            // El endpoint demo-backup sólo muta estado local de UI y provoca desalineación.
+            await loadDemoDataFromBackend();
         }
 
         async function loadModuleDemo(moduleKey) {
@@ -1892,7 +1986,11 @@
                 alert(`No se pudo cargar la base demo: ${lastError ? lastError.message : 'error desconocido'}\nTip: ejecuta 'docker compose up -d --build' para tomar el backend actualizado.`);
                 return;
             }
+            if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-demo-enabled', '1');
             await bootstrapFromBackend();
+            taxSummaryCache.clear();
+            backendAutoSyncedYears.clear();
+            backendSyncDiagnostics.clear();
             save();
             alert(`Base demo cargada. Movimientos: ${payload.summary?.movements || '-'} | Productos: ${payload.summary?.products || '-'} | Terceros: ${payload.summary?.thirdParties || '-'} | Cuentas: ${payload.summary?.accounts || '-'}`);
         }
@@ -1907,8 +2005,19 @@
             }
         }
 
-        function resetApp() {
-            if (confirm('¿Reiniciar todo? Se perderán datos.')) {
+        async function resetApp() {
+            if (!confirm('¿Reiniciar todo? Se perderán datos.')) return;
+            try {
+                await apiClient.post('/system/reset-runtime-data', {});
+                if (typeof sessionStorage !== 'undefined') { sessionStorage.removeItem('jet-autoclean-done'); sessionStorage.removeItem('jet-demo-enabled'); }
+                taxSummaryCache.clear();
+                backendAutoSyncedYears.clear();
+                backendSyncDiagnostics.clear();
+                await bootstrapFromBackend();
+                save();
+                alert('Base reiniciada en backend y frontend.');
+            } catch (err) {
+                alert(`No se pudo reiniciar backend automáticamente: ${err?.message || err}. Se recargará la interfaz.`);
                 location.reload();
             }
         }
@@ -2490,7 +2599,7 @@
         // Stock runout (unchanged)
         function calculateStockRunout(prodId) {
             const thirtyDaysAgo = new Date(); thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const sales = db.movimientos.filter(m => m.tipo === 'VENTA' && m.prodId == prodId && new Date(m.fecha) >= thirtyDaysAgo).reduce((a, b) => a + b.cant, 0);
+            const sales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && m.prodId == prodId && dt && dt >= thirtyDaysAgo; }).reduce((a, b) => a + b.cant, 0);
             const dailySales = sales / 30;
             const prod = db.productos.find(p => p.id == prodId);
             if (dailySales === 0) return { days: 999, date: 'Estable' };
@@ -2502,7 +2611,7 @@
         // Burn Rate (unchanged)
         function calculateBurnRate() {
             const threeMonthsAgo = new Date(); threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-            const expenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS' || m.tipo === 'IMPORTACION') && new Date(m.fecha) >= threeMonthsAgo).reduce((a, b) => a + b.total, 0);
+            const expenses = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS' || m.tipo === 'IMPORTACION') && dt && dt >= threeMonthsAgo; }).reduce((a, b) => a + b.total, 0);
             return Math.round(expenses / 3);
         }
 
@@ -2547,7 +2656,29 @@
             save();
         }
 
-        async function syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal) {
+
+        function parseMovementDateUi(value) {
+            if (!value) return null;
+            const raw = String(value).trim();
+            if (!raw) return null;
+            const native = new Date(raw);
+            if (!Number.isNaN(native.getTime())) return native;
+            const slash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            if (slash) {
+                const [, d, m, y] = slash;
+                const dt = new Date(`${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`);
+                if (!Number.isNaN(dt.getTime())) return dt;
+            }
+            const compact = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
+            if (compact) {
+                const [, y, m, d] = compact;
+                const dt = new Date(`${y}-${m}-${d}`);
+                if (!Number.isNaN(dt.getTime())) return dt;
+            }
+            return null;
+        }
+
+        async function syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal, localYearSales = 0) {
             try {
                 let accumulated = 0;
                 let selected = null;
@@ -2559,8 +2690,14 @@
                 }
 
                 const ivaPagar = Number(selected?.f29?.totals?.totalToPay || 0);
+                const apiYearSales = Number(selected?.f22?.rli?.components?.ventasNetas || 0);
                 safeSetText('dash-disponible', `$ ${(cajaTotal - Math.max(0, ivaPagar)).toLocaleString('es-CL')}`);
                 safeSetText('dash-iva-pagar', `$ ${Math.max(0, ivaPagar).toLocaleString('es-CL')}`);
+                safeSetText('dash-ventas', `$ ${apiYearSales.toLocaleString('es-CL')}`);
+                if (Math.abs(apiYearSales - Number(localYearSales || 0)) > 0) {
+                    const health = { status: 'warning', diagnostics: [{ code: 'TAX-UI-DIAG-106', message: `Diferencia entre ventas locales (${Number(localYearSales).toLocaleString('es-CL')}) y API tributaria (${apiYearSales.toLocaleString('es-CL')}). Se prioriza API.` }] };
+                    renderTaxDiagnostics(health);
+                }
                 renderTaxPanelFromApi(accumulated);
             } catch (_) {
                 safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
@@ -2571,14 +2708,15 @@
 
         // Render dashboard & others
         function render() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
-            const monthMovs = yearMovs.filter(m => new Date(m.fecha).getMonth() === db.config.selectedMonth);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
+            const monthMovs = yearMovs.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getMonth() === Number(db.config.selectedMonth); });
             // Dashboard summary
             const cajaTotal = db.cuentas.reduce((a, c) => a + c.saldo, 0);
             const year = Number(db.config.year || new Date().getFullYear());
             const selectedMonth = Number((db.config.selectedMonth || 0) + 1);
             safeSetText('dash-disponible', `$ ${cajaTotal.toLocaleString('es-CL')}`);
-            safeSetText('dash-ventas', `$ ${yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + b.neto, 0).toLocaleString('es-CL')}`);
+            const localYearSales = yearMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
+            safeSetText('dash-ventas', `$ ${localYearSales.toLocaleString('es-CL')}`);
             safeSetText('dash-iva-pagar', '$ 0');
             safeSetText('dash-stock', `$ ${db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0).toLocaleString('es-CL')}`);
             // Treasury cards
@@ -2615,7 +2753,7 @@
                     </tr>`).join('');
             }
             // Update tax panel and calendar
-            syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal);
+            syncTaxWidgetsFromApi(year, selectedMonth, cajaTotal, localYearSales);
             renderFiscalCalendar();
             safeCreateIcons();
             // Inventory grid
@@ -2704,11 +2842,250 @@ calculateReports(yearMovs);
         }
 
         const taxSummaryCache = new Map();
+        let backendSyncInFlight = false;
+        let backendRuntimePersistInFlight = false;
+        const backendAutoSyncedYears = new Set();
+        const backendSyncDiagnostics = new Map();
+        let bootstrapAutoCleanInfo = null;
+
+
+        function movementSignature(m) {
+            const fecha = String(m?.fecha || '').slice(0, 10);
+            const tipo = String(m?.tipo || '').toUpperCase();
+            const total = Number(m?.total ?? m?.monto ?? 0);
+            const neto = Number(m?.neto || 0);
+            return `${fecha}|${tipo}|${Math.round(total)}|${Math.round(neto)}`;
+        }
+
+        async function syncFrontendMovementsToBackend(options = {}) {
+            const { silent = true, refresh = false, yearOverride = null } = options;
+            if (backendSyncInFlight) return { imported: 0, skipped: 0, inFlight: true, failed: 0, errors: [] };
+            backendSyncInFlight = true;
+            try {
+                const year = Number(yearOverride || db.config.year || new Date().getFullYear());
+                const candidates = (db.movimientos || []).filter((m) => {
+                    const dt = parseMovementDateUi(m?.fecha);
+                    return !!dt && dt.getFullYear() === year;
+                });
+                const payload = await apiClient.post('/migration/sync-frontend-movements', {
+                    year,
+                    movements: candidates,
+                    cashflows: Array.isArray(db.flujoCaja) ? db.flujoCaja : [],
+                    accounts: Array.isArray(db.cuentas) ? db.cuentas : []
+                });
+                const imported = Number(payload?.imported || 0);
+                const skipped = Number(payload?.skipped || 0);
+                const failed = 0;
+                const errors = [];
+
+                if (refresh) {
+                    taxSummaryCache.clear();
+                    calculateReports(db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === year; }));
+                    renderOwnerTaxModule();
+                }
+                const result = { imported, skipped, failed, errors, year };
+                backendSyncDiagnostics.set(year, result);
+                if (!silent) alert(`Sincronización completada. Importados: ${imported}. Omitidos: ${skipped}. Fallidos: ${failed}.`);
+                return result;
+            } catch (err) {
+                if (!silent) alert(`No se pudo sincronizar al backend: ${err.message}`);
+                const year = Number(yearOverride || db.config.year || new Date().getFullYear());
+                const result = { imported: 0, skipped: 0, failed: 1, year, errors: [{ code: err?.code || 'TAX-UI-SYNC-BOOT-001', message: err?.message || 'sync_boot_failed' }], error: err };
+                backendSyncDiagnostics.set(year, result);
+                renderTaxDiagnosticsFromError(err);
+                return result;
+            } finally {
+                backendSyncInFlight = false;
+            }
+        }
+
+        async function persistRuntimeSnapshotToBackend(options = {}) {
+            const { silent = true } = options;
+            if (backendRuntimePersistInFlight) return { ok: false, inFlight: true };
+            backendRuntimePersistInFlight = true;
+            try {
+                const payload = {
+                    productos: Array.isArray(db.productos) ? db.productos : [],
+                    movimientos: Array.isArray(db.movimientos) ? db.movimientos : [],
+                    cuentas: Array.isArray(db.cuentas) ? db.cuentas : [],
+                    terceros: Array.isArray(db.terceros) ? db.terceros : [],
+                    flujoCaja: Array.isArray(db.flujoCaja) ? db.flujoCaja : [],
+                    source: 'frontend_runtime_snapshot'
+                };
+                await apiClient.post('/migration/import-json', payload);
+                return { ok: true };
+            } catch (err) {
+                if (!silent) alert(`No se pudo persistir runtime completo en backend: ${err.message}`);
+                return { ok: false, error: err };
+            } finally {
+                backendRuntimePersistInFlight = false;
+            }
+        }
+
+        function renderTaxDiagnostics(health) {
+            const targets = ['tax-diagnostics-f29', 'tax-diagnostics-f22', 'tax-diagnostics-owner'];
+            const diagnostics = Array.isArray(health?.diagnostics) ? health.diagnostics : [];
+            const status = health?.status || 'ok';
+            const visible = diagnostics.length > 0;
+            const css = status === 'error'
+                ? 'border-red-300 bg-red-50 text-red-700'
+                : status === 'warning'
+                    ? 'border-amber-300 bg-amber-50 text-amber-700'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            const message = visible
+                ? diagnostics.map(d => `<div><b>${d.code}</b> · ${d.message}</div>`).join('')
+                : '<div><b>TAX-DIAG-000</b> · Integración tributaria OK para el período consultado.</div>';
+            targets.forEach((id) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.className = `text-xs font-bold rounded-2xl border px-4 py-3 ${css}`;
+                el.innerHTML = message;
+            });
+        }
+
+        function renderTaxDiagnosticsFromError(err) {
+            const code = err?.code || 'TAX-UI-UNK-000';
+            renderTaxDiagnostics({
+                status: 'error',
+                diagnostics: [{ code, message: err?.message || 'Error no identificado consumiendo API tributaria.' }]
+            });
+        }
+
+        function augmentTaxDiagnosticsWithFrontendContext(health, year, payload = null) {
+            const diagnostics = Array.isArray(health?.diagnostics) ? [...health.diagnostics] : [];
+            const localYearMovs = (db.movimientos || []).filter((m) => {
+                const dt = parseMovementDateUi(m?.fecha);
+                return !!dt && dt.getFullYear() === Number(year);
+            }).length;
+            const backendYearMovs = Number(health?.stats?.movementsInYear || 0);
+            const rli = Number(payload?.f22?.rli?.components?.rli || 0);
+            const regime = String(payload?.f22?.selectedRegime?.regime || db.config?.regimen || '14D8');
+            if (rli < 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-103',
+                    message: `RLI negativa (${Math.round(rli).toLocaleString('es-CL')}). En SII dueño la base queda en 0 mientras exista pérdida tributaria.`
+                });
+                if (regime === '14D8') {
+                    diagnostics.push({
+                        code: 'TAX-UI-DIAG-104',
+                        message: 'Régimen 14D8: la renta atribuible del dueño se trunca a 0 cuando la RLI anual es negativa.'
+                    });
+                }
+            }
+
+
+            if (backendYearMovs === 0 && localYearMovs > 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-101',
+                    message: `Hay ${localYearMovs} movimientos en frontend local para ${year}, pero 0 en backend. Posible desfase por migración backend-first.`
+                });
+            }
+
+            if (!db.config?.apiToken) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-102',
+                    message: 'Frontend sin token API activo. Puede impedir lectura backend protegida.'
+                });
+            }
+
+            if (Number(health?.stats?.totalMovements || 0) > 0 && Number(localYearMovs || 0) === 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-107',
+                    message: `Backend ya tenía ${Number(health?.stats?.totalMovements || 0)} movimientos cargados al iniciar. Si esperabas base vacía, ejecuta /system/reset-runtime-data.`
+                });
+            }
+
+            if (String(health?.stats?.backendSource || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-108',
+                    message: `Origen backend detectado: ${health.stats.backendSource}. Cargado en: ${health.stats.backendMigratedAt || 'fecha no registrada'}.`
+                });
+            }
+
+            if (String(health?.stats?.backendSource || '').toLowerCase().includes('demo')) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-109',
+                    message: 'Se detectó fuente demo en backend. Esto explica valores precargados en 2026.'
+                });
+            }
+
+            if (bootstrapAutoCleanInfo && Number(bootstrapAutoCleanInfo.detectedMovements || 0) > 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-112',
+                    message: `Se ejecutó auto-limpieza al iniciar: ${bootstrapAutoCleanInfo.detectedMovements} movimientos detectados en backend (${bootstrapAutoCleanInfo.backendSource || 'source desconocido'}). Si reaparecen, existe un flujo que vuelve a insertarlos.`
+                });
+            }
+
+            if (bootstrapAutoCleanInfo?.mode === 'auto_reset_startup') {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-113',
+                    message: 'Arranque en modo base vacía: se forzó reset runtime backend antes de mostrar módulos tributarios.'
+                });
+            }
+            if (bootstrapAutoCleanInfo?.mode === 'auto_reset_failed') {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-114',
+                    message: `Falló auto-reset de arranque: ${bootstrapAutoCleanInfo.error || 'error desconocido'}.`
+                });
+            }
+
+            if (Number(health?.stats?.totalMovements || 0) > 0 && !String(health?.stats?.backendSource || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-110',
+                    message: 'Hay movimientos en backend pero sin metadata source. Revisa cargas previas/manuales en la base de datos.'
+                });
+            }
+
+            if (String(health?.stats?.minMovementDate || '').trim() || String(health?.stats?.maxMovementDate || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-111',
+                    message: `Huella temporal backend: ${health?.stats?.minMovementDate || 'N/D'} → ${health?.stats?.maxMovementDate || 'N/D'}.`
+                });
+            }
+
+            const syncDiag = backendSyncDiagnostics.get(Number(year));
+            if (syncDiag && Number(syncDiag.failed || 0) > 0) {
+                const firstErr = syncDiag.errors && syncDiag.errors.length ? syncDiag.errors[0] : { code: 'TAX-UI-SYNC-UNK', message: 'sync_failed' };
+                const msg = String(firstErr.message || '').toLowerCase();
+                let mappedCode = 'TAX-UI-SYNC-201';
+                if (msg.includes('período contable cerrado')) mappedCode = 'TAX-UI-SYNC-202';
+                else if (msg.includes('compliance_block') || msg.includes('cumplimiento') || msg.includes('bloqueo')) mappedCode = 'TAX-UI-SYNC-203';
+                else if (msg.includes('no autenticado') || msg.includes('401')) mappedCode = 'TAX-UI-SYNC-204';
+                diagnostics.push({
+                    code: mappedCode,
+                    message: `Auto-sync falló (${syncDiag.failed} movimientos). Primer error: ${firstErr.message}`
+                });
+            }
+
+            const status = diagnostics.some((d) => String(d.code || '').includes('001') || String(d.code || '').includes('006') || String(d.code || '').includes('SYNC-20')) ? 'error' : (diagnostics.length ? 'warning' : 'ok');
+            return { ...health, status, diagnostics };
+        }
 
         async function getTaxSummaryFromApi(year, month) {
             const key = `${year}-${month}`;
             if (taxSummaryCache.has(key)) return taxSummaryCache.get(key);
-            const payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+
+            if (!backendAutoSyncedYears.has(Number(year))) {
+                const initialSync = await syncFrontendMovementsToBackend({ silent: true, yearOverride: year });
+                if (!initialSync?.error && Number(initialSync?.failed || 0) === 0) {
+                    backendAutoSyncedYears.add(Number(year));
+                }
+            }
+
+            let payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+            let health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year, payload);
+
+            const hasDrift = (health?.diagnostics || []).some((d) => d.code === 'TAX-UI-DIAG-101');
+            if (hasDrift) {
+                const syncResult = await syncFrontendMovementsToBackend({ silent: true, yearOverride: year });
+                if ((syncResult?.imported || 0) > 0 || Number(syncResult?.failed || 0) > 0) {
+                    payload = await apiClient.get(`/tax/summary?year=${year}&month=${month}`);
+                    health = augmentTaxDiagnosticsWithFrontendContext(payload?.dataHealth || { status: 'ok', diagnostics: [], stats: {} }, year, payload);
+                }
+            }
+
+            renderTaxDiagnostics(health);
+            payload.dataHealth = health;
             taxSummaryCache.set(key, payload);
             return payload;
         }
@@ -2749,7 +3126,7 @@ calculateReports(yearMovs);
         }
 
         function renderOwnerTaxModule() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             const year = Number(db.config.year || new Date().getFullYear());
             const month = Number((db.config.selectedMonth || 0) + 1);
             getTaxSummaryFromApi(year, month).then((taxSummary) => {
@@ -2780,13 +3157,14 @@ calculateReports(yearMovs);
             }).catch((err) => {
                 safeSetText('owner-tax-net', `$ 0`);
                 safeSetText('owner-how', `No disponible: ${err.message}`);
+                renderTaxDiagnosticsFromError(err);
             });
         }
 
         // Projections
         function renderProjections() {
             const now = new Date(); const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(); const currentDay = now.getDate();
-            const currentMonthSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const currentMonthSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + b.neto, 0);
             const dailyAvg = currentMonthSales / currentDay; const projectedTotal = Math.round(dailyAvg * daysInMonth);
             safeSetText('proj-sales-current', `$ ${currentMonthSales.toLocaleString('es-CL')}`);
             safeSetText('proj-sales-forecast', `$ ${projectedTotal.toLocaleString('es-CL')}`);
@@ -2802,20 +3180,23 @@ calculateReports(yearMovs);
                     const ivaEst = Number(taxSummary?.f29?.totals?.totalToPay || 0);
                     safeSetText('proj-iva-est', `$ ${Math.max(0, ivaEst).toLocaleString('es-CL')}`);
                 })
-                .catch(() => safeSetText('proj-iva-est', '$ 0'));
+                .catch((err) => {
+                    safeSetText('proj-iva-est', '$ 0');
+                    renderTaxDiagnosticsFromError(err);
+                });
             // Calcular utilidad mensual proyectada y crecimiento interanual
             // Costo de mercaderías vendidas este mes
-            const currentMonthCost = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
+            const currentMonthCost = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + (b.costoMercaderia || 0), 0);
             // Gastos (aceptados y honorarios) del mes
-            const currentMonthExpenses = db.movimientos.filter(m => (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && new Date(m.fecha).getMonth() === now.getMonth() && new Date(m.fecha).getFullYear() === now.getFullYear()).reduce((a, b) => a + b.neto, 0);
+            const currentMonthExpenses = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return (m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS') && dt && dt.getMonth() === now.getMonth() && dt.getFullYear() === now.getFullYear(); }).reduce((a, b) => a + b.neto, 0);
             const projectedCost = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthCost : 0;
             const projectedExpenses = currentMonthSales > 0 ? (projectedTotal / currentMonthSales) * currentMonthExpenses : 0;
             const projectedProfit = projectedTotal - projectedCost - projectedExpenses;
             safeSetText('proj-profit-forecast', `$ ${Math.round(projectedProfit).toLocaleString('es-CL')}`);
             // Crecimiento interanual: comparación entre las ventas netas del año actual y del año anterior
             const currentYear = now.getFullYear();
-            const currentYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === currentYear).reduce((a, b) => a + b.neto, 0);
-            const prevYearSales = db.movimientos.filter(m => m.tipo === 'VENTA' && new Date(m.fecha).getFullYear() === (currentYear - 1)).reduce((a, b) => a + b.neto, 0);
+            const currentYearSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getFullYear() === currentYear; }).reduce((a, b) => a + b.neto, 0);
+            const prevYearSales = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return m.tipo === 'VENTA' && dt && dt.getFullYear() === (currentYear - 1); }).reduce((a, b) => a + b.neto, 0);
             let yoy = 0;
             if (prevYearSales > 0) yoy = ((currentYearSales - prevYearSales) / prevYearSales) * 100;
             safeSetText('proj-yoy-growth', `${yoy.toFixed(1)}%`);
@@ -2899,7 +3280,9 @@ calculateReports(yearMovs);
 
                 renderDDJJTables(yearMovs, totalPPM, totalRet);
             })().catch((err) => {
-                safeSetHTML('table-f29', `<tr><td colspan="6" class="px-4 py-3 text-red-500 font-bold">${err.message}</td></tr>`);
+                const code = err?.code || 'TAX-UI-UNK-000';
+                safeSetHTML('table-f29', `<tr><td colspan="6" class="px-4 py-3 text-red-500 font-bold">[${code}] ${err.message}</td></tr>`);
+                renderTaxDiagnosticsFromError(err);
             });
         }
 
@@ -2931,9 +3314,9 @@ calculateReports(yearMovs);
 
         // KPI rendering
         function renderKPI() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             // Rotacion: promedio mensual ventas / inventario promedio
-            const salesByMonth = {}; yearMovs.forEach(m => { const k = new Date(m.fecha).getMonth(); if (m.tipo === 'VENTA') salesByMonth[k] = (salesByMonth[k] || 0) + m.neto; });
+            const salesByMonth = {}; yearMovs.forEach(m => { const dt = parseMovementDateUi(m.fecha); if (!dt) return; const k = dt.getMonth(); if (m.tipo === 'VENTA') salesByMonth[k] = (salesByMonth[k] || 0) + m.neto; });
             const avgMonthlySales = Object.values(salesByMonth).length ? Object.values(salesByMonth).reduce((a, b) => a + b, 0) / Object.values(salesByMonth).length : 0;
             const avgInventoryValue = db.productos.reduce((a, p) => a + (p.stock * p.costoPromedio || 0), 0);
             const rotation = avgInventoryValue > 0 ? (avgMonthlySales / avgInventoryValue) : 0;
@@ -2953,7 +3336,7 @@ calculateReports(yearMovs);
             safeSetText('kpi-profit', `$ ${profit.toLocaleString('es-CL')}`);
             safeSetText('kpi-profit-year', `Año ${db.config.year}`);
 
-            const allMovs = db.movimientos.filter(m => [2024, 2025, 2026].includes(new Date(m.fecha).getFullYear()));
+            const allMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && [2024, 2025, 2026].includes(dt.getFullYear()); });
             const generalSales = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.neto || 0), 0);
             const generalCost = allMovs.filter(m => m.tipo === 'VENTA').reduce((a, b) => a + Number(b.costoMercaderia || 0), 0);
             const generalGastos = allMovs.filter(m => m.tipo === 'GASTO_LOCAL' || m.tipo === 'HONORARIOS').reduce((a, b) => a + Number(b.neto || 0), 0);
@@ -3033,11 +3416,13 @@ calculateReports(yearMovs);
         // Annual summary (chart and P&L) reused from original
         function renderAnnualSummary() {
             const ctx = document.getElementById('chart-performance').getContext('2d'); if (performanceChart) performanceChart.destroy();
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             const sD = Array(12).fill(0); const eD = Array(12).fill(0);
             let a_vne = 0, a_cmv = 0, a_gas = 0;
             yearMovs.forEach(m => {
-                const idx = new Date(m.fecha).getMonth();
+                const dt = parseMovementDateUi(m.fecha);
+                if (!dt) return;
+                const idx = dt.getMonth();
                 if (m.tipo === 'VENTA') { sD[idx] += m.neto; a_vne += m.neto; a_cmv += (m.costoMercaderia || 0); }
                 else { eD[idx] += m.neto; if (m.tipo !== 'IMPORTACION') a_gas += m.neto; }
             });
@@ -3056,7 +3441,7 @@ calculateReports(yearMovs);
 
         // Render DDJJ (calls separate tables)
         function renderDDJJ() {
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === db.config.year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === Number(db.config.year); });
             // The tables are prepared by calculateReports -> renderDDJJTables
             calculateReports(yearMovs);
             // Actualizar el encabezado de la DJ miscelánea según el régimen
@@ -3297,7 +3682,7 @@ calculateReports(yearMovs);
         function exportDJ(type) {
             const year = db.config.year;
             // Filtrar movimientos del año
-            const yearMovs = db.movimientos.filter(m => new Date(m.fecha).getFullYear() === year);
+            const yearMovs = db.movimientos.filter(m => { const dt = parseMovementDateUi(m.fecha); return dt && dt.getFullYear() === year; });
             let csv = '';
             let filename = '';
             if (type === '1887') {
@@ -3568,7 +3953,13 @@ calculateReports(yearMovs);
             const flow = db.flujoCaja.find(f => f.refId == movId);
             if (flow && flow.cuentaId) return flow.cuentaId;
             const mov = db.movimientos.find(m => m.id == movId);
-            return mov && mov.cuentaId ? mov.cuentaId : null;
+            if (mov && mov.cuentaId) return mov.cuentaId;
+            if (!mov) return null;
+            const tipo = String(mov.tipo || '').toUpperCase();
+            if (tipo === 'VENTA') return 'mp';
+            if (tipo === 'RETIRO') return 'banco';
+            if (['IMPORTACION', 'GASTO_LOCAL', 'HONORARIOS', 'COMISION_MARKETPLACE'].includes(tipo)) return 'banco';
+            return 'banco';
         }
 
         // Reconstruir asientos contables a partir de los movimientos y flujos existentes

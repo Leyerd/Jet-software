@@ -1,11 +1,11 @@
 const url = require('url');
 const { sendJson, notFound, methodNotAllowed } = require('./lib/http');
 const { register, login, me, logout, revokeSession, mfaSetup, mfaEnable, mfaDisable } = require('./modules/auth');
-const { importJson, getSummary } = require('./modules/migration');
+const { importJson, getSummary, syncFrontendMovements } = require('./modules/migration');
 const { closePeriod, reopenPeriod, listPeriods, getCloseChecklist } = require('./modules/accountingClose');
 const { createMovement, listMovements } = require('./modules/movements');
 const { createProduct, listProducts } = require('./modules/products');
-const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, shutdownSystem } = require('./modules/system');
+const { coherenceCheck, getFrontendState, getDemoBackup, loadDemoData, resetRuntimeData, shutdownSystem } = require('./modules/system');
 const { dbStatus } = require('./modules/db');
 const { getProjection } = require('./modules/finance');
 const { getInventoryOverview, importLot, consumeStock, getKardex } = require('./modules/inventory');
@@ -110,6 +110,9 @@ function route(req, res) {
   if (req.method === 'GET' && path === '/system/frontend-state') return handle(getFrontendState(req, res), res);
   if (req.method === 'POST' && path === '/system/shutdown') return handle(shutdownSystem(req, res), res);
   if (req.method === 'GET' && path === '/system/demo-backup') return handle(getDemoBackup(req, res), res);
+  if (path === '/system/reset-runtime-data') {
+    if (req.method === 'POST' || req.method === 'GET') return handle(resetRuntimeData(req, res), res);
+  }
   if (path === '/system/load-demo-data') {
     if (req.method === 'POST' || req.method === 'GET') return handle(loadDemoData(req, res), res);
     return methodNotAllowed(res);
@@ -178,6 +181,7 @@ function route(req, res) {
 
   if (path === '/migration/import-json') return req.method === 'POST' ? handle(importJson(req, res), res, 500) : methodNotAllowed(res);
   if (path === '/migration/summary') return req.method === 'GET' ? handle(getSummary(req, res), res) : methodNotAllowed(res);
+  if (path === '/migration/sync-frontend-movements') return req.method === 'POST' ? handle(syncFrontendMovements(req, res), res) : methodNotAllowed(res);
 
   if (path === '/periods/close') return req.method === 'POST' ? handle(closePeriod(req, res), res) : methodNotAllowed(res);
   if (path === '/periods/reopen') return req.method === 'POST' ? handle(reopenPeriod(req, res), res) : methodNotAllowed(res);

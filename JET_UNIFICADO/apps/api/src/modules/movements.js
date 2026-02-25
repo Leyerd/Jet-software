@@ -119,6 +119,8 @@ async function listMovements(req, res) {
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_created BOOLEAN DEFAULT FALSE');
+      await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS auto_entry_id TEXT');
       const rs = await client.query(
         'SELECT id, fecha, tipo, descripcion, total, neto, iva, retention, comision, costo_mercaderia AS "costoMercaderia", accepted, document_ref AS "documentRef", auto_entry_created AS "autoJournalCreated", auto_entry_id AS "autoJournalEntryId" FROM movimientos ORDER BY fecha ASC, id ASC'
       );
