@@ -51,6 +51,75 @@ async function importJson(req, res) {
     source
   };
 
+  if (isPostgresMode()) {
+    await withPgClient(async (client) => {
+      await client.query('BEGIN');
+      try {
+        await client.query('CREATE TABLE IF NOT EXISTS productos (id BIGSERIAL PRIMARY KEY, sku TEXT, nombre TEXT, categoria TEXT, costo_promedio NUMERIC(18,2) DEFAULT 0, stock NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS movimientos (id BIGSERIAL PRIMARY KEY, fecha DATE, tipo TEXT, descripcion TEXT, total NUMERIC(18,2) DEFAULT 0, neto NUMERIC(18,2) DEFAULT 0, iva NUMERIC(18,2) DEFAULT 0, retention NUMERIC(18,2) DEFAULT 0, comision NUMERIC(18,2) DEFAULT 0, costo_mercaderia NUMERIC(18,2) DEFAULT 0, accepted BOOLEAN DEFAULT TRUE, document_ref TEXT, creado_en TIMESTAMP DEFAULT NOW())');
+        await client.query('CREATE TABLE IF NOT EXISTS terceros (id BIGSERIAL PRIMARY KEY, rut TEXT, nombre TEXT, tipo TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS cuentas (id BIGSERIAL PRIMARY KEY, codigo TEXT, nombre TEXT, tipo TEXT, saldo NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS runtime_fragments (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())');
+
+        await client.query('TRUNCATE TABLE movimientos, productos, terceros, cuentas RESTART IDENTITY CASCADE');
+
+        for (const p of payload.productos || []) {
+          await client.query('INSERT INTO productos (sku, nombre, categoria, costo_promedio, stock) VALUES ($1,$2,$3,$4,$5)', [p.sku || null, p.nombre || null, p.categoria || null, Number(p.costoPromedio || p.costo_promedio || 0), Number(p.stock || 0)]);
+        }
+        for (const m of payload.movimientos || []) {
+          const fecha = normalizeFechaIso(m.fecha);
+          if (!fecha || !m.tipo) continue;
+          await client.query(
+            `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, retention, comision, costo_mercaderia, accepted, document_ref, creado_en)
+             VALUES ($1::date,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NOW())`,
+            [
+              fecha,
+              String(m.tipo || '').toUpperCase(),
+              m.descripcion || m.desc || '',
+              Number(m.total ?? m.monto ?? 0),
+              Number(m.neto || 0),
+              Number(m.iva || 0),
+              Number(m.retention || 0),
+              Number(m.comision || 0),
+              Number(m.costoMercaderia || m.costo_mercaderia || 0),
+              m.accepted === false ? false : true,
+              m.documentRef || m.nDoc || null
+            ]
+          );
+        }
+        for (const t of payload.terceros || []) {
+          await client.query('INSERT INTO terceros (rut, nombre, tipo) VALUES ($1,$2,$3)', [t.rut || null, t.nombre || null, t.tipo || null]);
+        }
+        for (const c of payload.cuentas || []) {
+          await client.query('INSERT INTO cuentas (codigo, nombre, tipo, saldo) VALUES ($1,$2,$3,$4)', [c.codigo || c.id || null, c.nombre || null, c.tipo || null, Number(c.saldo || 0)]);
+        }
+
+        const fragmentPayloads = {
+          movimientos: payload.movimientos || [],
+          productos: payload.productos || [],
+          terceros: payload.terceros || [],
+          cuentas: payload.cuentas || [],
+          flujoCaja: payload.flujoCaja || [],
+          source,
+          migratedAt: now
+        };
+        for (const [key, value] of Object.entries(fragmentPayloads)) {
+          await client.query(
+            `INSERT INTO runtime_fragments (key, value, updated_at)
+             VALUES ($1, $2::jsonb, NOW())
+             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+            [key, JSON.stringify(value)]
+          );
+        }
+
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    });
+  }
+
   await writeStore(next);
   await appendAudit('migration.import_json', {
     source, migratedAt: now,

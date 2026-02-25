@@ -1836,6 +1836,7 @@
                 // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
                 rebuildAsientos();
                 render();
+                persistRuntimeSnapshotToBackend({ silent: true }).catch(() => null);
                 syncFrontendMovementsToBackend({ silent: true, yearOverride: db.config.year }).catch(() => null);
             } catch (err) {
                 console.error('Error al refrescar UI después de guardar', err);
@@ -2842,6 +2843,7 @@ calculateReports(yearMovs);
 
         const taxSummaryCache = new Map();
         let backendSyncInFlight = false;
+        let backendRuntimePersistInFlight = false;
         const backendAutoSyncedYears = new Set();
         const backendSyncDiagnostics = new Map();
         let bootstrapAutoCleanInfo = null;
@@ -2894,6 +2896,29 @@ calculateReports(yearMovs);
                 return result;
             } finally {
                 backendSyncInFlight = false;
+            }
+        }
+
+        async function persistRuntimeSnapshotToBackend(options = {}) {
+            const { silent = true } = options;
+            if (backendRuntimePersistInFlight) return { ok: false, inFlight: true };
+            backendRuntimePersistInFlight = true;
+            try {
+                const payload = {
+                    productos: Array.isArray(db.productos) ? db.productos : [],
+                    movimientos: Array.isArray(db.movimientos) ? db.movimientos : [],
+                    cuentas: Array.isArray(db.cuentas) ? db.cuentas : [],
+                    terceros: Array.isArray(db.terceros) ? db.terceros : [],
+                    flujoCaja: Array.isArray(db.flujoCaja) ? db.flujoCaja : [],
+                    source: 'frontend_runtime_snapshot'
+                };
+                await apiClient.post('/migration/import-json', payload);
+                return { ok: true };
+            } catch (err) {
+                if (!silent) alert(`No se pudo persistir runtime completo en backend: ${err.message}`);
+                return { ok: false, error: err };
+            } finally {
+                backendRuntimePersistInFlight = false;
             }
         }
 
