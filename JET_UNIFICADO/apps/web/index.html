@@ -1641,13 +1641,21 @@
                 let state = data && data.state ? data.state : null;
                 if (!state) return;
 
-                const suspiciousGhostData = Array.isArray(state.movements) && state.movements.length > 0
-                    && (!Array.isArray(state.products) || state.products.length === 0)
-                    && (!Array.isArray(state.thirdParties) || state.thirdParties.length === 0)
+                const movementCount = Array.isArray(state.movements) ? state.movements.length : 0;
+                const products = Array.isArray(state.products) ? state.products : [];
+                const thirdParties = Array.isArray(state.thirdParties) ? state.thirdParties : [];
+                const accounts = Array.isArray(state.accounts) ? state.accounts : [];
+                const productCapital = products.reduce((acc, p) => acc + (Number(p?.stock || 0) * Number(p?.costoPromedio || p?.costo_promedio || 0)), 0);
+                const nonZeroAccounts = accounts.filter((a) => Math.abs(Number(a?.saldo || 0)) > 0).length;
+                const suspiciousGhostData = movementCount > 0
+                    && productCapital <= 0
+                    && nonZeroAccounts === 0
+                    && thirdParties.length === 0
                     && !(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1');
 
                 if (suspiciousGhostData) {
                     try {
+                        console.warn(`[JET] Detectado posible estado fantasma de backend (movimientos=${movementCount}). Ejecutando auto-limpieza.`);
                         await apiClient.post('/system/reset-runtime-data', {});
                         if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-autoclean-done', '1');
                         const cleanData = await apiClient.get('/system/frontend-state');
@@ -2880,6 +2888,13 @@ calculateReports(yearMovs);
                 diagnostics.push({
                     code: 'TAX-UI-DIAG-102',
                     message: 'Frontend sin token API activo. Puede impedir lectura backend protegida.'
+                });
+            }
+
+            if (Number(health?.stats?.totalMovements || 0) > 0 && Number(localYearMovs || 0) === 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-107',
+                    message: `Backend ya tenía ${Number(health?.stats?.totalMovements || 0)} movimientos cargados al iniciar. Si esperabas base vacía, ejecuta /system/reset-runtime-data.`
                 });
             }
 
