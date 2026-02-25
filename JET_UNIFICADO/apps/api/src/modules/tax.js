@@ -273,7 +273,7 @@ async function loadRuntimeMetaFromDb() {
   });
 }
 
-function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [], rliComponents = null, runtimeMeta = {} }) {
+function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements = 0, availableYears = [], rliComponents = null, runtimeMeta = {}, allMovements = [] }) {
   const diagnostics = [];
   const hasYearData = yearMovs.length > 0;
   const hasMonthData = monthMovs.length > 0;
@@ -412,6 +412,15 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
 
   const backendSource = runtimeMeta?.source || null;
   const backendMigratedAt = runtimeMeta?.migratedAt || null;
+  const universe = Array.isArray(allMovements) && allMovements.length ? allMovements : yearMovs;
+  const typeBreakdown = universe.reduce((acc, m) => {
+    const t = getTaxTipo(m) || 'UNKNOWN';
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const knownDates = universe.map((m) => parseMovementDate(m?.fecha)).filter(Boolean);
+  const minMovementDate = knownDates.length ? knownDates.reduce((a, b) => (a < b ? a : b)).toISOString().slice(0, 10) : null;
+  const maxMovementDate = knownDates.length ? knownDates.reduce((a, b) => (a > b ? a : b)).toISOString().slice(0, 10) : null;
   if (totalMovements > 0 && backendSource) {
     diagnostics.push({
       code: 'TAX-DIAG-014',
@@ -426,6 +435,29 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       severity: 'warning',
       reason: 'DEMO_SEED_DETECTED',
       message: 'Se detecta fuente de datos demo en backend. Si esperabas base vacía, ejecuta reset runtime.'
+    });
+  }
+
+  if (totalMovements > 0 && !backendSource) {
+    diagnostics.push({
+      code: 'TAX-DIAG-016',
+      severity: 'warning',
+      reason: 'BACKEND_MOVEMENTS_WITHOUT_SOURCE_META',
+      message: `El backend tiene ${totalMovements} movimientos sin metadata de origen (source=null). Posible carga operativa previa o importación histórica.`
+    });
+  }
+
+  if (totalMovements > 0) {
+    const topTypes = Object.entries(typeBreakdown)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}:${v}`)
+      .join(', ');
+    diagnostics.push({
+      code: 'TAX-DIAG-017',
+      severity: 'warning',
+      reason: 'BACKEND_MOVEMENT_FOOTPRINT',
+      message: `Huella backend movimientos=${totalMovements}. Tipos: ${topTypes || 'N/D'}. Rango fechas: ${minMovementDate || 'N/D'}→${maxMovementDate || 'N/D'}.`
     });
   }
 
@@ -460,7 +492,10 @@ function buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDat
       importacionesIvaCredito,
       zeroAmountAcceptedCount,
       backendSource,
-      backendMigratedAt
+      backendMigratedAt,
+      movementTypeBreakdown: typeBreakdown,
+      minMovementDate,
+      maxMovementDate
     }
   };
 }
@@ -701,6 +736,7 @@ async function getTaxSummary(req, res) {
   let totalMovements = 0;
   let availableYears = [];
   let runtimeMeta = { source: null, migratedAt: null };
+  let allMovements = [];
 
   if (isPostgresMode()) {
     cfg = await loadTaxConfigFromDb(year);
@@ -728,6 +764,7 @@ async function getTaxSummary(req, res) {
       );
       return rs.rows;
     });
+    allMovements = Array.isArray(yearMovs) ? [...yearMovs] : [];
     totalMovements = Array.isArray(yearMovs) ? yearMovs.length : 0;
     availableYears = extractAvailableYears(yearMovs);
     runtimeMeta = await loadRuntimeMetaFromDb();
@@ -738,6 +775,7 @@ async function getTaxSummary(req, res) {
     const state = await readStore();
     cfg = ensureTaxConfig(state);
     const baseMovs = Array.isArray(state.movimientos) ? state.movimientos : [];
+    allMovements = [...baseMovs];
     totalMovements = baseMovs.length;
     availableYears = extractAvailableYears(baseMovs);
     runtimeMeta = { source: state.source || null, migratedAt: state.migratedAt || null };
@@ -754,7 +792,7 @@ async function getTaxSummary(req, res) {
 
   const f29 = computeMonthlyF29(monthMovs, cfg, catalog);
   const rli = computeYearlyRli(yearMovs, catalog);
-  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears, rliComponents: rli.components, runtimeMeta });
+  const dataHealth = buildTaxDiagnostics({ year, month, cfg, yearMovs, monthMovs, invalidDateCount, totalMovements, availableYears, rliComponents: rli.components, runtimeMeta, allMovements });
   const selectedRegime = computeF22ByRegime(rli.components.rli, cfg.regime, catalog);
   const altCatalog = getCatalog(cfg.year || year, cfg.regime === '14D8' ? '14D3' : '14D8');
   const alternativeRegime = computeF22ByRegime(rli.components.rli, cfg.regime === '14D8' ? '14D3' : '14D8', altCatalog);

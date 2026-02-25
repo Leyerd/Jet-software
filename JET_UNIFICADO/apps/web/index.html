@@ -1650,15 +1650,19 @@
                 const backendSource = String(state?.source || '').toLowerCase();
                 const isDemoSource = backendSource.includes('seed-demo') || backendSource.includes('demo');
                 const demoAllowed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-demo-enabled') === '1';
+                const preserveExisting = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-preserve-existing-data') === '1';
+                const alreadyAutocleaned = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1';
                 const suspiciousGhostData = movementCount > 0 && (
                     (productCapital <= 0 && nonZeroAccounts === 0 && thirdParties.length === 0)
                     || (isDemoSource && !demoAllowed)
-                ) && !(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1');
+                    || (!demoAllowed && !preserveExisting)
+                ) && !alreadyAutocleaned;
 
                 if (suspiciousGhostData) {
                     try {
-                        console.warn(`[JET] Detectado posible estado fantasma de backend (movimientos=${movementCount}). Ejecutando auto-limpieza.`);
+                        console.warn(`[JET] Detectado backend precargado al iniciar (movimientos=${movementCount}, source=${backendSource || 'N/D'}). Ejecutando auto-limpieza.`);
                         await apiClient.post('/system/reset-runtime-data', {});
+                        bootstrapAutoCleanInfo = { detectedMovements: movementCount, backendSource: backendSource || null, at: new Date().toISOString() };
                         if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-autoclean-done', '1');
                         const cleanData = await apiClient.get('/system/frontend-state');
                         state = cleanData && cleanData.state ? cleanData.state : state;
@@ -2798,6 +2802,7 @@ calculateReports(yearMovs);
         let backendSyncInFlight = false;
         const backendAutoSyncedYears = new Set();
         const backendSyncDiagnostics = new Map();
+        let bootstrapAutoCleanInfo = null;
 
 
         function movementSignature(m) {
@@ -2929,6 +2934,27 @@ calculateReports(yearMovs);
                 diagnostics.push({
                     code: 'TAX-UI-DIAG-109',
                     message: 'Se detectó fuente demo en backend. Esto explica valores precargados en 2026.'
+                });
+            }
+
+            if (bootstrapAutoCleanInfo && Number(bootstrapAutoCleanInfo.detectedMovements || 0) > 0) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-112',
+                    message: `Se ejecutó auto-limpieza al iniciar: ${bootstrapAutoCleanInfo.detectedMovements} movimientos detectados en backend (${bootstrapAutoCleanInfo.backendSource || 'source desconocido'}).`
+                });
+            }
+
+            if (Number(health?.stats?.totalMovements || 0) > 0 && !String(health?.stats?.backendSource || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-110',
+                    message: 'Hay movimientos en backend pero sin metadata source. Revisa cargas previas/manuales en la base de datos.'
+                });
+            }
+
+            if (String(health?.stats?.minMovementDate || '').trim() || String(health?.stats?.maxMovementDate || '').trim()) {
+                diagnostics.push({
+                    code: 'TAX-UI-DIAG-111',
+                    message: `Huella temporal backend: ${health?.stats?.minMovementDate || 'N/D'} → ${health?.stats?.maxMovementDate || 'N/D'}.`
                 });
             }
 
