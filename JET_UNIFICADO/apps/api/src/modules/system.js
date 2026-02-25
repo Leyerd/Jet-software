@@ -126,16 +126,31 @@ async function getFrontendState(_req, res) {
     const state = await withPgClient(async (client) => {
       await client.query("CREATE TABLE IF NOT EXISTS usuarios (id BIGSERIAL PRIMARY KEY, nombre TEXT, email TEXT UNIQUE, rol TEXT, password_hash TEXT, creado_en TIMESTAMP DEFAULT NOW())");
       await client.query("CREATE TABLE IF NOT EXISTS sesiones (id BIGSERIAL PRIMARY KEY, usuario_id BIGINT, token TEXT UNIQUE, creado_en TIMESTAMP DEFAULT NOW(), expira_en TIMESTAMP, revocada BOOLEAN DEFAULT FALSE, revocada_en TIMESTAMP, revocada_por TEXT)");
-      const [productsRs, movementsRs, taxRs, sessionRs] = await Promise.all([
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS runtime_fragments (
+          key TEXT PRIMARY KEY,
+          value JSONB NOT NULL,
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      const [productsRs, movementsRs, taxRs, sessionRs, metaRs] = await Promise.all([
         client.query('SELECT id, sku, nombre, categoria, costo_promedio AS "costoPromedio", stock FROM productos ORDER BY id ASC LIMIT 5000'),
         client.query('SELECT id, fecha, tipo, descripcion, total, neto, iva FROM movimientos ORDER BY fecha ASC, id ASC LIMIT 10000'),
         client.query('SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate" FROM tax_config ORDER BY id DESC LIMIT 1'),
-        client.query("SELECT s.token FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE u.email = 'dueno@demo.cl' AND s.revocada IS DISTINCT FROM TRUE ORDER BY s.creado_en DESC LIMIT 1")
+        client.query("SELECT s.token FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE u.email = 'dueno@demo.cl' AND s.revocada IS DISTINCT FROM TRUE ORDER BY s.creado_en DESC LIMIT 1"),
+        client.query("SELECT key, value FROM runtime_fragments WHERE key IN ('source','migratedAt')")
       ]);
       const taxConfig = taxRs.rows[0] || { year: new Date().getFullYear(), regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
       const catalog = getCatalog(taxConfig.year, taxConfig.regime);
+      const runtimeMeta = { source: null, migratedAt: null };
+      for (const row of metaRs.rows || []) {
+        if (row.key === 'source') runtimeMeta.source = typeof row.value === 'string' ? row.value : (row.value ?? null);
+        if (row.key === 'migratedAt') runtimeMeta.migratedAt = typeof row.value === 'string' ? row.value : (row.value ?? null);
+      }
       return {
         backendFirst: true,
+        source: runtimeMeta.source,
+        migratedAt: runtimeMeta.migratedAt,
         products: productsRs.rows,
         movements: movementsRs.rows,
         accounts: (await client.query('SELECT id, codigo, nombre, tipo, saldo FROM cuentas ORDER BY id ASC LIMIT 1000')).rows.map((c) => ({ id: c.codigo || String(c.id), nombre: c.nombre, tipo: c.tipo, saldo: Number(c.saldo || 0) })),
@@ -161,6 +176,8 @@ async function getFrontendState(_req, res) {
     ok: true,
     state: {
       backendFirst: true,
+      source: store.source || null,
+      migratedAt: store.migratedAt || null,
       products: store.productos || [],
       movements: store.movimientos || [],
       accounts: store.cuentas || [],

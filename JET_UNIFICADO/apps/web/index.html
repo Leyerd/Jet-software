@@ -1647,11 +1647,13 @@
                 const accounts = Array.isArray(state.accounts) ? state.accounts : [];
                 const productCapital = products.reduce((acc, p) => acc + (Number(p?.stock || 0) * Number(p?.costoPromedio || p?.costo_promedio || 0)), 0);
                 const nonZeroAccounts = accounts.filter((a) => Math.abs(Number(a?.saldo || 0)) > 0).length;
-                const suspiciousGhostData = movementCount > 0
-                    && productCapital <= 0
-                    && nonZeroAccounts === 0
-                    && thirdParties.length === 0
-                    && !(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1');
+                const backendSource = String(state?.source || '').toLowerCase();
+                const isDemoSource = backendSource.includes('seed-demo') || backendSource.includes('demo');
+                const demoAllowed = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-demo-enabled') === '1';
+                const suspiciousGhostData = movementCount > 0 && (
+                    (productCapital <= 0 && nonZeroAccounts === 0 && thirdParties.length === 0)
+                    || (isDemoSource && !demoAllowed)
+                ) && !(typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1');
 
                 if (suspiciousGhostData) {
                     try {
@@ -1931,6 +1933,7 @@
                 alert(`No se pudo cargar la base demo: ${lastError ? lastError.message : 'error desconocido'}\nTip: ejecuta 'docker compose up -d --build' para tomar el backend actualizado.`);
                 return;
             }
+            if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('jet-demo-enabled', '1');
             await bootstrapFromBackend();
             taxSummaryCache.clear();
             backendAutoSyncedYears.clear();
@@ -1953,7 +1956,7 @@
             if (!confirm('¿Reiniciar todo? Se perderán datos.')) return;
             try {
                 await apiClient.post('/system/reset-runtime-data', {});
-                if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('jet-autoclean-done');
+                if (typeof sessionStorage !== 'undefined') { sessionStorage.removeItem('jet-autoclean-done'); sessionStorage.removeItem('jet-demo-enabled'); }
                 taxSummaryCache.clear();
                 backendAutoSyncedYears.clear();
                 backendSyncDiagnostics.clear();
