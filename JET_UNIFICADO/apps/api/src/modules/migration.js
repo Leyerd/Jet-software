@@ -133,6 +133,8 @@ async function syncFrontendMovements(req, res) {
   const body = await parseBody(req);
   const year = Number(body?.year || new Date().getFullYear());
   const incoming = Array.isArray(body?.movements) ? body.movements : [];
+  const incomingCashflows = Array.isArray(body?.cashflows) ? body.cashflows : [];
+  const incomingAccounts = Array.isArray(body?.accounts) ? body.accounts : [];
   const normalized = incoming
     .map(normalizeMovementPayload)
     .filter((m) => m.fecha && m.tipo && new Date(m.fecha).getFullYear() === year);
@@ -144,6 +146,7 @@ async function syncFrontendMovements(req, res) {
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS costo_mercaderia NUMERIC(18,2) DEFAULT 0');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS accepted BOOLEAN DEFAULT TRUE');
       await client.query('ALTER TABLE movimientos ADD COLUMN IF NOT EXISTS document_ref TEXT');
+      await client.query('CREATE TABLE IF NOT EXISTS runtime_fragments (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())');
       const rs = await client.query(`SELECT fecha, tipo, descripcion, total, neto FROM movimientos WHERE EXTRACT(YEAR FROM fecha) = $1`, [year]);
       const existing = new Set((rs.rows || []).map(movementKey));
       let imported = 0;
@@ -159,7 +162,23 @@ async function syncFrontendMovements(req, res) {
         existing.add(key);
         imported += 1;
       }
-      return { imported, skipped, received: normalized.length };
+      if (incomingCashflows.length) {
+        await client.query(
+          `INSERT INTO runtime_fragments (key, value, updated_at)
+           VALUES ('flujoCaja', $1::jsonb, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [JSON.stringify(incomingCashflows)]
+        );
+      }
+      if (incomingAccounts.length) {
+        await client.query(
+          `INSERT INTO runtime_fragments (key, value, updated_at)
+           VALUES ('cuentas', $1::jsonb, NOW())
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+          [JSON.stringify(incomingAccounts)]
+        );
+      }
+      return { imported, skipped, received: normalized.length, syncedCashflows: incomingCashflows.length, syncedAccounts: incomingAccounts.length };
     });
     await appendAuditLog('migration.frontend_movements.sync', { year, ...result }, auth.user.email);
     return sendJson(res, 200, { ok: true, year, mode: 'postgres', ...result });
@@ -176,9 +195,11 @@ async function syncFrontendMovements(req, res) {
     existing.add(key);
     imported += 1;
   }
+  if (incomingCashflows.length) state.flujoCaja = incomingCashflows;
+  if (incomingAccounts.length) state.cuentas = incomingAccounts;
   await writeStore(state);
-  await appendAudit('migration.frontend_movements.sync', { year, received: normalized.length, imported, skipped }, auth.user.email);
-  return sendJson(res, 200, { ok: true, year, mode: 'file', received: normalized.length, imported, skipped });
+  await appendAudit('migration.frontend_movements.sync', { year, received: normalized.length, imported, skipped, syncedCashflows: incomingCashflows.length, syncedAccounts: incomingAccounts.length }, auth.user.email);
+  return sendJson(res, 200, { ok: true, year, mode: 'file', received: normalized.length, imported, skipped, syncedCashflows: incomingCashflows.length, syncedAccounts: incomingAccounts.length });
 }
 
 module.exports = { importJson, getSummary, syncFrontendMovements };

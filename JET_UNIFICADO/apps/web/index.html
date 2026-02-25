@@ -1685,6 +1685,9 @@
                 ]) : db.cuentas;
                 db.terceros = Array.isArray(state.thirdParties) ? state.thirdParties : db.terceros;
                 db.flujoCaja = Array.isArray(state.cashflows) ? state.cashflows : [];
+                if ((!db.flujoCaja || db.flujoCaja.length === 0) && Array.isArray(db.movimientos) && db.movimientos.length > 0) {
+                    rebuildOperationalLedgerFromMovements();
+                }
                 if (!db.config) db.config = {};
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
@@ -1717,6 +1720,39 @@
         function safeSetText(id, text) { const el = document.getElementById(id); if (el) el.innerText = text; }
         function safeSetHTML(id, html) { const el = document.getElementById(id); if (el) el.innerHTML = html; }
         function safeCreateIcons() { if (typeof lucide !== 'undefined') lucide.createIcons(); else setTimeout(safeCreateIcons, 100); }
+
+        function rebuildOperationalLedgerFromMovements() {
+            if (!Array.isArray(db.cuentas) || db.cuentas.length === 0) {
+                db.cuentas = [
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 }
+                ];
+            }
+            db.cuentas.forEach((c) => { c.saldo = 0; });
+            const ordered = (db.movimientos || []).slice().sort((a, b) => {
+                const da = parseMovementDateUi(a?.fecha);
+                const dbb = parseMovementDateUi(b?.fecha);
+                return (da ? da.getTime() : 0) - (dbb ? dbb.getTime() : 0);
+            });
+            db.flujoCaja = [];
+            for (const m of ordered) {
+                const tipo = String(m?.tipo || '').toUpperCase();
+                const total = Number(m?.total || 0);
+                if (total <= 0) continue;
+                const cuentaId = m?.cuentaId || (tipo === 'VENTA' ? 'mp' : 'banco');
+                const cuenta = db.cuentas.find((c) => c.id === cuentaId);
+                if (!cuenta) continue;
+                if (tipo === 'VENTA') {
+                    cuenta.saldo += total;
+                    db.flujoCaja.push({ id: `AUTO-${m.id}-IN`, fecha: m.fecha, cuentaId, concepto: m.desc || m.descripcion || 'Venta', monto: total, tipoMovimiento: 'INGRESO', refId: m.id, saldoParcial: cuenta.saldo });
+                } else if (['IMPORTACION', 'GASTO_LOCAL', 'HONORARIOS', 'RETIRO', 'COMISION_MARKETPLACE'].includes(tipo)) {
+                    cuenta.saldo -= total;
+                    db.flujoCaja.push({ id: `AUTO-${m.id}-OUT`, fecha: m.fecha, cuentaId, concepto: m.desc || m.descripcion || tipo, monto: total, tipoMovimiento: 'EGRESO', refId: m.id, saldoParcial: cuenta.saldo });
+                }
+            }
+        }
 
         document.addEventListener('DOMContentLoaded', async () => {
             // En modo backend-first, no se usa localStorage como fuente principal de datos.
@@ -1800,6 +1836,7 @@
                 // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
                 rebuildAsientos();
                 render();
+                syncFrontendMovementsToBackend({ silent: true, yearOverride: db.config.year }).catch(() => null);
             } catch (err) {
                 console.error('Error al refrescar UI después de guardar', err);
                 // No bloquear el flujo de usuario por fallos de renderizado puntual.
@@ -2828,7 +2865,12 @@ calculateReports(yearMovs);
                     const dt = parseMovementDateUi(m?.fecha);
                     return !!dt && dt.getFullYear() === year;
                 });
-                const payload = await apiClient.post('/migration/sync-frontend-movements', { year, movements: candidates });
+                const payload = await apiClient.post('/migration/sync-frontend-movements', {
+                    year,
+                    movements: candidates,
+                    cashflows: Array.isArray(db.flujoCaja) ? db.flujoCaja : [],
+                    accounts: Array.isArray(db.cuentas) ? db.cuentas : []
+                });
                 const imported = Number(payload?.imported || 0);
                 const skipped = Number(payload?.skipped || 0);
                 const failed = 0;
