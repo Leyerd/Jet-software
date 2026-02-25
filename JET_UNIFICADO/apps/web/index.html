@@ -1653,11 +1653,14 @@
                 const preserveExisting = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-preserve-existing-data') === '1';
                 const alreadyAutocleaned = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('jet-autoclean-done') === '1';
                 const enforceEmptyStartup = !demoAllowed && !preserveExisting;
-                const suspiciousGhostData = movementCount > 0 && (
+                const suspiciousPattern = movementCount > 0 && (
                     (productCapital <= 0 && nonZeroAccounts === 0 && thirdParties.length === 0)
                     || (isDemoSource && !demoAllowed)
                     || enforceEmptyStartup
-                ) && !alreadyAutocleaned;
+                );
+                // Si todavía hay movimientos en backend, reintentar limpieza aunque exista marca previa de auto-clean.
+                // Evita quedarse bloqueado por una marca stale en sessionStorage.
+                const suspiciousGhostData = suspiciousPattern && (!alreadyAutocleaned || movementCount > 0);
 
                 if (suspiciousGhostData) {
                     try {
@@ -2942,7 +2945,7 @@ calculateReports(yearMovs);
             if (bootstrapAutoCleanInfo && Number(bootstrapAutoCleanInfo.detectedMovements || 0) > 0) {
                 diagnostics.push({
                     code: 'TAX-UI-DIAG-112',
-                    message: `Se ejecutó auto-limpieza al iniciar: ${bootstrapAutoCleanInfo.detectedMovements} movimientos detectados en backend (${bootstrapAutoCleanInfo.backendSource || 'source desconocido'}).`
+                    message: `Se ejecutó auto-limpieza al iniciar: ${bootstrapAutoCleanInfo.detectedMovements} movimientos detectados en backend (${bootstrapAutoCleanInfo.backendSource || 'source desconocido'}). Si reaparecen, existe un flujo que vuelve a insertarlos.`
                 });
             }
 
