@@ -138,14 +138,15 @@ async function getFrontendState(_req, res) {
         client.query('SELECT id, fecha, tipo, descripcion, total, neto, iva FROM movimientos ORDER BY fecha ASC, id ASC LIMIT 10000'),
         client.query('SELECT anio AS year, regimen AS regime, ppm_rate AS "ppmRate", iva_rate AS "ivaRate", ret_rate AS "retentionRate" FROM tax_config ORDER BY id DESC LIMIT 1'),
         client.query("SELECT s.token FROM sesiones s JOIN usuarios u ON u.id = s.usuario_id WHERE u.email = 'dueno@demo.cl' AND s.revocada IS DISTINCT FROM TRUE ORDER BY s.creado_en DESC LIMIT 1"),
-        client.query("SELECT key, value FROM runtime_fragments WHERE key IN ('source','migratedAt')")
+        client.query("SELECT key, value FROM runtime_fragments WHERE key IN ('source','migratedAt','flujoCaja')")
       ]);
       const taxConfig = taxRs.rows[0] || { year: new Date().getFullYear(), regime: '14D8', ppmRate: 0.2, ivaRate: 0.19, retentionRate: 14.5 };
       const catalog = getCatalog(taxConfig.year, taxConfig.regime);
-      const runtimeMeta = { source: null, migratedAt: null };
+      const runtimeMeta = { source: null, migratedAt: null, cashflows: [] };
       for (const row of metaRs.rows || []) {
         if (row.key === 'source') runtimeMeta.source = typeof row.value === 'string' ? row.value : (row.value ?? null);
         if (row.key === 'migratedAt') runtimeMeta.migratedAt = typeof row.value === 'string' ? row.value : (row.value ?? null);
+        if (row.key === 'flujoCaja') runtimeMeta.cashflows = Array.isArray(row.value) ? row.value : [];
       }
       return {
         backendFirst: true,
@@ -154,6 +155,7 @@ async function getFrontendState(_req, res) {
         products: productsRs.rows,
         movements: movementsRs.rows,
         accounts: (await client.query('SELECT id, codigo, nombre, tipo, saldo FROM cuentas ORDER BY id ASC LIMIT 1000')).rows.map((c) => ({ id: c.codigo || String(c.id), nombre: c.nombre, tipo: c.tipo, saldo: Number(c.saldo || 0) })),
+        cashflows: runtimeMeta.cashflows,
         thirdParties: (await client.query('SELECT id, rut, nombre, tipo FROM terceros ORDER BY id ASC LIMIT 2000')).rows.map((t) => ({ id: t.rut || String(t.id), rut: t.rut, nombre: t.nombre, tipo: t.tipo })),
         taxConfig,
         defaults: {
@@ -182,6 +184,7 @@ async function getFrontendState(_req, res) {
       movements: store.movimientos || [],
       accounts: store.cuentas || [],
       thirdParties: store.terceros || [],
+      cashflows: store.flujoCaja || [],
       taxConfig,
       defaults: {
         regime: '14D8',

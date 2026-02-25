@@ -1668,8 +1668,14 @@
                 }
                 db.productos = Array.isArray(state.products) ? state.products : db.productos;
                 db.movimientos = Array.isArray(state.movements) ? state.movements : db.movimientos;
-                db.cuentas = Array.isArray(state.accounts) && state.accounts.length ? state.accounts : db.cuentas;
-                db.terceros = Array.isArray(state.thirdParties) && state.thirdParties.length ? state.thirdParties : db.terceros;
+                db.cuentas = Array.isArray(state.accounts) ? (state.accounts.length ? state.accounts : [
+                    { id: 'banco', nombre: 'Banco Estado (Empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'banchile', nombre: 'Banco Chile (empresa)', tipo: 'banco', saldo: 0 },
+                    { id: 'mp', nombre: 'Mercado Pago', tipo: 'fintech', saldo: 0 },
+                    { id: 'caja', nombre: 'Efectivo', tipo: 'efectivo', saldo: 0 }
+                ]) : db.cuentas;
+                db.terceros = Array.isArray(state.thirdParties) ? state.thirdParties : db.terceros;
+                db.flujoCaja = Array.isArray(state.cashflows) ? state.cashflows : [];
                 if (!db.config) db.config = {};
                 db.config.regimen = (state.taxConfig && state.taxConfig.regime) || (state.defaults && state.defaults.regime) || '14D8';
                 db.config.year = (state.taxConfig && state.taxConfig.year) || (state.defaults && state.defaults.year) || db.config.year;
