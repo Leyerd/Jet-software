@@ -233,6 +233,51 @@ async function loadDemoData(_req, res) {
   let demoAuthToken = null;
 
   if (isPostgresMode()) {
+    await withPgClient(async (client) => {
+      await client.query('BEGIN');
+      try {
+        await client.query('CREATE TABLE IF NOT EXISTS productos (id BIGSERIAL PRIMARY KEY, sku TEXT, nombre TEXT, categoria TEXT, costo_promedio NUMERIC(18,2) DEFAULT 0, stock NUMERIC(18,2) DEFAULT 0)');
+        await client.query('CREATE TABLE IF NOT EXISTS movimientos (id BIGSERIAL PRIMARY KEY, fecha TEXT, tipo TEXT, descripcion TEXT, total NUMERIC(18,2) DEFAULT 0, neto NUMERIC(18,2) DEFAULT 0, iva NUMERIC(18,2) DEFAULT 0, producto_id BIGINT, cantidad NUMERIC(18,2) DEFAULT 0, costo_mercaderia NUMERIC(18,2) DEFAULT 0, retention NUMERIC(18,2) DEFAULT 0, accepted BOOLEAN DEFAULT TRUE, cuenta_id TEXT, n_doc TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS terceros (id BIGSERIAL PRIMARY KEY, rut TEXT, nombre TEXT, tipo TEXT)');
+        await client.query('CREATE TABLE IF NOT EXISTS cuentas (id BIGSERIAL PRIMARY KEY, codigo TEXT, nombre TEXT, tipo TEXT, saldo NUMERIC(18,2) DEFAULT 0)');
+        await client.query('TRUNCATE TABLE movimientos, productos, terceros, cuentas RESTART IDENTITY CASCADE');
+
+        for (const p of demo.state.productos || []) {
+          await client.query('INSERT INTO productos (sku, nombre, categoria, costo_promedio, stock) VALUES ($1,$2,$3,$4,$5)', [p.sku || null, p.nombre || null, p.categoria || null, Number(p.costoPromedio || p.costo_promedio || 0), Number(p.stock || 0)]);
+        }
+        for (const m of demo.state.movimientos || []) {
+          await client.query(
+            `INSERT INTO movimientos (fecha, tipo, descripcion, total, neto, iva, producto_id, cantidad, costo_mercaderia, retention, accepted, cuenta_id, n_doc)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [
+              m.fecha || null,
+              m.tipo || null,
+              m.descripcion || m.desc || null,
+              Number(m.total || 0),
+              Number(m.neto || 0),
+              Number(m.iva || 0),
+              m.prodId ? Number(m.prodId) : null,
+              Number(m.cant || 0),
+              Number(m.costoMercaderia || 0),
+              Number(m.retention || 0),
+              m.accepted === false ? false : true,
+              m.cuentaId || null,
+              m.nDoc || null
+            ]
+          );
+        }
+        for (const t of demo.state.terceros || []) {
+          await client.query('INSERT INTO terceros (rut, nombre, tipo) VALUES ($1,$2,$3)', [t.rut || null, t.nombre || null, t.tipo || null]);
+        }
+        for (const c of demo.state.cuentas || []) {
+          await client.query('INSERT INTO cuentas (codigo, nombre, tipo, saldo) VALUES ($1,$2,$3,$4)', [c.id || c.codigo || null, c.nombre || null, c.tipo || null, Number(c.saldo || 0)]);
+        }
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      }
+    });
     await writeStore(demo.state);
     demoAuthToken = await ensureDemoSessionInPostgres();
   } else {

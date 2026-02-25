@@ -1,5 +1,7 @@
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 const { route } = require('./src/routes');
 const { mode, readStore, writeStore } = require('./src/lib/store');
 const { withPgClient } = require('./src/lib/postgresRepo');
@@ -7,6 +9,8 @@ const { runWithRequestContext } = require('./src/lib/requestContext');
 const { recordRequest } = require('./src/modules/observability');
 
 const PORT = process.env.PORT || 4000;
+const BOOT_EMPTY_MARKER_FILE = path.join(__dirname, 'data', '.startup-empty-initialized');
+const BOOT_EMPTY_MARKER_KEY = 'startupEmptyInitialized';
 
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -32,8 +36,22 @@ const server = http.createServer((req, res) => {
 });
 
 async function forceEmptyRuntimeAtBoot() {
-  const enabled = String(process.env.JET_START_EMPTY_ON_BOOT || '1') !== '0';
-  if (!enabled) return;
+  const policy = String(process.env.JET_START_EMPTY_ON_BOOT || 'once').trim().toLowerCase();
+  if (policy === '0' || policy === 'false' || policy === 'off' || policy === 'disabled') return;
+  const runAlways = policy === 'always';
+
+  if (!runAlways) {
+    if (mode() === 'postgres') {
+      const alreadyInitialized = await withPgClient(async (client) => {
+        await client.query('CREATE TABLE IF NOT EXISTS runtime_fragments (key TEXT PRIMARY KEY, value JSONB NOT NULL, updated_at TIMESTAMP DEFAULT NOW())');
+        const rs = await client.query('SELECT value FROM runtime_fragments WHERE key = $1 LIMIT 1', [BOOT_EMPTY_MARKER_KEY]);
+        return rs.rows.length && rs.rows[0].value === true;
+      });
+      if (alreadyInitialized) return;
+    } else if (fs.existsSync(BOOT_EMPTY_MARKER_FILE)) {
+      return;
+    }
+  }
 
   if (mode() === 'postgres') {
     await withPgClient(async (client) => {
@@ -45,6 +63,12 @@ async function forceEmptyRuntimeAtBoot() {
       await client.query('TRUNCATE TABLE movimientos, productos, terceros, cuentas RESTART IDENTITY CASCADE');
       await client.query("DELETE FROM runtime_fragments WHERE key IN ('movimientos','productos','terceros','cuentas','flujoCaja','asientos','asientoLineas','auditLog','source','migratedAt')");
       await client.query("INSERT INTO runtime_fragments (key, value, updated_at) VALUES ('movimientos','[]'::jsonb,NOW()),('productos','[]'::jsonb,NOW()),('terceros','[]'::jsonb,NOW()),('cuentas','[]'::jsonb,NOW()),('flujoCaja','[]'::jsonb,NOW()),('asientos','[]'::jsonb,NOW()),('asientoLineas','[]'::jsonb,NOW()),('auditLog','[]'::jsonb,NOW()),('source','null'::jsonb,NOW()),('migratedAt','null'::jsonb,NOW()) ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=NOW()");
+      await client.query(
+        `INSERT INTO runtime_fragments (key, value, updated_at)
+         VALUES ($1, 'true'::jsonb, NOW())
+         ON CONFLICT (key) DO UPDATE SET value = 'true'::jsonb, updated_at = NOW()`,
+        [BOOT_EMPTY_MARKER_KEY]
+      );
     });
     console.log('[JET] Runtime backend vaciado al arranque (Postgres).');
     return;
@@ -62,6 +86,8 @@ async function forceEmptyRuntimeAtBoot() {
   state.source = null;
   state.migratedAt = null;
   await writeStore(state);
+  fs.mkdirSync(path.dirname(BOOT_EMPTY_MARKER_FILE), { recursive: true });
+  fs.writeFileSync(BOOT_EMPTY_MARKER_FILE, new Date().toISOString());
   console.log('[JET] Runtime backend vaciado al arranque (file-store).');
 }
 
