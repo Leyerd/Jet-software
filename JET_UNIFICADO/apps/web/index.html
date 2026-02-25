@@ -1770,6 +1770,8 @@
         function save() {
             try {
                 if (typeof taxSummaryCache !== 'undefined' && taxSummaryCache?.clear) taxSummaryCache.clear();
+                if (typeof backendAutoSyncedYears !== 'undefined' && backendAutoSyncedYears?.clear) backendAutoSyncedYears.clear();
+                if (typeof backendSyncDiagnostics !== 'undefined' && backendSyncDiagnostics?.clear) backendSyncDiagnostics.clear();
                 // Recalcula asientos contables en memoria (sin localStorage como fuente de verdad).
                 rebuildAsientos();
                 render();
@@ -3791,7 +3793,13 @@ calculateReports(yearMovs);
             const flow = db.flujoCaja.find(f => f.refId == movId);
             if (flow && flow.cuentaId) return flow.cuentaId;
             const mov = db.movimientos.find(m => m.id == movId);
-            return mov && mov.cuentaId ? mov.cuentaId : null;
+            if (mov && mov.cuentaId) return mov.cuentaId;
+            if (!mov) return null;
+            const tipo = String(mov.tipo || '').toUpperCase();
+            if (tipo === 'VENTA') return 'mp';
+            if (tipo === 'RETIRO') return 'banco';
+            if (['IMPORTACION', 'GASTO_LOCAL', 'HONORARIOS', 'COMISION_MARKETPLACE'].includes(tipo)) return 'banco';
+            return 'banco';
         }
 
         // Reconstruir asientos contables a partir de los movimientos y flujos existentes
